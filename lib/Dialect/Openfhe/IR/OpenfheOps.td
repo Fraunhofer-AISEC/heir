@@ -75,6 +75,8 @@ def GenParamsOp : Openfhe_Op<"gen_params"> {
   let arguments = (ins
     I64Attr:$mulDepth,
     I64Attr:$plainMod,
+    I64Attr:$firstModSize,
+    I64Attr:$scalingModSize,
     BoolAttr:$insecure
   );
   let results = (outs Openfhe_CCParams:$params);

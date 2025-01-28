@@ -737,11 +737,20 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   auto paramsName = variableNames->getNameForValue(op.getResult());
   int64_t mulDepth = op.getMulDepthAttr().getValue().getSExtValue();
   int64_t plainMod = op.getPlainModAttr().getValue().getSExtValue();
+  int64_t firstModSize = op.getFirstModSizeAttr().getValue().getSExtValue();
+  int64_t scalingModSize = op.getScalingModSizeAttr().getValue().getSExtValue();
 
   os << "CCParamsT " << paramsName << ";\n";
   os << paramsName << ".SetMultiplicativeDepth(" << mulDepth << ");\n";
   if (plainMod != 0) {
-    os << paramsName << ".SetPlaintextModulus(" << plainMod << ");\n";
+    os << paramsName << ".SetPlaintextModulus(65537);\n";
+  }
+  if (scalingModSize != 0) {
+    if (firstModSize != 0) {
+      os << paramsName << ".SetFirstModSize(" << firstModSize << ");\n";
+    }
+    os << paramsName << ".SetScalingModSize(" << scalingModSize << ");\n";
+    os << paramsName << ".SetScalingTechnique(FIXEDMANUAL);\n";
   }
   if (op.getInsecure()) {
     os << paramsName << ".SetSecurityLevel(lbcrypto::HEStd_NotSet);\n";

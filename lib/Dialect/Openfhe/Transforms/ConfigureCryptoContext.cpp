@@ -6,6 +6,7 @@
 #include <string>
 
 #include "lib/Dialect/LWE/IR/LWETypes.h"
+#include "lib/Dialect/Mgmt/IR/MgmtAttributes.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
 #include "lib/Dialect/Openfhe/IR/OpenfheOps.h"
 #include "lib/Dialect/Openfhe/IR/OpenfheTypes.h"
@@ -98,9 +99,19 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     }
   }
 
+  int64_t scalingModSize = 0;
+  int64_t firstModSize = 0;
+  if (auto openfheParamsAttr = op->getAttrOfType<mgmt::OpenfheParamsAttr>(
+          mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {
+    firstModSize = openfheParamsAttr.getScalingModSize();
+    scalingModSize = openfheParamsAttr.getFirstModSize();
+    // remove the attribute after reading
+    op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
+  }
+
   Type openfheParamsType = openfhe::CCParamsType::get(builder.getContext());
   Value ccParams = builder.create<openfhe::GenParamsOp>(
-      openfheParamsType, mulDepth, plainMod, insecure);
+      openfheParamsType, mulDepth, plainMod, firstModSize, scalingModSize, insecure);
   Value cryptoContext = builder.create<openfhe::GenContextOp>(
       openfheContextType, ccParams,
       BoolAttr::get(builder.getContext(), hasBootstrapOp));

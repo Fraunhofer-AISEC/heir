@@ -19,8 +19,11 @@ def Mgmt_Dialect : Dialect {
     /// Name of the attribute holding MgmtAttr
     constexpr const static ::llvm::StringLiteral
         kArgMgmtAttrName = "mgmt.mgmt";
-  }];
 
+    /// Name of the attribute holding OpenFHE parameters
+    constexpr const static ::llvm::StringLiteral
+        kArgOpenfheParamsAttrName = "mgmt.openfhe_params";
+  }];
 
   let useDefaultAttributePrinterParser = 1;
 }
