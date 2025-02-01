@@ -52,6 +52,7 @@
 #include "lib/Pipelines/ArithmeticPipelineRegistration.h"
 #include "lib/Pipelines/PipelineRegistration.h"
 #include "lib/Transforms/AnnotateSecretness/AnnotateSecretness.h"
+#include "lib/Transforms/AnnotateParameters/AnnotateParameters.h"
 #include "lib/Transforms/ApplyFolders/ApplyFolders.h"
 #include "lib/Transforms/ConvertIfToSelect/ConvertIfToSelect.h"
 #include "lib/Transforms/ConvertSecretExtractToStaticExtract/ConvertSecretExtractToStaticExtract.h"
@@ -278,6 +279,7 @@ int main(int argc, char **argv) {
   registerOptimizeRelinearizationPasses();
   registerLinalgCanonicalizationsPasses();
   registerTensorToScalarsPasses();
+  registerAnnotateParametersPasses();
   // Register yosys optimizer pipeline if configured.
 #ifndef HEIR_NO_YOSYS
 #ifndef HEIR_ABC_BINARY

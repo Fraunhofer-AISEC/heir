@@ -90,6 +90,7 @@ cc_binary(
         "@heir//lib/Pipelines:ArithmeticPipelineRegistration",
         "@heir//lib/Pipelines:PipelineRegistration",
         "@heir//lib/Transforms/AnnotateSecretness",
+        "@heir//lib/Transforms/AnnotateParameters",
         "@heir//lib/Transforms/ApplyFolders",
         "@heir//lib/Transforms/ConvertIfToSelect",
         "@heir//lib/Transforms/ConvertSecretExtractToStaticExtract",

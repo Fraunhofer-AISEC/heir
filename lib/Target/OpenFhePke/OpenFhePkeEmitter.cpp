@@ -751,6 +751,8 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
     }
     os << paramsName << ".SetScalingModSize(" << scalingModSize << ");\n";
     os << paramsName << ".SetScalingTechnique(FIXEDMANUAL);\n";
+    os << paramsName << ".SetRingDim(8192);\n";
+    os << paramsName << ".SetSecurityLevel(lbcrypto::HEStd_NotSet);\n";
   }
   if (op.getInsecure()) {
     os << paramsName << ".SetSecurityLevel(lbcrypto::HEStd_NotSet);\n";

@@ -2,6 +2,7 @@
 #define LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
 
 
+#include <cstdint>
 #include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
 #include "mlir/include/mlir/Analysis/DataFlow/SparseAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/Diagnostics.h"  // from @llvm-project
@@ -89,7 +90,7 @@ class OperationCount {
 
  private:
   bool initialized;
-  int addCount;
+  int addCount; // TODO: Maybe rename because it is more of the number of ciphertext
   int keySwitchCount;
 };
 
@@ -113,6 +114,9 @@ class OperationCountAnalysis
     propagateIfChanged(lattice, lattice->join(OperationCount()));
   }
 };
+
+void annotateCountParams(Operation *top, DataFlowSolver *solver,
+                         int ringDimension, int plaintextModulus);
 
 }  // namespace heir
 }  // namespace mlir

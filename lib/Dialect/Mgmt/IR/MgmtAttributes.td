@@ -47,6 +47,7 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
     This attribute is used to store some OpenFHE-specific parameters.
 
     The attribute is a struct with the following fields:
+      - `multiplicativeDepth` : the multiplicative depth
       - `firstModeSize` : the first modulus size
       - `scalingModSize` : the scaling modulus size
 
@@ -54,16 +55,14 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
     will use these parameters to set the corresponding OpenFHE
     parameters.
 
-    It should be populated by --secret-with-mgmt-bgv before
-    going through the secret-to-bgv bgv-to-openfhe pass.
-
     Example:
     ```
-    #openfhe_params = #mgmt.openfhe_params<firstModSize = 17, scalingModSize = 34>
+    #openfhe_params = #mgmt.openfhe_params<firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38>
     ```
   }];
 
   let parameters = (ins
+    "int": $multiplicativeDepth,
     "int": $scalingModSize,
     "int": $firstModSize
   );

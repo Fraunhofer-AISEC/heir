@@ -99,19 +99,25 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     }
   }
 
-  int64_t scalingModSize = 0;
-  int64_t firstModSize = 0;
+  int64_t scalingModSizeAttr = 0;
+  int64_t firstModSizeAttr = 0;
+  int64_t multDepthAttr = 0;
   if (auto openfheParamsAttr = op->getAttrOfType<mgmt::OpenfheParamsAttr>(
           mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {
-    firstModSize = openfheParamsAttr.getScalingModSize();
-    scalingModSize = openfheParamsAttr.getFirstModSize();
+    firstModSizeAttr = openfheParamsAttr.getScalingModSize();
+    scalingModSizeAttr = openfheParamsAttr.getFirstModSize();
+    multDepthAttr = openfheParamsAttr.getMultiplicativeDepth();
     // remove the attribute after reading
     op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
+  }
+  
+  if (multDepthAttr != 0) {
+    mulDepth = multDepthAttr;
   }
 
   Type openfheParamsType = openfhe::CCParamsType::get(builder.getContext());
   Value ccParams = builder.create<openfhe::GenParamsOp>(
-      openfheParamsType, mulDepth, plainMod, firstModSize, scalingModSize, insecure);
+      openfheParamsType, mulDepth, plainMod, firstModSizeAttr, scalingModSizeAttr, insecure);
   Value cryptoContext = builder.create<openfhe::GenContextOp>(
       openfheContextType, ccParams,
       BoolAttr::get(builder.getContext(), hasBootstrapOp));
