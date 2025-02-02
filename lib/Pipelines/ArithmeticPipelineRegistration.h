@@ -34,6 +34,10 @@ struct MlirToRLWEPipelineOptions
       llvm::cl::desc("Modulus switching right before the first multiplication "
                      "(default to false)"),
       llvm::cl::init(false)};
+  PassOptions::Option<bool> insertMgmt{
+      *this, "insert-mgmt",
+      llvm::cl::desc("Insert management operations for the specified scheme"),
+      llvm::cl::init(true)};
 };
 
 struct OpenfheOptions : public PassPipelineOptions<OpenfheOptions> {

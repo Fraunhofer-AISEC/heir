@@ -98,27 +98,29 @@ void mlirToRLWEPipeline(OpPassManager &pm,
                         const RLWEScheme scheme) {
   mlirToSecretArithmeticPipelineBuilder(pm);
 
-  // place mgmt.op and MgmtAttr for BGV
-  // which is required for secret-to-<scheme> lowering
-  switch (scheme) {
-    case RLWEScheme::bgvScheme: {
-      auto secretInsertMgmtBGVOptions = SecretInsertMgmtBGVOptions{};
-      secretInsertMgmtBGVOptions.includeFirstMul =
-          options.modulusSwitchBeforeFirstMul;
-      pm.addPass(createSecretInsertMgmtBGV(secretInsertMgmtBGVOptions));
-      break;
+  if (options.insertMgmt) {
+    // place mgmt.op and MgmtAttr for BGV
+    // which is required for secret-to-<scheme> lowering
+    switch (scheme) {
+      case RLWEScheme::bgvScheme: {
+        auto secretInsertMgmtBGVOptions = SecretInsertMgmtBGVOptions{};
+        secretInsertMgmtBGVOptions.includeFirstMul =
+            options.modulusSwitchBeforeFirstMul;
+        pm.addPass(createSecretInsertMgmtBGV(secretInsertMgmtBGVOptions));
+        break;
+      }
+      case RLWEScheme::ckksScheme: {
+        auto secretInsertMgmtCKKSOptions = SecretInsertMgmtCKKSOptions{};
+        secretInsertMgmtCKKSOptions.includeFirstMul =
+            options.modulusSwitchBeforeFirstMul;
+        secretInsertMgmtCKKSOptions.slotNumber = options.ciphertextDegree;
+        pm.addPass(createSecretInsertMgmtCKKS(secretInsertMgmtCKKSOptions));
+        break;
+      }
+      default:
+        llvm::errs() << "Unsupported RLWE scheme: " << scheme;
+        exit(EXIT_FAILURE);
     }
-    case RLWEScheme::ckksScheme: {
-      auto secretInsertMgmtCKKSOptions = SecretInsertMgmtCKKSOptions{};
-      secretInsertMgmtCKKSOptions.includeFirstMul =
-          options.modulusSwitchBeforeFirstMul;
-      secretInsertMgmtCKKSOptions.slotNumber = options.ciphertextDegree;
-      pm.addPass(createSecretInsertMgmtCKKS(secretInsertMgmtCKKSOptions));
-      break;
-    }
-    default:
-      llvm::errs() << "Unsupported RLWE scheme: " << scheme;
-      exit(EXIT_FAILURE);
   }
 
   // Optimize relinearization at mgmt dialect level
