@@ -136,11 +136,20 @@ static uint64_t findValidFirstModSize(int minModSize, int ringDimension, int pla
 static uint64_t findValidScalingModSize(int minModSize, int firstModSize, int numPrimes, int ringDimension, int plaintextModulus) {
   uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
 
+  lbcrypto::NativeInteger firstModulus = 0;
+  if (firstModSize < minModSize) {
+    firstModulus = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
+  }
+
   while (minModSize < 60) {
     try {
       auto q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
       for (int i = 1; i < numPrimes; i++) {
         q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
+        if (q == firstModulus) {
+          minModSize += 1;
+          continue;
+        }
       }
       return minModSize;
     } catch (lbcrypto::OpenFHEException &e) {
