@@ -163,7 +163,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
                          int ringDimension, int plaintextModulus) {
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
     int maxKeySwitchCount = 0;
-    int maxAddCount = 0;
+    int maxCiphertextCount = 0;
 
     genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
       if (op->getNumResults() == 0) {
@@ -180,7 +180,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       }
 
       maxKeySwitchCount = std::max(maxKeySwitchCount, count.getKeySwitchCount());
-      maxAddCount = std::max(maxAddCount, count.getCiphertextCount());
+      maxCiphertextCount = std::max(maxCiphertextCount, count.getCiphertextCount());
     });
 
     auto log2 = [](double x) { return log(x) / log(2); };
@@ -204,9 +204,6 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto multiplicativeDepth = maxLevel;
     auto numPrimes = multiplicativeDepth + 1;
 
-    auto nRotate = maxKeySwitchCount - 1; // TODO Clear up the OperationCount
-    auto nAdd = maxAddCount;  
-
     // Compute param sizes for HYBRID Key Switching
     auto phi = ringDimension;
     auto beta = pow(2.0, 10); // TODO Replace by value set through developer
@@ -227,8 +224,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
 
     auto vKS = f0 * boundKeySwitch + boundScale;
 
-    auto bOptimal = boundScale + sqrt(boundScale * boundScale + ((nRotate + 1) * vKS));
-    auto pOptimal = 2.0 * (nAdd + 1)  * bOptimal;
+    auto bOptimal = boundScale + sqrt(boundScale * boundScale + (maxKeySwitchCount * vKS));
+    auto pOptimal = 2.0 * maxCiphertextCount * bOptimal;
 
     auto scalingModSize = ceil(log2(pOptimal));
     if (scalingModSize > 60) {
