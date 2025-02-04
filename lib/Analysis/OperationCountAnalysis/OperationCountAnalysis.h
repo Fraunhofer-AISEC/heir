@@ -14,15 +14,15 @@ namespace heir {
 
 class OperationCount {
  public:
-  OperationCount() : initialized(false), addCount(0), keySwitchCount(0) {}
-  explicit OperationCount(int addCount, int keySwitchCount)
-      : initialized(true), addCount(addCount), keySwitchCount(keySwitchCount) {}
+  OperationCount() : initialized(false), ciphertextCount(0), keySwitchCount(0) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount)
+      : initialized(true), ciphertextCount(ciphertextCount), keySwitchCount(keySwitchCount) {}
   
   void countOperation(Operation *op);
 
-  int getAddCount() const {
+  int getCiphertextCount() const {
     assert(isInitialized() && "OperationCount not initialized");
-    return addCount;
+    return ciphertextCount;
   }
 
   int getKeySwitchCount() const {
@@ -32,27 +32,27 @@ class OperationCount {
 
   OperationCount incrementKeySwitch() const {
     assert(isInitialized() && "OperationCount not initialized");
-    return OperationCount(addCount, keySwitchCount + 1);
+    return OperationCount(ciphertextCount, keySwitchCount + 1);
   }
 
   bool isInitialized() const { return initialized; }
 
   bool operator==(const OperationCount &rhs) const {
-    return initialized == rhs.initialized && addCount == rhs.addCount &&
+    return initialized == rhs.initialized && ciphertextCount == rhs.ciphertextCount &&
            keySwitchCount == rhs.keySwitchCount;
   }
 
   OperationCount operator+(const OperationCount &rhs) const {
     assert(isInitialized() && rhs.isInitialized() &&
            "OperationCount not initialized");
-    return OperationCount(addCount + rhs.addCount,
+    return OperationCount(ciphertextCount + rhs.ciphertextCount,
                           keySwitchCount + rhs.keySwitchCount);
   }
 
   OperationCount max(const OperationCount &rhs) const {
     assert(isInitialized() && rhs.isInitialized() &&
            "OperationCount not initialized");
-    return OperationCount(std::max(addCount, rhs.addCount),
+    return OperationCount(std::max(ciphertextCount, rhs.ciphertextCount),
                           std::max(keySwitchCount, rhs.keySwitchCount));
   }
 
@@ -75,7 +75,7 @@ class OperationCount {
 
   void print(llvm::raw_ostream &os) const {
     if (isInitialized()) {
-      os << "OperationCount(addCount=" << addCount
+      os << "OperationCount(ciphertextCount=" << ciphertextCount
          << ", keySwitchCount=" << keySwitchCount << ")";
     } else {
       os << "OperationCount(uninitialized)";
@@ -90,7 +90,8 @@ class OperationCount {
 
  private:
   bool initialized;
-  int addCount; // TODO: Maybe rename because it is more of the number of ciphertext
+  // "Number of ciphertexts with base noise" that flow into the respective value
+  int ciphertextCount;
   int keySwitchCount;
 };
 

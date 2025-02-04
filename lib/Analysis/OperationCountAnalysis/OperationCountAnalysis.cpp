@@ -103,16 +103,12 @@ LogicalResult OperationCountAnalysis::visitOperation(
   return mlir::success();
 }
 
+static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus) {
+  uint64_t cyclOrder = 2 * ringDimension;
+  uint64_t pow2ptm = 1;
 
-// May be changed for the BGV GHS Variant
-uint64_t findValidFirstModSize(int modSize, int rindDimension, int plaintextModulus) {
-  // Schameless copy from OpenFHE
-  uint32_t cyclOrder = 2 * rindDimension;
-  uint32_t ptm = static_cast<uint32_t>(plaintextModulus);
-  uint32_t pow2ptm = 1;  // The largest power of 2 dividing ptm (check
-                      // whether it is larger than cyclOrder or not)
-  while (ptm % 2 == 0) {
-    ptm >>= 1;
+  while (plaintextModulus % 2 == 0) {
+    plaintextModulus >>= 1;
     pow2ptm <<= 1;
   }
 
@@ -120,53 +116,37 @@ uint64_t findValidFirstModSize(int modSize, int rindDimension, int plaintextModu
     pow2ptm = cyclOrder;
   }
 
-  uint64_t modulusOrder = pow2ptm * ptm;
+  return pow2ptm * plaintextModulus;
+}
 
-  while (modSize < 60) {
+static uint64_t findValidFirstModSize(int minModSize, int ringDimension, int plaintextModulus) {
+  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
+
+  while (minModSize < 60) {
     try {
-      lbcrypto::LastPrime<lbcrypto::NativeInteger>(modSize, modulusOrder);
+      lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
+      return minModSize;
     } catch (lbcrypto::OpenFHEException &e) {
-      modSize += 1;
+      minModSize += 1;
     }
-    return modSize;
   }
   return 0;
 }
 
-uint64_t findValidScalingModSize(int modSize, int numPrimes, int ringDimension, int plaintextModulus) {
-  // Schameless copy from OpenFHE
-  uint32_t cyclOrder = 2 * ringDimension;
-  uint32_t ptm = static_cast<uint32_t>(plaintextModulus);
-  uint32_t pow2ptm = 1;  // The largest power of 2 dividing ptm (check
-                         // whether it is larger than cyclOrder or not)
-  std::cerr << "CyclOrder: " << cyclOrder << "\n";
-  std::cerr << "ptm: " << ptm << "\n";
-  std::cerr << "modSize: " << modSize << "\n";
-  std::cerr << "numPrimes: " << numPrimes << "\n";
+static uint64_t findValidScalingModSize(int minModSize, int firstModSize, int numPrimes, int ringDimension, int plaintextModulus) {
+  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
 
-  while (ptm % 2 == 0) {
-    ptm >>= 1;
-    pow2ptm <<= 1;
-  }
-
-  if (pow2ptm < cyclOrder) {
-    pow2ptm = cyclOrder;
-  }
-
-  uint64_t modulusOrder = pow2ptm * ptm;
-
-  while (modSize < 60) {
+  while (minModSize < 60) {
     try {
-      auto q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(modSize, modulusOrder);
-      for (int i = 0; i < numPrimes; i++) {
+      auto q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
+      for (int i = 1; i < numPrimes; i++) {
         q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
       }
-      return modSize;
+      return minModSize;
     } catch (lbcrypto::OpenFHEException &e) {
-      modSize += 1;
+      minModSize += 1;
     }
   }
-
   return 0;
 }
 
@@ -191,7 +171,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       }
 
       maxKeySwitchCount = std::max(maxKeySwitchCount, count.getKeySwitchCount());
-      maxAddCount = std::max(maxAddCount, count.getAddCount());
+      maxAddCount = std::max(maxAddCount, count.getCiphertextCount());
     });
 
     auto log2 = [](double x) { return log(x) / log(2); };
@@ -207,75 +187,61 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         }
         // ensure result is secret
         auto level = solver->lookupState<LevelLattice>(op->getResult(0))
-                        ->getValue()
-                        .getLevel();
+                        ->getValue().getLevel();
         maxLevel = std::max(maxLevel, level);
       });
     });
+
+    auto multiplicativeDepth = maxLevel;
+    auto numPrimes = multiplicativeDepth + 1;
 
     auto nRotate = maxKeySwitchCount - 1; // TODO Clear up the OperationCount
     auto nAdd = maxAddCount;  
 
     // Compute param sizes for HYBRID Key Switching
     auto phi = ringDimension;
-    auto beta = pow(2.0, 10);
-    auto t = 2.0 * plaintextModulus;
-
+    auto beta = pow(2.0, 10); // TODO Replace by value set through developer
+    auto t = plaintextModulus;
     auto D = 6.0;
 
-    auto vKey = 2.0 / 3.0;
+    auto vKey = 2.0 / 3.0; // TODO Make adjustable
     auto vErr = 3.19 * 3.19; // TODO Make adjustable
 
-    // BScale and BClean
-    auto bScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
-    // BKS
-    auto bKS = D * t * phi * sqrt(vErr / 12.0);
+    auto boundScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
+
+    auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
 
     auto K = 100.0;
-    auto P = K * beta * sqrt(log((maxLevel + 1) * pow(2.0, 60)) / log(beta));
+    auto P = K * beta * sqrt(log(numPrimes * pow(2.0, 60)) / log(beta));
 
-    auto f0 = beta * sqrt((maxLevel + 1) * log2(t * phi)) / P;
-    auto f1 = 1.0;
+    auto f0 = beta * sqrt(numPrimes * log2(t * phi)) / P;
 
-    auto vKS = f0 * bKS + f1 * bScale;
+    auto vKS = f0 * boundKeySwitch + boundScale;
 
-    auto bOptimal = bScale + sqrt(bScale * bScale + ((nRotate + 1) * vKS));
+    auto bOptimal = boundScale + sqrt(boundScale * boundScale + ((nRotate + 1) * vKS));
     auto pOptimal = 2.0 * (nAdd + 1)  * bOptimal;
 
-    std::cerr << "q (p*): " << pOptimal << "\n";
-
-    std::cerr << "qi_size: " << pOptimal << "\n";
-    std::cerr << "B*: " << log2(bOptimal) << "\n";
-
-    std::cerr << "BScale: " << log2(bScale) << "\n";
-
-    // Compute qi_size
     auto scalingModSize = ceil(log2(pOptimal));
-
     if (scalingModSize > 60) {
-      top->emitOpError() << "q size too large (> 60 bit).\n";
+      top->emitOpError() << "ScalingModSize too large (> 60 bit).\n";
     }
 
-    scalingModSize = findValidScalingModSize(scalingModSize, maxLevel + 1, ringDimension, plaintextModulus);
-    if (!scalingModSize) {
-      top->emitOpError() << "Cannot find valid scalingModSize \n";
-    };
-
-    // Compute the first modulus (the last to be reduced)
-    double firstModSize = ceil(log2(2 * bOptimal));
-
+    double firstModSize = ceil(1 + log2( bOptimal));
     firstModSize = findValidFirstModSize(firstModSize, ringDimension, plaintextModulus); 
     if (!firstModSize) {
-      top->emitOpError() << "Cannot find valid firstModSize\n";
+      top->emitOpError() << "Cannot find valid prime for scalingModSize\n";
     };
+    
 
-    std::cerr << "ScalingModSize: " << scalingModSize << "\n";
-    std::cerr << "FirstModSize: " << firstModSize << "\n";
+    scalingModSize = findValidScalingModSize(scalingModSize,firstModSize , numPrimes, ringDimension, plaintextModulus);
+    if (!scalingModSize) {
+      top->emitOpError() << "Cannot find enough valid primes for scalingModSize\n";
+    };
 
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp
     auto *funcOp = genericOp->getParentOp();
     auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
-        funcOp->getContext(), maxLevel + 1, scalingModSize, firstModSize);
+        funcOp->getContext(), multiplicativeDepth, scalingModSize, firstModSize);
     funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName, openfheParamAttr);
   });
 }
