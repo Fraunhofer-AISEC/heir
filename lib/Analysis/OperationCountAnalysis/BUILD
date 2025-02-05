@@ -17,6 +17,7 @@ cc_library(
         "@heir//lib/Analysis/SecretnessAnalysis",
         "@heir//lib/Analysis/LevelAnalysis",
         "@openfhe//:core",
+        "@openfhe//:pke",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
