@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
+#include <utility>
 
 #include "OperationCountAnalysis.h"
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
@@ -245,8 +246,33 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       return logP + logQ;
     };
 
-    auto upperBoundOnModuli = lbcrypto::GetMSB(plaintextModulus) + 28;
-    auto logQP = computeLogPQ(upperBoundOnModuli, upperBoundOnModuli, numPrimes);
+    auto computeModuliSizes = [&](int ringDimension)-> std::pair<int, int> {
+     auto boundOptimal = computeOptimalBoundSize(ringDimension, plaintextModulus, maxKeySwitchCount, maxCiphertextCount, numPrimes);
+      auto moduliOptimal = ceil(1 + log2(maxCiphertextCount) + boundOptimal);
+
+      auto scalingModSize = ceil(log2(moduliOptimal));
+      if (scalingModSize > MAX_BIT_SIZE) {
+        top->emitOpError() << "ScalingModSize too large (> 60 bit).\n";
+      }
+
+      auto firstModSize = ceil(1 + boundOptimal);
+      firstModSize = findValidFirstModSize(firstModSize, ringDimension, plaintextModulus); 
+      if (!firstModSize) {
+        top->emitOpError() << "Cannot find valid prime for scalingModSize\n";
+      };
+
+      scalingModSize = findValidScalingModSize(scalingModSize, firstModSize, numPrimes, ringDimension, plaintextModulus);
+      if (!scalingModSize) {
+        top->emitOpError() << "Cannot find enough valid primes for scalingModSize\n";
+      };
+
+      return std::make_pair(scalingModSize, firstModSize);
+    };
+
+    auto computeRingDimension = [&](int scalingModSize, int firstModSize) {
+      auto logQP = computeLogPQ(scalingModSize, firstModSize, numPrimes);
+      return lbcrypto::StdLatticeParm::FindRingDim(lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
+    };
     
     if (!isRingDimensionSet){
       ringDimension = 16384;
@@ -260,70 +286,35 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       auto startDimension = ringDimension;
       std::cerr << "Testing Ring Dimension: " << ringDimension << std::endl;
       // Compute param sizes for HYBRID Key Switching
-      auto boundOptimal = computeOptimalBoundSize(startDimension, plaintextModulus, maxKeySwitchCount, maxCiphertextCount, numPrimes);
-      auto moduliOptimal = ceil(1 + log2(maxCiphertextCount) + boundOptimal);
-
-      scalingModSize = ceil(log2(moduliOptimal));
-      if (scalingModSize > MAX_BIT_SIZE) {
-        top->emitOpError() << "ScalingModSize too large (> 60 bit).\n";
-      }
-
-      firstModSize = ceil(1 + boundOptimal);
-      firstModSize = findValidFirstModSize(firstModSize, startDimension, plaintextModulus); 
-      if (!firstModSize) {
-        top->emitOpError() << "Cannot find valid prime for scalingModSize\n";
-      };
-
-      scalingModSize = findValidScalingModSize(scalingModSize, firstModSize, numPrimes, startDimension, plaintextModulus);
-      if (!scalingModSize) {
-        top->emitOpError() << "Cannot find enough valid primes for scalingModSize\n";
-      };
-
-      logQP = computeLogPQ(scalingModSize, firstModSize, numPrimes);
-      
+ 
+      auto moduli = computeModuliSizes(ringDimension);
+      scalingModSize = moduli.first;
+      firstModSize = moduli.second;
+  
       if (isRingDimensionSet) {
         break;
       }
-      
-      newRingDimension = lbcrypto::StdLatticeParm::FindRingDim(lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
+
+      newRingDimension = computeRingDimension(scalingModSize, firstModSize);
 
       if (newRingDimension != startDimension) {
-        std::cerr << "Set new RingDimension: " << newRingDimension << std::endl;
+        // 
         startDimension = newRingDimension;
       } else {
+        // Try whether reduction of ring dimension is possible
         startDimension /= 2;
-        std::cerr << "Try smaller RingDimension: " << startDimension << std::endl;
-        // Try smaller ring dimension
 
-
-        // Compute param sizes for HYBRID Key Switching
-        auto boundOptimal = computeOptimalBoundSize(startDimension, plaintextModulus, maxKeySwitchCount, maxCiphertextCount, numPrimes);
-        auto moduliOptimal = ceil(1 + log2(maxCiphertextCount) + boundOptimal);
-
-        auto testScalingModSize = ceil(log2(moduliOptimal));
-        if (scalingModSize > MAX_BIT_SIZE) {
-          top->emitOpError() << "ScalingModSize too large (> 60 bit).\n";
-        }
-
-        auto testFirstModSize = ceil(1 + boundOptimal);
-        testFirstModSize = findValidFirstModSize(testFirstModSize, startDimension, plaintextModulus); 
-        if (!testFirstModSize) {
-          top->emitOpError() << "Cannot find valid prime for scalingModSize\n";
-        };
-
-        testScalingModSize = findValidScalingModSize(testScalingModSize, testFirstModSize, numPrimes, startDimension, plaintextModulus);
-        if (!testScalingModSize) {
-          top->emitOpError() << "Cannot find enough valid primes for scalingModSize\n";
-        };
-
-        logQP = computeLogPQ(scalingModSize, firstModSize, numPrimes);
-        newRingDimension = lbcrypto::StdLatticeParm::FindRingDim(lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
+        auto moduli = computeModuliSizes(ringDimension);
+        auto testScalingModSize = moduli.first;
+        auto testFirstModSize = moduli.second;
+  
+        newRingDimension = computeRingDimension(testScalingModSize, testFirstModSize);
         
         if (newRingDimension == startDimension) {
-          std::cerr << "Smaller possible. Set new RingDimension: " << newRingDimension << std::endl;
+          // Smaller ring dimension possible, check if further reduction is possible
           startDimension = newRingDimension;
         } else {
-          std::cerr << "Smaller not possible. Final RingDimension: " << 2 * startDimension << std::endl;
+          // Smaller ring dimension not possible
           ringDimension = 2 * startDimension;
           break;
         }
@@ -340,29 +331,3 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
 
 }  // namespace heir
 }  // namespace mlir
-
-
-
-// int findRingDimension() {
-
-//   while (true) {
-//     int startDimension = 16384;
-
-//     scale, first = computeModuli()
-
-//     logPQ = computeLogPQ 
-//     dimension = computeDimension(logPQ)
-
-//     if (dimension != startDimension) {
-//       startDimension = dimension
-//     }
-
-//     if (dimension == startDimension) {
-//       dimension /= 2
-//       scale, first computeModuli()
-//       logPQ = computeLogPQ
-//       dimension = computeDimension(logPQ)
-//       break;
-//     }
-//   }
-// }
