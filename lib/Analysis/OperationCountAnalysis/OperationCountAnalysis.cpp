@@ -34,7 +34,7 @@
 namespace mlir {
 namespace heir {
 
-constexpr int MAX_BIT_SIZE = 60;
+constexpr int MaxBitSize = 60;
 
 LogicalResult OperationCountAnalysis::visitOperation(
     Operation *op, 
@@ -129,7 +129,7 @@ static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus
 static uint64_t findValidFirstModSize(int minModSize, int ringDimension, int plaintextModulus) {
   uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
 
-  while (minModSize < MAX_BIT_SIZE) {
+  while (minModSize < MaxBitSize) {
     try {
       lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
       return minModSize;
@@ -148,7 +148,7 @@ static uint64_t findValidScalingModSize(int minModSize, int firstModSize, int nu
     firstModulus = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
   }
 
-  while (minModSize < MAX_BIT_SIZE) {
+  while (minModSize < MaxBitSize) {
     try {
       auto q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
       for (int i = 1; i < numPrimes; i++) {
@@ -180,7 +180,7 @@ static int computeOptimalBoundSize(int ringDimension, int plaintextModulus, int 
       auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
 
       auto K = 100.0;
-      auto P = K * beta * sqrt(log(numPrimes * pow(2.0, MAX_BIT_SIZE)) / log(beta));
+      auto P = K * beta * sqrt(log(numPrimes * pow(2.0, MaxBitSize)) / log(beta));
 
       auto f0 = beta * sqrt(numPrimes * log2(t * phi)) / P;
 
@@ -237,7 +237,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto numPrimes = multiplicativeDepth + 1;
 
     uint32_t numPartQ = ComputeNumLargeDigits(0, multiplicativeDepth);
-    auto auxBits = MAX_BIT_SIZE;  // Max size of a prime number in OpenFHE
+    auto auxBits = MaxBitSize;  // Max size of a prime number in OpenFHE
     
     auto computeLogPQ = [&](int scalingModSize, int firstModSize, int numPrimes) {
       auto logQ = firstModSize + (numPrimes + 1) * scalingModSize;
@@ -251,7 +251,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       auto moduliOptimal = ceil(1 + log2(maxCiphertextCount) + boundOptimal);
 
       auto scalingModSize = ceil(log2(moduliOptimal));
-      if (scalingModSize > MAX_BIT_SIZE) {
+      if (scalingModSize > MaxBitSize) {
         top->emitOpError() << "ScalingModSize too large (> 60 bit).\n";
       }
 
@@ -284,9 +284,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     while (true) {
       auto newRingDimension = ringDimension;
       auto startDimension = ringDimension;
-      std::cerr << "Testing Ring Dimension: " << ringDimension << std::endl;
+
       // Compute param sizes for HYBRID Key Switching
- 
       auto moduli = computeModuliSizes(ringDimension);
       scalingModSize = moduli.first;
       firstModSize = moduli.second;
@@ -324,7 +323,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp
     auto *funcOp = genericOp->getParentOp();
     auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
-        funcOp->getContext(), multiplicativeDepth, scalingModSize, firstModSize);
+        funcOp->getContext(), multiplicativeDepth, ringDimension, scalingModSize, firstModSize);
     funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName, openfheParamAttr);
   });
 }

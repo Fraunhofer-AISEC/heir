@@ -737,6 +737,7 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   auto paramsName = variableNames->getNameForValue(op.getResult());
   int64_t mulDepth = op.getMulDepthAttr().getValue().getSExtValue();
   int64_t plainMod = op.getPlainModAttr().getValue().getSExtValue();
+  int64_t ringDimension = op.getRingDimensionAttr().getValue().getSExtValue();
   int64_t firstModSize = op.getFirstModSizeAttr().getValue().getSExtValue();
   int64_t scalingModSize = op.getScalingModSizeAttr().getValue().getSExtValue();
 
@@ -751,7 +752,7 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
     }
     os << paramsName << ".SetScalingModSize(" << scalingModSize << ");\n";
     os << paramsName << ".SetScalingTechnique(FIXEDMANUAL);\n";
-    os << paramsName << ".SetRingDim(8192);\n";
+    os << paramsName << ".SetRingDim(" << ringDimension << ");\n";
     os << paramsName << ".SetSecurityLevel(lbcrypto::HEStd_NotSet);\n";
   }
   if (op.getInsecure()) {

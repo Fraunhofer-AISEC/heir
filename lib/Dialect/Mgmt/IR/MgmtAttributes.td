@@ -48,6 +48,7 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
 
     The attribute is a struct with the following fields:
       - `multiplicativeDepth` : the multiplicative depth
+      - `ringDimension` : the ring dimension
       - `firstModeSize` : the first modulus size
       - `scalingModSize` : the scaling modulus size
 
@@ -63,6 +64,7 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
 
   let parameters = (ins
     "int": $multiplicativeDepth,
+    "int": $ringDimension,
     "int": $scalingModSize,
     "int": $firstModSize
   );

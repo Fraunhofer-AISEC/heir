@@ -10,8 +10,8 @@ def AnnotateParameters : Pass<"annotate-parameters"> {
   saving it into the function's attribute dictionary as parameter.
   }];
   let options = [
-    Option<"ringDimension", "ring-dimension", "int", "1024", "Specify the ring dimension for the parameters">,
-    Option<"plaintextModulus", "plaintext-modulus", "int","64", "Specify the plaintext modulus for the parameters">
+    Option<"ringDimension", "ring-dimension", "int", "0", "Specify the ring dimension for the parameters">,
+    Option<"plaintextModulus", "plaintext-modulus", "int","0", "Specify the plaintext modulus for the parameters">
   ];
 }
 
