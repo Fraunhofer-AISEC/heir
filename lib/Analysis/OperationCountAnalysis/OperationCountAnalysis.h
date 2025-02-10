@@ -49,17 +49,15 @@ class OperationCount {
                           keySwitchCount + rhs.keySwitchCount);
   }
 
-  OperationCount max(const OperationCount &rhs) const {
-    assert(isInitialized() && rhs.isInitialized() &&
+  static OperationCount max(const OperationCount &lhs, const OperationCount &rhs) {
+    assert(lhs.isInitialized() && rhs.isInitialized() &&
            "OperationCount not initialized");
-    return OperationCount(std::max(ciphertextCount, rhs.ciphertextCount),
-                          std::max(keySwitchCount, rhs.keySwitchCount));
+    return OperationCount(std::max(lhs.ciphertextCount, rhs.ciphertextCount),
+                          std::max(lhs.keySwitchCount, rhs.keySwitchCount));
   }
 
   static OperationCount join(const OperationCount &lhs,
                              const OperationCount &rhs) {
-    OperationCount result;
-
     if (!lhs.isInitialized()) {
       return rhs;
     }
@@ -68,9 +66,7 @@ class OperationCount {
       return lhs;
     }
 
-    return lhs.max(rhs);
-
-    return result;
+    return OperationCount::max(lhs, rhs);
   }
 
   void print(llvm::raw_ostream &os) const {

@@ -192,8 +192,7 @@ static int computeOptimalBoundSize(int ringDimension, int plaintextModulus, int 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
                          int ringDimension, int plaintextModulus) {
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
-    int maxKeySwitchCount = 0;
-    int maxCiphertextCount = 0;
+    OperationCount operationCount(0,0);
 
     bool isRingDimensionSet = ringDimension != 0;
 
@@ -211,27 +210,27 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         return;
       }
 
-      maxKeySwitchCount = std::max(maxKeySwitchCount, count.getKeySwitchCount());
-      maxCiphertextCount = std::max(maxCiphertextCount, count.getCiphertextCount());
+      operationCount = OperationCount::max(operationCount, count);
     });
 
     auto log2 = [](double x) { return log(x) / log(2); };
 
     auto maxLevel = 0;
-    top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
-      genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
-        if (op->getNumResults() == 0) {
-          return;
-        }
-        if (!isSecret(op->getResult(0), solver)) {
-          return;
-        }
-        // ensure result is secret
-        auto level = solver->lookupState<LevelLattice>(op->getResult(0))
-                        ->getValue().getLevel();
-        maxLevel = std::max(maxLevel, level);
-      });
+    genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
+      if (op->getNumResults() == 0) {
+        return;
+      }
+      if (!isSecret(op->getResult(0), solver)) {
+        return;
+      }
+      // ensure result is secret
+      auto level = solver->lookupState<LevelLattice>(op->getResult(0))
+                       ->getValue().getLevel();
+      maxLevel = std::max(maxLevel, level);
     });
+
+    auto maxKeySwitchCount = operationCount.getKeySwitchCount();
+    auto maxCiphertextCount = operationCount.getCiphertextCount();
 
     auto multiplicativeDepth = maxLevel;
     auto numPrimes = multiplicativeDepth + 1;
