@@ -280,10 +280,10 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto firstModSize = 0;
     auto scalingModSize = 0;
     
-    while (true) {
-      auto newRingDimension = ringDimension;
-      auto startDimension = ringDimension;
+    auto newRingDimension = ringDimension;
+    auto startDimension = ringDimension;
 
+    while (true) {
       // Compute param sizes for HYBRID Key Switching
       auto moduli = computeModuliSizes(ringDimension);
       scalingModSize = moduli.first;
