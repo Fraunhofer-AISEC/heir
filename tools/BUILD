@@ -1,5 +1,7 @@
 # HEIR tools
 
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
 package(
     default_applicable_licenses = ["@heir//:license"],
     default_visibility = ["//visibility:public"],
@@ -36,7 +38,6 @@ cc_binary(
         "@heir//lib/Dialect/Arith/Conversions/ArithToCGGIQuart",
         "@heir//lib/Dialect/Arith/Conversions/ArithToModArith",
         "@heir//lib/Dialect/BGV/Conversions/BGVToLWE",
-        "@heir//lib/Dialect/BGV/Conversions/BGVToLattigo",
         "@heir//lib/Dialect/BGV/IR:Dialect",
         "@heir//lib/Dialect/CGGI/Conversions/CGGIToJaxite",
         "@heir//lib/Dialect/CGGI/Conversions/CGGIToTfheRust",
@@ -48,6 +49,7 @@ cc_binary(
         "@heir//lib/Dialect/CKKS/IR:Dialect",
         "@heir//lib/Dialect/Comb/IR:Dialect",
         "@heir//lib/Dialect/Jaxite/IR:Dialect",
+        "@heir//lib/Dialect/LWE/Conversions/LWEToLattigo",
         "@heir//lib/Dialect/LWE/Conversions/LWEToOpenfhe",
         "@heir//lib/Dialect/LWE/Conversions/LWEToPolynomial",
         "@heir//lib/Dialect/LWE/IR:Dialect",
@@ -83,6 +85,7 @@ cc_binary(
         "@heir//lib/Dialect/TensorExt/IR:Dialect",
         "@heir//lib/Dialect/TensorExt/Transforms",
         "@heir//lib/Dialect/TensorExt/Transforms:CollapseInsertionChains",
+        "@heir//lib/Dialect/TensorExt/Transforms:ImplementShiftNetwork",
         "@heir//lib/Dialect/TensorExt/Transforms:InsertRotate",
         "@heir//lib/Dialect/TensorExt/Transforms:RotateAndReduce",
         "@heir//lib/Dialect/TfheRust/IR:Dialect",
@@ -102,6 +105,7 @@ cc_binary(
         "@heir//lib/Transforms/ForwardInsertToExtract",
         "@heir//lib/Transforms/ForwardStoreToLoad",
         "@heir//lib/Transforms/FullLoopUnroll",
+        "@heir//lib/Transforms/LayoutPropagation",
         "@heir//lib/Transforms/LinalgCanonicalizations",
         "@heir//lib/Transforms/MemrefToArith:ExpandCopy",
         "@heir//lib/Transforms/MemrefToArith:MemrefToArithRegistration",
@@ -112,6 +116,7 @@ cc_binary(
         "@heir//lib/Transforms/StraightLineVectorizer",
         "@heir//lib/Transforms/TensorToScalars",
         "@heir//lib/Transforms/UnusedMemRef",
+        "@heir//lib/Transforms/ValidateNoise",
         "@heir//lib/Utils/Tablegen:AsmInterfaces",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
@@ -157,6 +162,7 @@ cc_binary(
         "@llvm-project//mlir:TosaToTensor",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:UBToLLVM",
+        "@llvm-project//mlir:VectorToLLVM",
     ] + select({
         "@heir//:config_enable_yosys": [
             "@heir//lib/Pipelines:BooleanPipelineRegistration",
@@ -208,7 +214,6 @@ cc_binary(
         "@heir//lib/Dialect/TensorExt/IR:Dialect",
         "@heir//lib/Dialect/TfheRust/IR:Dialect",
         "@heir//lib/Dialect/TfheRustBool/IR:Dialect",
-        "@heir//lib/Utils/Tablegen:AsmInterfaces",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
@@ -220,7 +225,31 @@ cc_binary(
         "@llvm-project//mlir:MlirLspServerLib",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TosaDialect",
+    ],
+)
+
+bzl_library(
+    name = "heir_translate_bzl",
+    srcs = ["heir-translate.bzl"],
+    visibility = ["//visibility:private"],
+)
+
+bzl_library(
+    name = "heir_opt_bzl",
+    srcs = ["heir-opt.bzl"],
+    visibility = ["//visibility:private"],
+)
+
+bzl_library(
+    name = "heir_jaxite_bzl",
+    srcs = ["heir-jaxite.bzl"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":heir_opt_bzl",
+        ":heir_translate_bzl",
+        "@rules_python//python:py_library_bzl",
     ],
 )

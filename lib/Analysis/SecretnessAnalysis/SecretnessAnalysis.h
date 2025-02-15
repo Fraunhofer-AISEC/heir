@@ -1,11 +1,17 @@
 #ifndef LIB_ANALYSIS_SECRETNESSANALYSIS_SECRETNESSANALYSIS_H_
 #define LIB_ANALYSIS_SECRETNESSANALYSIS_SECRETNESSANALYSIS_H_
 
+#include <cassert>
 #include <optional>
 
+#include "llvm/include/llvm/ADT/ArrayRef.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlow/SparseAnalysis.h"  // from @llvm-project
-#include "mlir/include/mlir/IR/Operation.h"  // from @llvm-project
-#include "mlir/include/mlir/IR/Value.h"      // from @llvm-project
+#include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
+#include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
+#include "mlir/include/mlir/IR/ValueRange.h"               // from @llvm-project
+#include "mlir/include/mlir/Interfaces/CallInterfaces.h"   // from @llvm-project
+#include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
 
 namespace mlir {
 namespace heir {
@@ -187,6 +193,25 @@ class SecretnessAnalysisDependent {
     for (auto &operand : op->getOpOperands()) {
       if (isSecretInternal(op, operand.get())) {
         secretOperands.push_back(&operand);
+      }
+    }
+  }
+
+  /**
+   * @brief Selects the OpOperands of an operation that are not secret
+   * (secretness = false or unknown).
+   *
+   * This method iterates through the operands of the given operation and adds
+   * those that are not secret to the provided vector.
+   *
+   * @param op The operation to analyze.
+   * @param nonSecretOperands A vector to store the non-secret operands.
+   */
+  void getNonSecretOperands(Operation *op,
+                            SmallVectorImpl<OpOperand *> &nonSecretOperands) {
+    for (auto &operand : op->getOpOperands()) {
+      if (!isSecretInternal(op, operand.get())) {
+        nonSecretOperands.push_back(&operand);
       }
     }
   }

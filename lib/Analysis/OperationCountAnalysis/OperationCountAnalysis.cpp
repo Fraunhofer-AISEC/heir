@@ -176,8 +176,13 @@ static int computeOptimalBoundSize(int ringDimension, int plaintextModulus, int 
       auto vErr = 3.19 * 3.19; // TODO Make adjustable
 
       auto boundScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
+      std::cerr << "Noise: boundScale: " << boundScale << std::endl;
 
       auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
+      std::cerr << "Noise: boundKeySwitch: " << boundKeySwitch << std::endl;
+
+      double B_clean = D * t * sqrt(phi * (1.0 / 12.0 + 2 * phi * vErr * vKey + vErr));
+      std::cerr << "Noise: B_clean: " << B_clean << std::endl;
 
       auto K = 100.0;
       auto P = K * beta * sqrt(log(numPrimes * pow(2.0, MaxBitSize)) / log(beta));
@@ -185,6 +190,7 @@ static int computeOptimalBoundSize(int ringDimension, int plaintextModulus, int 
       auto f0 = beta * sqrt(numPrimes * log2(t * phi)) / P;
 
       auto vKS = f0 * boundKeySwitch + boundScale;
+      std::cerr << "Noise: vKS: " << vKS << std::endl;
 
       return log2(boundScale + sqrt(boundScale * boundScale + (maxKeySwitchCount * vKS)));
 }
@@ -322,7 +328,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp
     auto *funcOp = genericOp->getParentOp();
     auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
-        funcOp->getContext(), multiplicativeDepth, ringDimension, scalingModSize, firstModSize);
+        funcOp->getContext(), multiplicativeDepth, ringDimension, scalingModSize, firstModSize, 0, 0);
     funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName, openfheParamAttr);
   });
 }

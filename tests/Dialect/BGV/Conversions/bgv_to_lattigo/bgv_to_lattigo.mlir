@@ -1,4 +1,4 @@
-// RUN: heir-opt --mlir-print-local-scope --bgv-to-lwe --bgv-to-lattigo %s | FileCheck %s
+// RUN: heir-opt --mlir-print-local-scope --bgv-to-lwe --lwe-to-lattigo %s | FileCheck %s
 
 
 !Z1032955396097_i64_ = !mod_arith.int<1032955396097 : i64>
@@ -28,7 +28,7 @@
 !ct2 = !lwe.new_lwe_ciphertext<application_data = <message_type = i3>, plaintext_space = #plaintext_space, ciphertext_space = #ciphertext_space_L0_, key = #key, modulus_chain = #modulus_chain_L5_C0_>
 
 // CHECK: module
-module {
+module attributes {scheme.bgv} {
   // CHECK-LABEL: @test_ops
   // CHECK-SAME: ([[C:%.+]]: [[S:.*evaluator]], [[X:%.+]]: [[T:!lattigo.rlwe.ciphertext]], [[Y:%.+]]: [[T]])
   func.func @test_ops(%x : !ct, %y : !ct) {

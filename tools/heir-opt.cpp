@@ -7,7 +7,6 @@
 #include "lib/Dialect/Arith/Conversions/ArithToCGGIQuart/ArithToCGGIQuart.h"
 #include "lib/Dialect/Arith/Conversions/ArithToModArith/ArithToModArith.h"
 #include "lib/Dialect/BGV/Conversions/BGVToLWE/BGVToLWE.h"
-#include "lib/Dialect/BGV/Conversions/BGVToLattigo/BGVToLattigo.h"
 #include "lib/Dialect/BGV/IR/BGVDialect.h"
 #include "lib/Dialect/CGGI/Conversions/CGGIToJaxite/CGGIToJaxite.h"
 #include "lib/Dialect/CGGI/Conversions/CGGIToTfheRust/CGGIToTfheRust.h"
@@ -18,6 +17,7 @@
 #include "lib/Dialect/CKKS/IR/CKKSDialect.h"
 #include "lib/Dialect/Comb/IR/CombDialect.h"
 #include "lib/Dialect/Jaxite/IR/JaxiteDialect.h"
+#include "lib/Dialect/LWE/Conversions/LWEToLattigo/LWEToLattigo.h"
 #include "lib/Dialect/LWE/Conversions/LWEToOpenfhe/LWEToOpenfhe.h"
 #include "lib/Dialect/LWE/Conversions/LWEToPolynomial/LWEToPolynomial.h"
 #include "lib/Dialect/LWE/IR/LWEDialect.h"
@@ -64,6 +64,7 @@
 #include "lib/Transforms/ForwardInsertToExtract/ForwardInsertToExtract.h"
 #include "lib/Transforms/ForwardStoreToLoad/ForwardStoreToLoad.h"
 #include "lib/Transforms/FullLoopUnroll/FullLoopUnroll.h"
+#include "lib/Transforms/LayoutPropagation/LayoutPropagation.h"
 #include "lib/Transforms/LinalgCanonicalizations/LinalgCanonicalizations.h"
 #include "lib/Transforms/OperationBalancer/OperationBalancer.h"
 #include "lib/Transforms/OptimizeRelinearization/OptimizeRelinearization.h"
@@ -72,6 +73,7 @@
 #include "lib/Transforms/StraightLineVectorizer/StraightLineVectorizer.h"
 #include "lib/Transforms/TensorToScalars/TensorToScalars.h"
 #include "lib/Transforms/UnusedMemRef/UnusedMemRef.h"
+#include "lib/Transforms/ValidateNoise/ValidateNoise.h"
 #include "lib/Utils/Tablegen/AsmInterfaces.h"
 #include "mlir/include/mlir/Conversion/AffineToStandard/AffineToStandard.h"  // from @llvm-project
 #include "mlir/include/mlir/Conversion/ArithToLLVM/ArithToLLVM.h"  // from @llvm-project
@@ -86,6 +88,7 @@
 #include "mlir/include/mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"  // from @llvm-project
 #include "mlir/include/mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"  // from @llvm-project
 #include "mlir/include/mlir/Conversion/UBToLLVM/UBToLLVM.h"  // from @llvm-project
+#include "mlir/include/mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Affine/Passes.h"   // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"  // from @llvm-project
@@ -207,6 +210,7 @@ int main(int argc, char **argv) {
   registerConvertMathToLLVMInterface(registry);
   registerConvertMemRefToLLVMInterface(registry);
   ub::registerConvertUBToLLVMInterface(registry);
+  vector::registerConvertVectorToLLVMInterface(registry);
 
   // Misc
   registerTransformsPasses();      // canonicalize, cse, etc.
@@ -276,7 +280,9 @@ int main(int argc, char **argv) {
   registerOperationBalancerPasses();
   registerStraightLineVectorizerPasses();
   registerUnusedMemRefPasses();
+  registerValidateNoisePasses();
   registerOptimizeRelinearizationPasses();
+  registerLayoutPropagationPasses();
   registerLinalgCanonicalizationsPasses();
   registerTensorToScalarsPasses();
   registerAnnotateParametersPasses();
@@ -313,9 +319,9 @@ int main(int argc, char **argv) {
   mlir::heir::arith::registerArithToCGGIQuartPasses();
   mod_arith::registerConvertToMacPass();
   bgv::registerBGVToLWEPasses();
-  bgv::registerBGVToLattigoPasses();
   ckks::registerCKKSToLWEPasses();
   registerSecretToCGGIPasses();
+  lwe::registerLWEToLattigoPasses();
   lwe::registerLWEToOpenfhePasses();
   lwe::registerLWEToPolynomialPasses();
   ::mlir::heir::linalg::registerLinalgToTensorExtPasses();
@@ -349,18 +355,24 @@ int main(int argc, char **argv) {
                              "Lower basic MLIR to LLVM",
                              ::mlir::heir::basicMLIRToLLVMPipelineBuilder);
 
-  PassPipelineRegistration<>(
+  PassPipelineRegistration<SimdVectorizerOptions>(
       "heir-simd-vectorizer",
       "Run scheme-agnostic passes to convert FHE programs that operate on "
       "scalar types to equivalent programs that operate on vectors and use "
       "tensor_ext.rotate",
-      mlir::heir::heirSIMDVectorizerPipelineBuilder);
+      [](OpPassManager &pm, const SimdVectorizerOptions &options) {
+        ::mlir::heir::heirSIMDVectorizerPipelineBuilder(
+            pm, options.experimentalDisableLoopUnroll);
+      });
 
-  PassPipelineRegistration<>(
+  PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
       "mlir-to-secret-arithmetic",
       "Convert a func using standard MLIR dialects to secret dialect with "
       "arithmetic ops",
-      mlirToSecretArithmeticPipelineBuilder);
+      [](OpPassManager &pm,
+         const mlir::heir::MlirToRLWEPipelineOptions &options) {
+        mlirToSecretArithmeticPipelineBuilder(pm, options);
+      });
 
   PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
       "mlir-to-bgv",
@@ -368,22 +380,21 @@ int main(int argc, char **argv) {
       "BGV.",
       mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::bgvScheme));
 
-  PassPipelineRegistration<mlir::heir::OpenfheOptions>(
-      "scheme-to-openfhe",
-      "Convert code expressed at FHE scheme level to OpenFHE C++ code.",
-      toOpenFhePipelineBuilder());
-
-  PassPipelineRegistration<mlir::heir::LattigoOptions>(
-      "mlir-to-lattigo-bgv",
-      "Convert a func using standard MLIR dialects to FHE using BGV and "
-      "export to Lattigo GO code.",
-      mlirToLattigoRLWEPipelineBuilder(mlir::heir::RLWEScheme::bgvScheme));
-
   PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
       "mlir-to-ckks",
       "Convert a func using standard MLIR dialects to FHE using "
       "CKKS.",
       mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::ckksScheme));
+
+  PassPipelineRegistration<mlir::heir::BackendOptions>(
+      "scheme-to-openfhe",
+      "Convert code expressed at FHE scheme level to OpenFHE C++ code.",
+      toOpenFhePipelineBuilder());
+
+  PassPipelineRegistration<mlir::heir::BackendOptions>(
+      "scheme-to-lattigo",
+      "Convert code expressed at FHE scheme level to Lattigo Go code.",
+      toLattigoPipelineBuilder());
 
   PassPipelineRegistration<>(
       "convert-to-data-oblivious",

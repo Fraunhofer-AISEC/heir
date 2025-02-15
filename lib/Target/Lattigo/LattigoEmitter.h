@@ -1,6 +1,7 @@
 #ifndef LIB_TARGET_LATTIGO_LATTIGOEMITTER_H_
 #define LIB_TARGET_LATTIGO_LATTIGOEMITTER_H_
 
+#include <string>
 #include <string_view>
 
 #include "lib/Analysis/SelectVariableNames/SelectVariableNames.h"
@@ -13,6 +14,7 @@
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinOps.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"              // from @llvm-project
+#include "mlir/include/mlir/IR/TypeRange.h"              // from @llvm-project
 #include "mlir/include/mlir/IR/Types.h"                  // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                  // from @llvm-project
 #include "mlir/include/mlir/IR/ValueRange.h"             // from @llvm-project
@@ -56,7 +58,9 @@ class LattigoEmitter {
   LogicalResult printOperation(::mlir::func::CallOp op);
   LogicalResult printOperation(::mlir::arith::ConstantOp op);
   LogicalResult printOperation(::mlir::tensor::ExtractOp op);
+  LogicalResult printOperation(::mlir::tensor::FromElementsOp op);
   // Lattigo ops
+  // RLWE
   LogicalResult printOperation(RLWENewEncryptorOp op);
   LogicalResult printOperation(RLWENewDecryptorOp op);
   LogicalResult printOperation(RLWENewKeyGeneratorOp op);
@@ -66,6 +70,7 @@ class LattigoEmitter {
   LogicalResult printOperation(RLWENewEvaluationKeySetOp op);
   LogicalResult printOperation(RLWEEncryptOp op);
   LogicalResult printOperation(RLWEDecryptOp op);
+  // BGV
   LogicalResult printOperation(BGVNewParametersFromLiteralOp op);
   LogicalResult printOperation(BGVNewEncoderOp op);
   LogicalResult printOperation(BGVNewEvaluatorOp op);
@@ -79,6 +84,19 @@ class LattigoEmitter {
   LogicalResult printOperation(BGVRescaleOp op);
   LogicalResult printOperation(BGVRotateColumnsOp op);
   LogicalResult printOperation(BGVRotateRowsOp op);
+  // CKKS
+  LogicalResult printOperation(CKKSNewParametersFromLiteralOp op);
+  LogicalResult printOperation(CKKSNewEncoderOp op);
+  LogicalResult printOperation(CKKSNewEvaluatorOp op);
+  LogicalResult printOperation(CKKSNewPlaintextOp op);
+  LogicalResult printOperation(CKKSEncodeOp op);
+  LogicalResult printOperation(CKKSDecodeOp op);
+  LogicalResult printOperation(CKKSAddOp op);
+  LogicalResult printOperation(CKKSSubOp op);
+  LogicalResult printOperation(CKKSMulOp op);
+  LogicalResult printOperation(CKKSRelinearizeOp op);
+  LogicalResult printOperation(CKKSRescaleOp op);
+  LogicalResult printOperation(CKKSRotateOp op);
 
   // Helpers for above
   void printErrPanic(std::string_view errName);
@@ -106,11 +124,20 @@ class LattigoEmitter {
                               op, err);
   }
 
+  // Canonicalize Debug Port
+  bool isDebugPort(::llvm::StringRef debugPortName);
+  ::llvm::StringRef canonicalizeDebugPort(::llvm::StringRef debugPortName);
+
   // helper on name and type
   std::string getName(::mlir::Value value) {
     // special case for 'nil' emission
     if (value == Value()) {
       return "nil";
+    }
+    // when the value has no uses, we can not assign it a name
+    // otherwise GO would complain "declared and not used"
+    if (value.use_empty()) {
+      return "_";
     }
     return variableNames->getNameForValue(value);
   }

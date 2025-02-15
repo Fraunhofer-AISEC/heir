@@ -21,8 +21,34 @@ package_group(
     packages = [],
 )
 
-# Disables Yosys deps for CLI tools and tests.
-# use by passing `--//:enable_yosys=0` to `bazel build` or `bazel test`
+# Disables deps for CI tools and tests.
+# use by passing `--//:enable_openmp=0` or `--//:enable_yosys=0`
+# to `bazel build` or `bazel test`
+
+# OpenMP
+string_flag(
+    name = "enable_openmp",
+    # TODO(#1361): re-enable when it's compatible with the Python frontend
+    build_setting_default = "0",
+)
+
+config_setting(
+    name = "config_enable_openmp",
+    flag_values = {
+        ":enable_openmp": "1",
+    },
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "config_disable_openmp",
+    flag_values = {
+        ":enable_openmp": "0",
+    },
+    visibility = ["//visibility:public"],
+)
+
+# Yosys
 string_flag(
     name = "enable_yosys",
     build_setting_default = "1",

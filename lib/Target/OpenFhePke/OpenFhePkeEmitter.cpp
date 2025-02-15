@@ -19,6 +19,7 @@
 #include "llvm/include/llvm/ADT/SmallVector.h"           // from @llvm-project
 #include "llvm/include/llvm/ADT/StringExtras.h"          // from @llvm-project
 #include "llvm/include/llvm/ADT/TypeSwitch.h"            // from @llvm-project
+#include "llvm/include/llvm/Support/Casting.h"           // from @llvm-project
 #include "llvm/include/llvm/Support/FormatVariadic.h"    // from @llvm-project
 #include "llvm/include/llvm/Support/raw_ostream.h"       // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
@@ -740,6 +741,8 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   int64_t ringDimension = op.getRingDimensionAttr().getValue().getSExtValue();
   int64_t firstModSize = op.getFirstModSizeAttr().getValue().getSExtValue();
   int64_t scalingModSize = op.getScalingModSizeAttr().getValue().getSExtValue();
+  int64_t evalAddCount = op.getEvalAddCountAttr().getValue().getSExtValue();
+  int64_t keySwitchCount = op.getKeySwitchCountAttr().getValue().getSExtValue();
 
   os << "CCParamsT " << paramsName << ";\n";
   os << paramsName << ".SetMultiplicativeDepth(" << mulDepth << ");\n";
@@ -758,6 +761,12 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   if (op.getInsecure()) {
     os << paramsName << ".SetSecurityLevel(lbcrypto::HEStd_NotSet);\n";
     os << paramsName << ".SetRingDim(128);\n";
+  }
+  if (evalAddCount != 0) {
+    os << paramsName << ".SetEvalAddCount(" << evalAddCount << ");\n";
+  }
+  if (keySwitchCount != 0) {
+    os << paramsName << ".SetKeySwitchCount(" << keySwitchCount << ");\n";
   }
   return success();
 }

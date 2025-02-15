@@ -1,12 +1,14 @@
 #include "lib/Dialect/Openfhe/Transforms/ConfigureCryptoContext.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <set>
 #include <string>
 
+#include "lib/Dialect/BGV/IR/BGVAttributes.h"
+#include "lib/Dialect/BGV/IR/BGVDialect.h"
 #include "lib/Dialect/LWE/IR/LWETypes.h"
 #include "lib/Dialect/Mgmt/IR/MgmtAttributes.h"
+#include "lib/Dialect/Mgmt/IR/MgmtDialect.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
 #include "lib/Dialect/Openfhe/IR/OpenfheOps.h"
 #include "lib/Dialect/Openfhe/IR/OpenfheTypes.h"
@@ -15,6 +17,7 @@
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"     // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinOps.h"            // from @llvm-project
+#include "mlir/include/mlir/IR/BuiltinTypes.h"          // from @llvm-project
 #include "mlir/include/mlir/IR/ImplicitLocOpBuilder.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/TypeUtilities.h"         // from @llvm-project
@@ -99,13 +102,18 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     }
   }
 
+  // get evalAddCount/KeySwitchCount from func attribute, if present
+  int64_t evalAddCount = 0;
+  int64_t keySwitchCount = 0;
   int64_t ringDimensionAttr = 0;
   int64_t scalingModSizeAttr = 0;
   int64_t firstModSizeAttr = 0;
   int64_t multDepthAttr = 0;
-  
+
   if (auto openfheParamsAttr = op->getAttrOfType<mgmt::OpenfheParamsAttr>(
           mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {
+    evalAddCount = openfheParamsAttr.getEvalAddCount();
+    keySwitchCount = openfheParamsAttr.getKeySwitchCount();
     ringDimensionAttr = openfheParamsAttr.getRingDimension();
     firstModSizeAttr = openfheParamsAttr.getScalingModSize();
     scalingModSizeAttr = openfheParamsAttr.getFirstModSize();
@@ -113,14 +121,10 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     // remove the attribute after reading
     op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
   }
-  
-  if (multDepthAttr != 0) {
-    mulDepth = multDepthAttr;
-  }
 
   Type openfheParamsType = openfhe::CCParamsType::get(builder.getContext());
   Value ccParams = builder.create<openfhe::GenParamsOp>(
-      openfheParamsType, mulDepth, plainMod, ringDimensionAttr, firstModSizeAttr, scalingModSizeAttr, insecure);
+      openfheParamsType, mulDepth, plainMod, ringDimensionAttr, firstModSizeAttr, scalingModSizeAttr, insecure, evalAddCount, keySwitchCount);
   Value cryptoContext = builder.create<openfhe::GenContextOp>(
       openfheContextType, ccParams,
       BoolAttr::get(builder.getContext(), hasBootstrapOp));
@@ -187,6 +191,12 @@ LogicalResult convertFunc(func::FuncOp op, int levelBudgetEncode,
 
   ImplicitLocOpBuilder builder =
       ImplicitLocOpBuilder::atBlockEnd(module.getLoc(), module.getBody());
+
+  // remove bgv.schemeParam attribute if present
+  if (auto schemeParamAttr = module->getAttrOfType<bgv::SchemeParamAttr>(
+          bgv::BGVDialect::kSchemeParamAttrName)) {
+    module->removeAttr(bgv::BGVDialect::kSchemeParamAttrName);
+  }
 
   // get mulDepth from function argument ciphertext type
   int64_t mulDepth = 0;

@@ -47,18 +47,23 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
     This attribute is used to store some OpenFHE-specific parameters.
 
     The attribute is a struct with the following fields:
-      - `multiplicativeDepth` : the multiplicative depth
-      - `ringDimension` : the ring dimension
-      - `firstModeSize` : the first modulus size
-      - `scalingModSize` : the scaling modulus size
+      - `multiplicativeDepth` : param for OpenFHE SetMultiplicativeDepth
+      - `ringDimension` : param for OpenFHE SetRingDimension
+      - `firstModeSize` : param for OpenFHE SetFirstModSize
+      - `scalingModSize` : param for OpenFHE SetScalingModSize
+      - `evalAddCount` : param for OpenFHE SetEvalAddCount
+      - `keySwitchCount` : param for OpenFHE SetKeySwitchCount
 
     When this attribute presents, the lowering of openfhe pass
     will use these parameters to set the corresponding OpenFHE
     parameters.
 
+    It should be populated by --secret-with-mgmt-bgv before
+    going through the secret-to-bgv bgv-to-openfhe pass.
+
     Example:
     ```
-    #openfhe_params = #mgmt.openfhe_params<firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38>
+    #openfhe_params = #mgmt.openfhe_params<evalAddCount = 1, keySwitchCount = 1, firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38>
     ```
   }];
 
@@ -66,10 +71,11 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
     "int": $multiplicativeDepth,
     "int": $ringDimension,
     "int": $scalingModSize,
-    "int": $firstModSize
+    "int": $firstModSize,
+    "int": $evalAddCount,
+    "int": $keySwitchCount
   );
   let assemblyFormat = "`<` struct(params) `>`";
 }
-
 
 #endif  // LIB_DIALECT_MGMT_IR_MGMTATTRIBUTES_TD_

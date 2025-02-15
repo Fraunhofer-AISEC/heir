@@ -11,8 +11,7 @@ def Lattigo_RLWENewKeyGeneratorOp : Lattigo_RLWEOp<"new_key_generator"> {
     This operation generates a new RLWE key generator
   }];
   let arguments = (ins
-    // accepts only BGV for now
-    Lattigo_BGVParameter:$params
+    Lattigo_RLWEParameter:$params
   );
   let results = (outs Lattigo_RLWEKeyGenerator:$keyGenerator);
 }
@@ -80,11 +79,11 @@ def Lattigo_RLWENewEncryptorOp : Lattigo_RLWEOp<"new_encryptor"> {
     This operation creates a new RLWE encryptor
   }];
   let arguments = (ins
-    // accepts only BGV for now
-    Lattigo_BGVParameter:$params,
-    Lattigo_RLWEPublicKey:$publicKey
+    Lattigo_RLWEParameter:$params,
+    Lattigo_RLWEPublicKeyOrSecretKey:$encryptionKey
   );
   let results = (outs Lattigo_RLWEEncryptor:$encryptor);
+  let hasVerifier = 1;
 }
 
 def Lattigo_RLWENewDecryptorOp : Lattigo_RLWEOp<"new_decryptor"> {
@@ -93,8 +92,7 @@ def Lattigo_RLWENewDecryptorOp : Lattigo_RLWEOp<"new_decryptor"> {
     This operation creates a new RLWE decryptor
   }];
   let arguments = (ins
-    // accepts only BGV for now
-    Lattigo_BGVParameter:$params,
+    Lattigo_RLWEParameter:$params,
     Lattigo_RLWESecretKey:$secretKey
   );
   let results = (outs Lattigo_RLWEDecryptor:$decryptor);

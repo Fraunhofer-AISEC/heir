@@ -9,6 +9,18 @@ cc_library(
     hdrs = ["Utils.h"],
     deps = [
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
+    name = "AffineMapUtils",
+    srcs = ["AffineMapUtils.cpp"],
+    hdrs = ["AffineMapUtils.h"],
+    deps = [
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
     ],

@@ -8,7 +8,8 @@
 !ct = !lattigo.rlwe.ciphertext
 !pt = !lattigo.rlwe.plaintext
 
-!encryptor = !lattigo.rlwe.encryptor
+!encryptor = !lattigo.rlwe.encryptor<publicKey = true>
+!encryptor_sk = !lattigo.rlwe.encryptor<publicKey = false>
 !decryptor = !lattigo.rlwe.decryptor
 !key_generator = !lattigo.rlwe.key_generator
 
@@ -32,7 +33,7 @@
     plaintextModulus = 0x3ee0001
 >
 
-module {
+module attributes {scheme.bgv} {
   // CHECK-LABEL: func compute
   // CHECK-SAME: ([[evaluator:.*]] *bgv.Evaluator, [[ct:.*]] *rlwe.Ciphertext, [[ct1:.*]] *rlwe.Ciphertext) (*rlwe.Ciphertext)
   // CHECK: [[ct2:[^, ].*]], [[err:.*]] := [[evaluator]].AddNew([[ct]], [[ct1]])
@@ -65,6 +66,7 @@ module {
   // CHECK: [[gk5:[^, ].*]] := [[kgen]].GenGaloisKeyNew(5, [[sk]])
   // CHECK: [[evalKeySet:[^, ].*]] := rlwe.NewMemEvaluationKeySet([[rk]], [[gk5]])
   // CHECK: [[enc:[^, ].*]] := rlwe.NewEncryptor([[param]], [[pk]])
+  // CHECK: [[encSk:[^, ].*]] := rlwe.NewEncryptor([[param]], [[sk]])
   // CHECK: [[dec:[^, ].*]] := rlwe.NewDecryptor([[param]], [[sk]])
   // CHECK: [[eval:[^, ].*]] := bgv.NewEvaluator([[param]], [[evalKeySet]])
   // CHECK: [[value1:[^, ].*]] := []int64
@@ -94,6 +96,7 @@ module {
     %gk5 = lattigo.rlwe.gen_galois_key %kgen, %sk {galoisElement = 5} : (!key_generator, !sk) -> !gk5
     %eval_key_set = lattigo.rlwe.new_evaluation_key_set %rk, %gk5 : (!rk, !gk5) -> !eval_key_set
     %encryptor = lattigo.rlwe.new_encryptor %param, %pk : (!params, !pk) -> !encryptor
+    %encryptor_sk = lattigo.rlwe.new_encryptor %param, %sk : (!params, !sk) -> !encryptor_sk
     %decryptor = lattigo.rlwe.new_decryptor %param, %sk : (!params, !sk) -> !decryptor
 
     %evaluator = lattigo.bgv.new_evaluator %param, %eval_key_set : (!params, !eval_key_set) -> !evaluator
@@ -128,11 +131,13 @@ module {
 // CHECK: [[v1:.*]] := 1
 // CHECK: [[v2:.*]] := []int64{1, 2}
 // CHECK: [[v3:.*]] := []int64{2, 2, 2, 2}
-func.func @test_constant() -> () {
-  %int = arith.constant 1 : i32
-  %ints = arith.constant dense<[1, 2]> : tensor<2xi32>
-  %dense = arith.constant dense<2> : tensor<4xi32>
-  return
+module attributes {scheme.bgv} {
+  func.func @test_constant() -> () {
+    %int = arith.constant 1 : i32
+    %ints = arith.constant dense<[1, 2]> : tensor<2xi32>
+    %dense = arith.constant dense<2> : tensor<4xi32>
+    return
+  }
 }
 
 // -----
@@ -143,9 +148,11 @@ func.func @test_constant() -> () {
 
 // CHECK-LABEL: test_new_evaluation_key_set_no_relin_key
 // CHECK: rlwe.NewMemEvaluationKeySet(nil, [[gk:[^, ].*]])
-func.func @test_new_evaluation_key_set_no_relin_key(%gk : !gk) -> (!ekset) {
-  %ekset = lattigo.rlwe.new_evaluation_key_set %gk : (!gk) -> !ekset
-  return %ekset : !ekset
+module attributes {scheme.bgv} {
+  func.func @test_new_evaluation_key_set_no_relin_key(%gk : !gk) -> (!ekset) {
+    %ekset = lattigo.rlwe.new_evaluation_key_set %gk : (!gk) -> !ekset
+    return %ekset : !ekset
+  }
 }
 
 // -----
@@ -155,7 +162,9 @@ func.func @test_new_evaluation_key_set_no_relin_key(%gk : !gk) -> (!ekset) {
 
 // CHECK-LABEL: test_new_evaluator_no_key_set
 // CHECK: bgv.NewEvaluator([[params:[^, ].*]], nil)
-func.func @test_new_evaluator_no_key_set(%params : !params) -> (!evaluator) {
-  %evaluator = lattigo.bgv.new_evaluator %params : (!params) -> !evaluator
-  return %evaluator : !evaluator
+module attributes {scheme.bgv} {
+  func.func @test_new_evaluator_no_key_set(%params : !params) -> (!evaluator) {
+    %evaluator = lattigo.bgv.new_evaluator %params : (!params) -> !evaluator
+    return %evaluator : !evaluator
+  }
 }

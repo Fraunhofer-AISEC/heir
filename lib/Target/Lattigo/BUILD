@@ -14,7 +14,9 @@ cc_library(
     ],
     deps = [
         "@heir//lib/Analysis/SelectVariableNames",
+        "@heir//lib/Dialect:ModuleAttributes",
         "@heir//lib/Dialect/Lattigo/IR:Dialect",
+        "@heir//lib/Dialect/Mgmt/IR:Dialect",
         "@heir//lib/Dialect/RNS/IR:Dialect",
         "@heir//lib/Utils:TargetUtils",
         "@llvm-project//llvm:Support",

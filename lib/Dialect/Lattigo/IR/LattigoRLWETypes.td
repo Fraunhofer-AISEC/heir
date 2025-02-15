@@ -31,6 +31,8 @@ def Lattigo_RLWEPublicKey : Lattigo_RLWEType<"PublicKey", "public_key"> {
   let nameSuggestion = "pk";
 }
 
+def Lattigo_RLWEPublicKeyOrSecretKey : AnyTypeOf<[Lattigo_RLWEPublicKey, Lattigo_RLWESecretKey]>;
+
 def Lattigo_RLWERelinearizationKey : Lattigo_RLWEType<"RelinearizationKey", "relinearization_key"> {
   let description = [{
     This type represents the relinearization key for the RLWE encryption scheme.
@@ -60,6 +62,8 @@ def Lattigo_RLWEEncryptor : Lattigo_RLWEType<"Encryptor", "encryptor"> {
   let description = [{
     This type represents the encryptor for the RLWE encryption scheme.
   }];
+  let parameters = (ins "bool":$publicKey);
+  let assemblyFormat = "`<` struct(params) `>`";
   let nameSuggestion = "encryptor";
 }
 
@@ -85,5 +89,10 @@ def Lattigo_RLWECiphertext : Lattigo_RLWEType<"Ciphertext", "ciphertext"> {
 }
 
 def Lattigo_RLWECiphertextOrPlaintext : AnyTypeOf<[Lattigo_RLWECiphertext, Lattigo_RLWEPlaintext]>;
+
+// common interface for RLWE
+def Lattigo_RLWEParameter : AnyTypeOf<[Lattigo_BGVParameter, Lattigo_CKKSParameter]>;
+def Lattigo_RLWEEncoder : AnyTypeOf<[Lattigo_BGVEncoder, Lattigo_CKKSEncoder]>;
+def Lattigo_RLWEEvaluator : AnyTypeOf<[Lattigo_BGVEvaluator, Lattigo_CKKSEvaluator]>;
 
 #endif  // LIB_DIALECT_LATTIGO_IR_LATTIGORLWETYPES_TD_
