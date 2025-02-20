@@ -152,9 +152,9 @@ struct TypeWithAttrTypeConverter : public ContextAwareTypeConverter {
       SmallVectorImpl<Type> &newResultTypes) const override;
 
   // Custom hook to check legality
-  bool isValueLegal(Value value);
+  bool isValueLegal(Value value) const;
 
-  bool isOperationLegal(Operation *op);
+  bool isOperationLegal(Operation *op) const;
 
   bool isFuncArgumentAndResultLegal(FunctionOpInterface funcOp);
 
@@ -400,8 +400,7 @@ class SecretGenericOpRotateConversion
       op.emitError("expected constant offset for rotate");
     }
     auto offsetAttr = llvm::dyn_cast<IntegerAttr>(constantOffset.getValue());
-
-    rewriter.replaceOpWithNewOp<T>(op, inputs[0], offsetAttr);
+    rewriter.replaceOpWithNewOp<T>(op, outputTypes, inputs[0], offsetAttr);
     return success();
   }
 };
@@ -521,12 +520,7 @@ inline Type encrytpedUIntTypeFromWidth(MLIRContext *ctx, int width) {
   // notion of signedness.
   switch (width) {
     case 1:
-      // The minimum bit width of the integer tfhe_rust API is UInt2
-      // https://docs.rs/tfhe/latest/tfhe/index.html#types
-      // This may happen if there are no LUT or boolean gate operations that
-      // require a minimum bit width (e.g. shuffling bits in a program that
-      // multiplies by two).
-      [[fallthrough]];
+      return tfhe_rust::EncryptedBoolType::get(ctx);
     case 2:
       return tfhe_rust::EncryptedUInt2Type::get(ctx);
     case 3:
@@ -551,6 +545,33 @@ inline Type encrytpedUIntTypeFromWidth(MLIRContext *ctx, int width) {
       return tfhe_rust::EncryptedUInt128Type::get(ctx);
     case 256:
       return tfhe_rust::EncryptedUInt256Type::get(ctx);
+    default:
+      llvm_unreachable("Unsupported bitwidth");
+  }
+}
+
+inline Type encrytpedIntTypeFromWidth(MLIRContext *ctx, int width) {
+  // Only supporting unsigned types because the LWE dialect does not have a
+  // notion of signedness.
+  switch (width) {
+    case 1:
+      return tfhe_rust::EncryptedBoolType::get(ctx);
+    case 2:
+      return tfhe_rust::EncryptedInt2Type::get(ctx);
+    case 4:
+      return tfhe_rust::EncryptedInt4Type::get(ctx);
+    case 8:
+      return tfhe_rust::EncryptedInt8Type::get(ctx);
+    case 16:
+      return tfhe_rust::EncryptedInt16Type::get(ctx);
+    case 32:
+      return tfhe_rust::EncryptedInt32Type::get(ctx);
+    case 64:
+      return tfhe_rust::EncryptedInt64Type::get(ctx);
+    case 128:
+      return tfhe_rust::EncryptedInt128Type::get(ctx);
+    case 256:
+      return tfhe_rust::EncryptedInt256Type::get(ctx);
     default:
       llvm_unreachable("Unsupported bitwidth");
   }
