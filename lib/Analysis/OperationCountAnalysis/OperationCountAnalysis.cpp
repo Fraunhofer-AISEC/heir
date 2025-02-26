@@ -245,7 +245,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto auxBits = MaxBitSize;  // Max size of a prime number in OpenFHE
     
     auto computeLogPQ = [&](int scalingModSize, int firstModSize, int numPrimes) {
-      auto logQ = firstModSize + (numPrimes + 1) * scalingModSize;
+      auto logQ = firstModSize + (numPrimes - 1) * scalingModSize;
       auto logP = ceil(ceil(static_cast<double>(logQ)  / numPartQ) / auxBits) * auxBits;
 
       return logP + logQ;
