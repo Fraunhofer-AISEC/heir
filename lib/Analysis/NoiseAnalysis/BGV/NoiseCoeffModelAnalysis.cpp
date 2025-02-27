@@ -3,6 +3,7 @@
 #include "lib/Analysis/DimensionAnalysis/DimensionAnalysis.h"
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
 #include "lib/Analysis/NoiseAnalysis/BGV/NoiseByBoundCoeffModel.h"
+#include "lib/Analysis/NoiseAnalysis/BGV/NoiseByMonoBoundCoeffModel.h"
 #include "lib/Analysis/NoiseAnalysis/BGV/NoiseByVarianceCoeffModel.h"
 #include "lib/Analysis/NoiseAnalysis/NoiseAnalysis.h"
 #include "lib/Analysis/Utils.h"
@@ -181,6 +182,10 @@ template class NoiseAnalysis<bgv::NoiseByBoundCoeffAverageCasePkModel>;
 template class NoiseAnalysis<bgv::NoiseByBoundCoeffWorstCasePkModel>;
 template class NoiseAnalysis<bgv::NoiseByBoundCoeffAverageCaseSkModel>;
 template class NoiseAnalysis<bgv::NoiseByBoundCoeffWorstCaseSkModel>;
+
+// for mono bounds
+template class NoiseAnalysis<bgv::NoiseByMonoBoundCoeffPkModel>;
+template class NoiseAnalysis<bgv::NoiseByMonoBoundCoeffSkModel>;
 
 // for by variance
 template class NoiseAnalysis<bgv::NoiseByVarianceCoeffPkModel>;
