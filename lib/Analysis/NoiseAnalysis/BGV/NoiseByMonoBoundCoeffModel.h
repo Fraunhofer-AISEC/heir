@@ -28,6 +28,7 @@ class NoiseByMonoBoundCoeffModel {
   static double getVarianceErr(const LocalParamType &param);
   static double getVarianceKey(const LocalParamType &param);
   static double getBScale(const LocalParamType &param);
+  static double getBKs(const LocalParamType &param);
   static double getFactorD(const LocalParamType &param);
   static double getPhi(const LocalParamType &param);
 

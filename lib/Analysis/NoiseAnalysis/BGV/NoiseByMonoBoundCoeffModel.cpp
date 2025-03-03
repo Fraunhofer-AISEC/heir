@@ -1,5 +1,6 @@
 #include "lib/Analysis/NoiseAnalysis/BGV/NoiseByMonoBoundCoeffModel.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iomanip>
@@ -124,6 +125,17 @@ double Model<P>::getBScale(const LocalParamType &param) {
 }
 
 template<bool P>
+double Model<P>::getBKs(const LocalParamType &param) {
+  auto varianceError = getVarianceErr(param);
+  auto t = param.getSchemeParam()->getPlaintextModulus();
+  auto d = getFactorD(param);
+  auto phi = getPhi(param);
+
+  // B_ks = D * t * phi(m) * sqrt(V_err / 12)
+  return d * t * phi * sqrt(varianceError / 12.);  
+}
+
+template<bool P>
 double Model<P>::getPhi(const LocalParamType &param) {
   return param.getSchemeParam()->getRingDim() / 2.;  
 }
@@ -230,43 +242,22 @@ typename Model<P>::StateType Model<P>::evalRelinearizeHYBRID(
   // We only need to consider the error from key switching key
   // and rounding error during moddown.
   // Check section 3.2 of MMLGA22 for more details.
-
-
-  //TODO: implement mono keyswitch
   auto dnum = inputParam.getSchemeParam()->getDnum();
-  auto expansionFactor = getExpansionFactor(inputParam);
-  auto boundErr = getBoundErr(inputParam);
-  auto boundKey = getBoundKey(inputParam);
 
   auto currentLevel = inputParam.getCurrentLevel();
-  // modup from Ql to QlP, so one more digit
-  auto currentNumDigit = ceil(static_cast<double>(currentLevel + 1) / dnum) + 1;
+  auto moduliPi = inputParam.getSchemeParam()->getPi();
+  auto maxPi = *std::max_element(moduliPi.begin(), moduliPi.end());
+  auto prodPi = std::accumulate(moduliPi.begin(), moduliPi.end(), 1, std::multiplies<int64_t>());
+  auto k = moduliPi.size();
 
-  // log(qiq_{i+1}...), the digit size for a certain digit
-  // we use log(pip_{i+1}...) as an approximation,
-  // as we often choose P > each digit
-  auto logqi = inputParam.getSchemeParam()->getLogqi();
-  double logDigitSize = std::accumulate(logqi.begin(), logqi.end(), 0.0);
-  // omega in literature
-  auto digitSize = pow(2.0, logDigitSize);
+  // v_ks = v + sqrt(dnum * (currentLevel + 1)) * p_l^(ceil(currentLevel / dnum) * B_ks / P + sqrt(k) * B_scale
+  double bKs = getBKs(inputParam);
+  auto pPower = ceil(static_cast<double>(currentLevel) / dnum);
+  auto noiseKs = sqrt(dnum * (currentLevel + 1)) * pow(static_cast<double>(maxPi), static_cast<double>(pPower)) * bKs / prodPi;
+  double bScale = getBScale(inputParam);
+  auto noiseScale = sqrt(k) * bScale;
 
-  // the HYBRID key switching error is
-  // sum over all digit (ct_2 * e_ksk)
-  // there are "currentNumDigit" digits
-  // and ||c_2|| <= digitSize / 2
-  // ||c_2 * e_ksk|| <= delta * digitSize * Berr / 2
-  auto boundKeySwitch =
-      currentNumDigit * digitSize * expansionFactor * boundErr / 2.0;
-
-  // moddown by P
-  auto scaled = boundKeySwitch / digitSize;
-
-  // moddown added noise, similar to modreduce above.
-  auto added = (1.0 + expansionFactor * boundKey) / 2;
-
-  // for relinearization after multiplication, often scaled + added is far less
-  // than input.
-  return StateType::of(input.getValue() + scaled + added);
+  return StateType::of(input.getValue() + noiseKs + noiseScale);
 }
 
 template<bool P>
