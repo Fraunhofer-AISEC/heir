@@ -19,6 +19,7 @@
 #include "mlir/include/mlir/Analysis/DataFlow/DeadCodeAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"     // from @llvm-project
+#include "mlir/include/mlir/IR/Attributes.h"               // from @llvm-project
 #include "mlir/include/mlir/IR/Block.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Builders.h"                 // from @llvm-project
 #include "mlir/include/mlir/IR/Dominance.h"                // from @llvm-project
@@ -616,6 +617,9 @@ void moveMgmtAttrAnnotationToFuncArgument(Operation *top) {
   // some unused func secret type arg should also be annotated with mgmt attr,
   // inferred from other used arg
   top->walk([&](func::FuncOp funcOp) {
+    if (funcOp.isDeclaration()) {
+      return;
+    }
     Attribute firstMgmtAttr;
     for (auto i = 0; i != funcOp.getNumArguments(); ++i) {
       firstMgmtAttr = funcOp.getArgAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName);
@@ -629,6 +633,31 @@ void moveMgmtAttrAnnotationToFuncArgument(Operation *top) {
           !funcOp.getArgAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName)) {
         funcOp.setArgAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName,
                           firstMgmtAttr);
+      }
+    }
+  });
+}
+
+// should be called right before all splitting, after
+// moveMgmtAttrAnnotationToFuncArgument
+void moveDialectAttrsToFuncArgument(Operation *top) {
+  top->walk([&](secret::GenericOp genericOp) {
+    for (auto i = 0; i != genericOp->getNumOperands(); ++i) {
+      auto operand = genericOp.getOperand(i);
+      auto funcBlockArg = dyn_cast<BlockArgument>(operand);
+      if (isa<SecretType>(operand.getType()) && funcBlockArg) {
+        auto funcOp =
+            dyn_cast<func::FuncOp>(funcBlockArg.getOwner()->getParentOp());
+        auto attrs = genericOp.getArgAttrs(i);
+        genericOp.removeArgAttrs(i);
+        // only set attr using name with dialect prefix
+        // TODO: require generic arg attrs to have dialect prefix
+        for (auto &namedAttr : attrs) {
+          if (namedAttr.getName().getValue().find(".") != StringRef::npos) {
+            funcOp.setArgAttr(funcBlockArg.getArgNumber(), namedAttr.getName(),
+                              namedAttr.getValue());
+          }
+        }
       }
     }
   });
@@ -681,6 +710,8 @@ struct DistributeGeneric
 
     // used by secret-to-<scheme> lowering
     moveMgmtAttrAnnotationToFuncArgument(getOperation());
+    // move dialect attrs from secret generic op arg to func arg
+    moveDialectAttrsToFuncArgument(getOperation());
 
     patterns.add<SplitGeneric>(context, opsToDistribute, &solver);
     // These patterns are shared with canonicalization

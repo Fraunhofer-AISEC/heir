@@ -10,6 +10,7 @@ package(default_applicable_licenses = ["@heir//:license"])
 # @unused
 glaze_ignore = [
     "dot_product_8_debug.go",
+    "dot_product_8_bfv_debug.go",
 ]
 
 # BGV
@@ -69,7 +70,7 @@ heir_lattigo_lib(
     name = "box_blur",
     go_library_name = "boxblur",
     heir_opt_flags = [
-        "--mlir-to-bgv=ciphertext-degree=4096 plaintext-modulus=4295294977",
+        "--mlir-to-bgv=ciphertext-degree=4096 plaintext-modulus=786433",
         "--scheme-to-lattigo",
     ],
     mlir_src = "box_blur_64x64.mlir",
@@ -83,6 +84,29 @@ heir_lattigo_lib(
         "--scheme-to-lattigo",
     ],
     mlir_src = "roberts_cross_64x64.mlir",
+)
+
+# B/FV
+
+heir_lattigo_lib(
+    name = "dot_product_8_bfv",
+    go_library_name = "dotproduct8bfv",
+    heir_opt_flags = [
+        "--mlir-to-bfv=ciphertext-degree=8",
+        "--scheme-to-lattigo",
+    ],
+    mlir_src = "dot_product_8.mlir",
+)
+
+heir_lattigo_lib(
+    name = "dot_product_8_bfv_debug",
+    extra_srcs = ["dot_product_8_bfv_debug.go"],
+    go_library_name = "dotproduct8bfvdebug",
+    heir_opt_flags = [
+        "--mlir-to-bfv=ciphertext-degree=8",
+        "--scheme-to-lattigo=insert-debug-handler-calls=true",
+    ],
+    mlir_src = "dot_product_8.mlir",
 )
 
 # CKKS
@@ -132,11 +156,24 @@ go_test(
     embed = [":dotproduct8debug"],
 )
 
-# happens to have logN = 13
 go_test(
     name = "robertscross_test",
     srcs = ["roberts_cross_test.go"],
     embed = [":robertscross"],
+)
+
+# B/FV
+
+go_test(
+    name = "dotproduct8bfv_test",
+    srcs = ["dot_product_8_bfv_test.go"],
+    embed = [":dotproduct8bfv"],
+)
+
+go_test(
+    name = "dotproduct8bfvdebug_test",
+    srcs = ["dot_product_8_bfv_debug_handler_test.go"],
+    embed = [":dotproduct8bfvdebug"],
 )
 
 # CKKS

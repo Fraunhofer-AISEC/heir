@@ -6,16 +6,12 @@
 #include <cstdint>
 #include <optional>
 
-#include "lib/Dialect/ModArith/IR/ModArithAttributes.h"
-#include "lib/Dialect/ModArith/IR/ModArithOps.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
 #include "lib/Dialect/Polynomial/IR/PolynomialAttributes.h"
 #include "lib/Dialect/Polynomial/IR/PolynomialTypes.h"
 #include "lib/Utils/Polynomial/Polynomial.h"
 #include "llvm/include/llvm/ADT/APInt.h"                 // from @llvm-project
-#include "llvm/include/llvm/ADT/TypeSwitch.h"            // from @llvm-project
 #include "llvm/include/llvm/Support/ErrorHandling.h"     // from @llvm-project
-#include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
 #include "mlir/include/mlir/IR/Attributes.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Builders.h"               // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypeInterfaces.h"  // from @llvm-project
@@ -271,6 +267,8 @@ LogicalResult LeadingTermOp::verify() {
 }
 
 ParseResult ConstantOp::parse(OpAsmParser &parser, OperationState &result) {
+  auto loc = parser.getCurrentLocation();
+
   // Using the built-in parser.parseAttribute requires the full
   // #polynomial.typed_int_polynomial syntax, which is excessive.
   // Instead we parse a keyword int to signal it's an integer polynomial
@@ -316,7 +314,8 @@ ParseResult ConstantOp::parse(OpAsmParser &parser, OperationState &result) {
     return success();
   }
 
-  return failure();
+  return parser.emitError(
+      loc, "Failed to parse polynomimal.constant op for unknown reasons.");
 }
 
 void ConstantOp::print(OpAsmPrinter &p) {

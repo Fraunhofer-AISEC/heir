@@ -94,6 +94,32 @@ openfhe_end_to_end_test(
     test_src = "roberts_cross_test.cpp",
 )
 
+# B/FV
+
+openfhe_end_to_end_test(
+    name = "dot_product_8_bfv_test",
+    generated_lib_header = "dot_product_8_bfv_lib.h",
+    heir_opt_flags = [
+        "--mlir-to-bfv=ciphertext-degree=8",
+        "--scheme-to-openfhe",
+    ],
+    mlir_src = "dot_product_8.mlir",
+    tags = ["notap"],
+    test_src = "dot_product_8_bfv_test.cpp",
+)
+
+openfhe_end_to_end_test(
+    name = "dot_product_8_bfv_debug_test",
+    generated_lib_header = "dot_product_8_bfv_debug_lib.h",
+    heir_opt_flags = [
+        "--mlir-to-bfv=ciphertext-degree=8",
+        "--scheme-to-openfhe=insert-debug-handler-calls=true",
+    ],
+    mlir_src = "dot_product_8.mlir",
+    tags = ["notap"],
+    test_src = "dot_product_8_bfv_debug_test.cpp",
+)
+
 # CKKS
 
 openfhe_end_to_end_test(
@@ -114,7 +140,6 @@ openfhe_end_to_end_test(
     generated_lib_header = "naive_matmul_lib.h",
     # We manually specify the passes since the test file is already expressed at the CKKS dialect level.
     heir_opt_flags = [
-        "--full-loop-unroll",
         "--ckks-to-lwe",
         "--lwe-to-openfhe",
         "--canonicalize",
@@ -142,6 +167,21 @@ openfhe_end_to_end_test(
     mlir_src = "halevi_shoup_matmul.mlir",
     tags = ["notap"],
     test_src = "halevi_shoup_matmul_test.cpp",
+)
+
+openfhe_end_to_end_test(
+    name = "halevi_shoup_matmul_loop_test",
+    generated_lib_header = "halevi_shoup_matmul_loop_lib.h",
+    heir_opt_flags = [
+        "--mlir-to-ckks=ciphertext-degree=16 experimental-disable-loop-unroll=true",
+        "--scheme-to-openfhe=entry-function=matmul",
+    ],
+    heir_translate_flags = [
+        "--openfhe-include-type=source-relative",
+    ],
+    mlir_src = "halevi_shoup_matmul.mlir",
+    tags = ["notap"],
+    test_src = "halevi_shoup_matmul_loop_test.cpp",
 )
 
 openfhe_end_to_end_test(

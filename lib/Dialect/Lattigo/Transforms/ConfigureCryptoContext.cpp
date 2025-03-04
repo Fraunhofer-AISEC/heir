@@ -1,6 +1,5 @@
 #include "lib/Dialect/Lattigo/Transforms/ConfigureCryptoContext.h"
 
-#include <cmath>
 #include <cstdint>
 #include <set>
 #include <string>
@@ -20,6 +19,7 @@
 #include "mlir/include/mlir/IR/BuiltinOps.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"          // from @llvm-project
 #include "mlir/include/mlir/IR/ImplicitLocOpBuilder.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/MLIRContext.h"           // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Types.h"                 // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                 // from @llvm-project
@@ -37,7 +37,8 @@ namespace lattigo {
 bool hasRelinOp(func::FuncOp op) {
   bool result = false;
   op.walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (isa<BGVRelinearizeOp, CKKSRelinearizeOp>(op)) {
+    if (isa<BGVRelinearizeOp, BGVRelinearizeNewOp, CKKSRelinearizeOp,
+            CKKSRelinearizeNewOp>(op)) {
       result = true;
       return WalkResult::interrupt();
     }
@@ -50,11 +51,19 @@ bool hasRelinOp(func::FuncOp op) {
 // TODO(#1186): handle rotate rows
 SmallVector<int64_t> findAllRotIndices(func::FuncOp op) {
   std::set<int64_t> distinctRotIndices;
+  op.walk([&](BGVRotateColumnsNewOp rotOp) {
+    distinctRotIndices.insert(rotOp.getOffset().getInt());
+    return WalkResult::advance();
+  });
   op.walk([&](BGVRotateColumnsOp rotOp) {
     distinctRotIndices.insert(rotOp.getOffset().getInt());
     return WalkResult::advance();
   });
   op.walk([&](CKKSRotateOp rotOp) {
+    distinctRotIndices.insert(rotOp.getOffset().getInt());
+    return WalkResult::advance();
+  });
+  op.walk([&](CKKSRotateNewOp rotOp) {
     distinctRotIndices.insert(rotOp.getOffset().getInt());
     return WalkResult::advance();
   });
@@ -82,6 +91,7 @@ RLWEEncryptorType findEncryptorType(ModuleOp module) {
   return RLWEEncryptorType::get(module.getContext(), /*publicKey*/ true);
 }
 
+template <bool IsBFV>
 struct LattigoBGVScheme {
   using EvaluatorType = BGVEvaluatorType;
   using ParameterType = BGVParameterType;
@@ -134,6 +144,12 @@ struct LattigoBGVScheme {
     if (schemeParamAttr) {
       moduleOp->removeAttr(bgv::BGVDialect::kSchemeParamAttrName);
     }
+  }
+
+  static Value getNewEvaluatorOp(ImplicitLocOpBuilder &builder, Value params,
+                                 Value evalKeySet) {
+    return builder.create<NewEvaluatorOp>(
+        EvaluatorType::get(builder.getContext()), params, evalKeySet, IsBFV);
   }
 };
 
@@ -190,6 +206,12 @@ struct LattigoCKKSScheme {
       moduleOp->removeAttr(ckks::CKKSDialect::kSchemeParamAttrName);
     }
   }
+
+  static Value getNewEvaluatorOp(ImplicitLocOpBuilder &builder, Value params,
+                                 Value evalKeySet) {
+    return builder.create<NewEvaluatorOp>(
+        EvaluatorType::get(builder.getContext()), params, evalKeySet);
+  }
 };
 
 template <typename LattigoScheme>
@@ -200,7 +222,6 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
   using NewParametersFromLiteralOp =
       typename LattigoScheme::NewParametersFromLiteralOp;
   using NewEncoderOp = typename LattigoScheme::NewEncoderOp;
-  using NewEvaluatorOp = typename LattigoScheme::NewEvaluatorOp;
 
   auto module = op->getParentOfType<ModuleOp>();
   std::string configFuncName("");
@@ -291,8 +312,8 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
   }
 
   // evalKeySet is optional so nulltpr is acceptable
-  auto evaluator =
-      builder.create<NewEvaluatorOp>(evaluatorType, params, evalKeySet);
+  Value evaluator =
+      LattigoScheme::getNewEvaluatorOp(builder, params, evalKeySet);
 
   SmallVector<Value> results = {evaluator, params, encoder, encryptor,
                                 decryptor};
@@ -303,7 +324,10 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
 LogicalResult convertFunc(func::FuncOp op) {
   auto module = op->getParentOfType<ModuleOp>();
   if (moduleIsBGV(module)) {
-    return convertFuncForScheme<LattigoBGVScheme>(op);
+    return convertFuncForScheme<LattigoBGVScheme</*IsBFV*/ false>>(op);
+  }
+  if (moduleIsBFV(module)) {
+    return convertFuncForScheme<LattigoBGVScheme</*IsBFV*/ true>>(op);
   }
   if (moduleIsCKKS(module)) {
     return convertFuncForScheme<LattigoCKKSScheme>(op);

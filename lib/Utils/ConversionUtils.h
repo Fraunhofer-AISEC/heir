@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <numeric>
-#include <optional>
-#include <string>
 
 #include "lib/Dialect/LWE/IR/LWEDialect.h"
 #include "lib/Dialect/LWE/IR/LWEOps.h"
@@ -16,7 +14,6 @@
 #include "lib/Dialect/TfheRust/IR/TfheRustTypes.h"
 #include "llvm/include/llvm/ADT/STLExtras.h"             // from @llvm-project
 #include "llvm/include/llvm/Support/Casting.h"           // from @llvm-project
-#include "llvm/include/llvm/Support/Debug.h"             // from @llvm-project
 #include "llvm/include/llvm/Support/ErrorHandling.h"     // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"   // from @llvm-project
@@ -248,7 +245,23 @@ class SecretGenericOpConversion
       if (failed(result)) return failure();
     }
 
-    return matchAndRewriteInner(op, resultTypes, inputs, innerOp.getAttrs(),
+    // only preserve dialect attrs
+    // we do not want op attrs like overflowFlags from arith.add
+    SmallVector<NamedAttribute> dialectAttrs;
+    for (auto &namedAttr : innerOp.getDialectAttrs()) {
+      dialectAttrs.push_back(namedAttr);
+    }
+
+    // special treatment for memref.alloc, which has alignment attr
+    // that should be preserved
+    // TODO: secret-to-cggi should handle this instead of here
+    for (auto &namedAttr : innerOp.getAttrs()) {
+      if (namedAttr.getName().getValue() == "alignment") {
+        dialectAttrs.push_back(namedAttr);
+      }
+    }
+
+    return matchAndRewriteInner(op, resultTypes, inputs, dialectAttrs,
                                 rewriter);
   }
 
@@ -278,7 +291,8 @@ class SecretGenericOpCipherConversion : public SecretGenericOpConversion<T, Y> {
         })) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<Y>(op, outputTypes, inputs);
+    rewriter.replaceOpWithNewOp<Y>(op, outputTypes, inputs)
+        ->setDialectAttrs(attributes);
     return success();
   }
 };
@@ -324,7 +338,8 @@ class SecretGenericOpCipherPlainConversion
         ciphertextTy.getPlaintextSpace().getEncoding(),
         ciphertextTy.getPlaintextSpace().getRing());
 
-    rewriter.replaceOpWithNewOp<Y>(op, ciphertext, plaintext);
+    rewriter.replaceOpWithNewOp<Y>(op, ciphertext, plaintext)
+        ->setDialectAttrs(attributes);
     return success();
   }
 };
@@ -349,34 +364,11 @@ class SecretGenericOpRelinearizeConversion
     }
     SmallVector<int32_t> toBasis = {0, 1};
 
-    rewriter.replaceOpWithNewOp<T>(op, inputs[0],
-                                   rewriter.getDenseI32ArrayAttr(fromBasis),
-                                   rewriter.getDenseI32ArrayAttr(toBasis));
-    return success();
-  }
-};
-
-template <typename M, typename T, typename Y>
-class SecretGenericOpMulConversion : public SecretGenericOpConversion<M, T> {
- public:
-  using SecretGenericOpConversion<M, T>::SecretGenericOpConversion;
-
-  LogicalResult matchAndRewriteInner(
-      secret::GenericOp op, TypeRange outputTypes, ValueRange inputs,
-      ArrayRef<NamedAttribute> attributes,
-      ConversionPatternRewriter &rewriter) const override {
-    auto plaintextValues =
-        llvm::to_vector(llvm::make_filter_range(inputs, [&](Value input) {
-          return !isa<lwe::NewLWECiphertextType>(input.getType());
-        }));
-    if (!plaintextValues.empty()) {
-      return failure();
-    }
-
-    // only left for CKKS, should be removed later
-    rewriter.replaceOpWithNewOp<Y>(op, rewriter.create<T>(op.getLoc(), inputs),
-                                   rewriter.getDenseI32ArrayAttr({0, 1, 2}),
-                                   rewriter.getDenseI32ArrayAttr({0, 1}));
+    rewriter
+        .replaceOpWithNewOp<T>(op, inputs[0],
+                               rewriter.getDenseI32ArrayAttr(fromBasis),
+                               rewriter.getDenseI32ArrayAttr(toBasis))
+        ->setDialectAttrs(attributes);
     return success();
   }
 };
@@ -400,7 +392,8 @@ class SecretGenericOpRotateConversion
       op.emitError("expected constant offset for rotate");
     }
     auto offsetAttr = llvm::dyn_cast<IntegerAttr>(constantOffset.getValue());
-    rewriter.replaceOpWithNewOp<T>(op, outputTypes, inputs[0], offsetAttr);
+    rewriter.replaceOpWithNewOp<T>(op, outputTypes, inputs[0], offsetAttr)
+        ->setDialectAttrs(attributes);
     return success();
   }
 };
@@ -448,6 +441,7 @@ class SecretGenericOpModulusSwitchConversion
                                                           inputs[0], constants);
         auto modulusSwitchOp = rewriter.create<Y>(
             op.getLoc(), outputElementType, extract.getResult(), outputRing);
+        modulusSwitchOp->setDialectAttrs(attributes);
         auto insert = rewriter.create<tensor::InsertOp>(
             op.getLoc(), modulusSwitchOp.getResult(), resultOp->getResult(0),
             constants);
@@ -455,10 +449,10 @@ class SecretGenericOpModulusSwitchConversion
       }
       rewriter.replaceOp(op, resultOp);
       return success();
-    } else {
-      rewriter.replaceOpWithNewOp<Y>(op, outputTypes[0], inputs[0], outputRing);
-      return success();
     }
+    rewriter.replaceOpWithNewOp<Y>(op, outputTypes[0], inputs[0], outputRing)
+        ->setDialectAttrs(attributes);
+    return success();
   }
 };
 

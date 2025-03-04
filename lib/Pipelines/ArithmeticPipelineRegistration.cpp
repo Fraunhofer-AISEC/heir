@@ -10,6 +10,7 @@
 #include "lib/Dialect/LWE/Conversions/LWEToOpenfhe/LWEToOpenfhe.h"
 #include "lib/Dialect/LWE/Transforms/AddClientInterface.h"
 #include "lib/Dialect/LWE/Transforms/AddDebugPort.h"
+#include "lib/Dialect/Lattigo/Transforms/AllocToInplace.h"
 #include "lib/Dialect/Lattigo/Transforms/ConfigureCryptoContext.h"
 #include "lib/Dialect/LinAlg/Conversions/LinalgToTensorExt/LinalgToTensorExt.h"
 #include "lib/Dialect/Openfhe/Transforms/ConfigureCryptoContext.h"
@@ -136,6 +137,10 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       pm.addPass(createSecretInsertMgmtBGV(secretInsertMgmtBGVOptions));
       break;
     }
+    case RLWEScheme::bfvScheme: {
+      pm.addPass(createSecretInsertMgmtBFV());
+      break;
+    }
     case RLWEScheme::ckksScheme: {
       auto secretInsertMgmtCKKSOptions = SecretInsertMgmtCKKSOptions{};
       secretInsertMgmtCKKSOptions.includeFirstMul =
@@ -158,18 +163,23 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       auto validateNoiseOptions = ValidateNoiseOptions{};
       validateNoiseOptions.model = options.noiseModel;
       validateNoiseOptions.plaintextModulus = options.plaintextModulus;
+      validateNoiseOptions.slotNumber = options.ciphertextDegree;
       pm.addPass(createValidateNoise(validateNoiseOptions));
-
-      // count add and keyswitch for Openfhe
-      pm.addPass(openfhe::createCountAddAndKeySwitch());
       break;
     }
+    case RLWEScheme::bfvScheme:
     case RLWEScheme::ckksScheme: {
       break;
     }
     default:
       llvm::errs() << "Unsupported RLWE scheme: " << scheme;
       exit(EXIT_FAILURE);
+  }
+
+  if (scheme == RLWEScheme::bgvScheme) {
+    // count add and keyswitch for Openfhe
+    // this pass only works for BGV now
+    pm.addPass(openfhe::createCountAddAndKeySwitch());
   }
 
   // Prepare to lower to RLWE Scheme
@@ -184,7 +194,8 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       pm.addPass(createSecretToCKKS(secretToCKKSOpts));
       break;
     }
-    case RLWEScheme::bgvScheme: {
+    case RLWEScheme::bgvScheme:
+    case RLWEScheme::bfvScheme: {
       auto secretToBGVOpts = SecretToBGVOptions{};
       secretToBGVOpts.polyModDegree = options.ciphertextDegree;
       pm.addPass(createSecretToBGV(secretToBGVOpts));
@@ -256,6 +267,9 @@ BackendPipelineBuilder toLattigoPipelineBuilder() {
 
     // Convert LWE (and scheme-specific BGV ops) to Lattigo
     pm.addPass(lwe::createLWEToLattigo());
+
+    // Convert Alloc Ops to Inplace Ops
+    pm.addPass(lattigo::createAllocToInplace());
 
     // Simplify, in case the lowering revealed redundancy
     pm.addPass(createCanonicalizerPass());

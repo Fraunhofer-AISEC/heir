@@ -12,27 +12,22 @@
 #include "lib/Dialect/CKKS/IR/CKKSOps.h"
 #include "lib/Dialect/LWE/IR/LWEAttributes.h"
 #include "lib/Dialect/LWE/IR/LWEDialect.h"
-#include "lib/Dialect/LWE/IR/LWEOps.h"
 #include "lib/Dialect/LWE/IR/LWETypes.h"
 #include "lib/Dialect/Mgmt/IR/MgmtAttributes.h"
 #include "lib/Dialect/Mgmt/IR/MgmtDialect.h"
 #include "lib/Dialect/Mgmt/IR/MgmtOps.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
-#include "lib/Dialect/ModuleAttributes.h"
 #include "lib/Dialect/Polynomial/IR/PolynomialAttributes.h"
 #include "lib/Dialect/RNS/IR/RNSTypes.h"
 #include "lib/Dialect/Secret/IR/SecretDialect.h"
 #include "lib/Dialect/Secret/IR/SecretOps.h"
 #include "lib/Dialect/Secret/IR/SecretTypes.h"
-#include "lib/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "lib/Parameters/CKKS/Params.h"
 #include "lib/Utils/ConversionUtils.h"
 #include "lib/Utils/Polynomial/Polynomial.h"
 #include "lib/Utils/Utils.h"
 #include "llvm/include/llvm/ADT/STLExtras.h"           // from @llvm-project
 #include "llvm/include/llvm/ADT/SmallVector.h"         // from @llvm-project
-#include "llvm/include/llvm/ADT/TypeSwitch.h"          // from @llvm-project
-#include "llvm/include/llvm/Support/Casting.h"         // from @llvm-project
 #include "llvm/include/llvm/Support/Debug.h"           // from @llvm-project
 #include "llvm/include/llvm/Support/FormatVariadic.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h"  // from @llvm-project
@@ -402,9 +397,6 @@ struct SecretToCKKS : public impl::SecretToCKKSBase<SecretToCKKS> {
     MLIRContext *context = &getContext();
     auto *module = getOperation();
 
-    // Helper for future lowerings that want to know what scheme was used
-    module->setAttr(kCKKSSchemeAttrName, UnitAttr::get(context));
-
     // generate scheme parameters
     auto maxLevel = getMaxLevel();
     std::vector<double> logPrimes;
@@ -413,8 +405,10 @@ struct SecretToCKKS : public impl::SecretToCKKSBase<SecretToCKKS> {
       logPrimes.push_back(scalingModBits);
     }
 
-    auto schemeParam =
-        ckks::SchemeParam::getConcreteSchemeParam(logPrimes, scalingModBits);
+    // pass option polyModDegree is actually the number of slots
+    // TODO(#1402): use a proper name for CKKS
+    auto schemeParam = ckks::SchemeParam::getConcreteSchemeParam(
+        logPrimes, scalingModBits, polyModDegree);
     LLVM_DEBUG(llvm::dbgs() << "Concrete Scheme Param:\n"
                             << schemeParam << "\n");
 

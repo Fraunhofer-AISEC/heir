@@ -17,10 +17,12 @@
 #include "lib/Dialect/ModuleAttributes.h"
 #include "lib/Utils/ConversionUtils.h"
 #include "lib/Utils/Utils.h"
+#include "llvm/include/llvm/ADT/APFloat.h"               // from @llvm-project
 #include "llvm/include/llvm/ADT/STLExtras.h"             // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"   // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Attributes.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"      // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"           // from @llvm-project
 #include "mlir/include/mlir/IR/PatternMatch.h"           // from @llvm-project
@@ -181,8 +183,9 @@ struct ConvertFuncCallOp : public OpConversionPattern<func::CallOp> {
       newOperands.push_back(operand);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes,
-                                              newOperands);
+    rewriter
+        .replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes, newOperands)
+        ->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
 
@@ -210,8 +213,9 @@ struct RemoveKeyArgForFuncCall : public OpConversionPattern<func::CallOp> {
         newOperands.push_back(operand);
       }
     }
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes,
-                                              newOperands);
+    rewriter
+        .replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes, newOperands)
+        ->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
 };
@@ -415,33 +419,32 @@ struct ConvertLWEReinterpretUnderlyingType
 }  // namespace
 
 // BGV
-using ConvertBGVAddOp =
-    ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RAddOp, lattigo::BGVAddOp>;
-using ConvertBGVSubOp =
-    ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RSubOp, lattigo::BGVSubOp>;
-using ConvertBGVMulOp =
-    ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RMulOp, lattigo::BGVMulOp>;
+using ConvertBGVAddOp = ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RAddOp,
+                                         lattigo::BGVAddNewOp>;
+using ConvertBGVSubOp = ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RSubOp,
+                                         lattigo::BGVSubNewOp>;
+using ConvertBGVMulOp = ConvertRlweBinOp<lattigo::BGVEvaluatorType, lwe::RMulOp,
+                                         lattigo::BGVMulNewOp>;
 using ConvertBGVAddPlainOp =
     ConvertRlwePlainOp<lattigo::BGVEvaluatorType, bgv::AddPlainOp,
-                       lattigo::BGVAddOp>;
+                       lattigo::BGVAddNewOp>;
 using ConvertBGVSubPlainOp =
     ConvertRlwePlainOp<lattigo::BGVEvaluatorType, bgv::SubPlainOp,
-                       lattigo::BGVSubOp>;
+                       lattigo::BGVSubNewOp>;
 using ConvertBGVMulPlainOp =
     ConvertRlwePlainOp<lattigo::BGVEvaluatorType, bgv::MulPlainOp,
-                       lattigo::BGVMulOp>;
+                       lattigo::BGVMulNewOp>;
 
 using ConvertBGVRelinOp =
     ConvertRlweUnaryOp<lattigo::BGVEvaluatorType, bgv::RelinearizeOp,
-                       lattigo::BGVRelinearizeOp>;
+                       lattigo::BGVRelinearizeNewOp>;
 using ConvertBGVModulusSwitchOp =
     ConvertRlweUnaryOp<lattigo::BGVEvaluatorType, bgv::ModulusSwitchOp,
-                       lattigo::BGVRescaleOp>;
+                       lattigo::BGVRescaleNewOp>;
 
-// TODO(#1186): figure out generic rotating using BGVRotateColumns/RowsOp
-using ConvertBGVRotateOp =
-    ConvertRlweRotateOp<lattigo::BGVEvaluatorType, bgv::RotateOp,
-                        lattigo::BGVRotateColumnsOp>;
+using ConvertBGVRotateColumnsOp =
+    ConvertRlweRotateOp<lattigo::BGVEvaluatorType, bgv::RotateColumnsOp,
+                        lattigo::BGVRotateColumnsNewOp>;
 
 using ConvertBGVEncryptOp =
     ConvertRlweUnaryOp<lattigo::RLWEEncryptorType, lwe::RLWEEncryptOp,
@@ -460,31 +463,31 @@ using ConvertBGVDecodeOp =
 
 // CKKS
 using ConvertCKKSAddOp = ConvertRlweBinOp<lattigo::CKKSEvaluatorType,
-                                          lwe::RAddOp, lattigo::CKKSAddOp>;
+                                          lwe::RAddOp, lattigo::CKKSAddNewOp>;
 using ConvertCKKSSubOp = ConvertRlweBinOp<lattigo::CKKSEvaluatorType,
-                                          lwe::RSubOp, lattigo::CKKSSubOp>;
+                                          lwe::RSubOp, lattigo::CKKSSubNewOp>;
 using ConvertCKKSMulOp = ConvertRlweBinOp<lattigo::CKKSEvaluatorType,
-                                          lwe::RMulOp, lattigo::CKKSMulOp>;
+                                          lwe::RMulOp, lattigo::CKKSMulNewOp>;
 using ConvertCKKSAddPlainOp =
     ConvertRlwePlainOp<lattigo::CKKSEvaluatorType, ckks::AddPlainOp,
-                       lattigo::CKKSAddOp>;
+                       lattigo::CKKSAddNewOp>;
 using ConvertCKKSSubPlainOp =
     ConvertRlwePlainOp<lattigo::CKKSEvaluatorType, ckks::SubPlainOp,
-                       lattigo::CKKSSubOp>;
+                       lattigo::CKKSSubNewOp>;
 using ConvertCKKSMulPlainOp =
     ConvertRlwePlainOp<lattigo::CKKSEvaluatorType, ckks::MulPlainOp,
-                       lattigo::CKKSMulOp>;
+                       lattigo::CKKSMulNewOp>;
 
 using ConvertCKKSRelinOp =
     ConvertRlweUnaryOp<lattigo::CKKSEvaluatorType, ckks::RelinearizeOp,
-                       lattigo::CKKSRelinearizeOp>;
+                       lattigo::CKKSRelinearizeNewOp>;
 using ConvertCKKSModulusSwitchOp =
     ConvertRlweUnaryOp<lattigo::CKKSEvaluatorType, ckks::RescaleOp,
-                       lattigo::CKKSRescaleOp>;
+                       lattigo::CKKSRescaleNewOp>;
 
 using ConvertCKKSRotateOp =
     ConvertRlweRotateOp<lattigo::CKKSEvaluatorType, ckks::RotateOp,
-                        lattigo::CKKSRotateOp>;
+                        lattigo::CKKSRotateNewOp>;
 
 using ConvertCKKSEncryptOp =
     ConvertRlweUnaryOp<lattigo::RLWEEncryptorType, lwe::RLWEEncryptOp,
@@ -505,7 +508,41 @@ using ConvertCKKSDecodeOp =
 #include "lib/Dialect/LWE/Conversions/LWEToLattigo/LWEToLattigo.h.inc"
 
 struct LWEToLattigo : public impl::LWEToLattigoBase<LWEToLattigo> {
+  // See https://github.com/llvm/llvm-project/pull/127772
+  // During dialect conversion, the attribute of the func::CallOp is not
+  // preserved. We save the dialect attributes of func::CallOp before
+  // conversion and restore them after conversion.
+  //
+  // Note that this is not safe as after conversion the order of func::CallOp
+  // may change. However, this is the best we can do for now as we do not have
+  // a map from the old func::CallOp to the new func::CallOp.
+  SmallVector<SmallVector<NamedAttribute>> funcCallOpDialectAttrs;
+
+  void saveFuncCallOpDialectAttrs() {
+    funcCallOpDialectAttrs.clear();
+    auto *module = getOperation();
+    module->walk([&](func::CallOp callOp) {
+      SmallVector<NamedAttribute> dialectAttrs;
+      for (auto namedAttr : callOp->getDialectAttrs()) {
+        dialectAttrs.push_back(namedAttr);
+      }
+      funcCallOpDialectAttrs.push_back(dialectAttrs);
+    });
+  }
+
+  void restoreFuncCallOpDialectAttrs() {
+    auto *module = getOperation();
+    auto *funcCallOpDialectAttrsIter = funcCallOpDialectAttrs.begin();
+    module->walk([&](func::CallOp callOp) {
+      callOp->setDialectAttrs(*funcCallOpDialectAttrsIter);
+      ++funcCallOpDialectAttrsIter;
+    });
+  }
+
   void runOnOperation() override {
+    // Save the dialect attributes of func::CallOp before conversion.
+    saveFuncCallOpDialectAttrs();
+
     MLIRContext *context = &getContext();
     auto *module = getOperation();
     ToLattigoTypeConverter typeConverter(context);
@@ -569,7 +606,7 @@ struct LWEToLattigo : public impl::LWEToLattigoBase<LWEToLattigo> {
     auto gateByBGVModuleAttr =
         [&](const OpPredicate &inputPredicate) -> OpPredicate {
       return [module, inputPredicate](Operation *op) {
-        return moduleIsBGV(module) && inputPredicate(op);
+        return moduleIsBGVOrBFV(module) && inputPredicate(op);
       };
     };
 
@@ -638,13 +675,14 @@ struct LWEToLattigo : public impl::LWEToLattigoBase<LWEToLattigo> {
     patterns.add<AddEvaluatorArg>(context, evaluators);
     patterns.add<ConvertFuncCallOp>(context, evaluators);
 
-    if (moduleIsBGV(module)) {
+    if (moduleIsBGVOrBFV(module)) {
       patterns
           .add<ConvertBGVAddOp, ConvertBGVSubOp, ConvertBGVMulOp,
                ConvertBGVAddPlainOp, ConvertBGVSubPlainOp, ConvertBGVMulPlainOp,
-               ConvertBGVRelinOp, ConvertBGVModulusSwitchOp, ConvertBGVRotateOp,
-               ConvertBGVEncryptOp, ConvertBGVDecryptOp, ConvertBGVEncodeOp,
-               ConvertBGVDecodeOp>(typeConverter, context);
+               ConvertBGVRelinOp, ConvertBGVModulusSwitchOp,
+               ConvertBGVRotateColumnsOp, ConvertBGVEncryptOp,
+               ConvertBGVDecryptOp, ConvertBGVEncodeOp, ConvertBGVDecodeOp>(
+              typeConverter, context);
     }
     if (moduleIsCKKS(module)) {
       patterns.add<ConvertCKKSAddOp, ConvertCKKSSubOp, ConvertCKKSMulOp,
@@ -688,6 +726,9 @@ struct LWEToLattigo : public impl::LWEToLattigoBase<LWEToLattigo> {
     postPatterns2.add<RemoveKeyArg<lattigo::RLWESecretKeyType>>(context);
     postPatterns2.add<RemoveKeyArg<lattigo::RLWEPublicKeyType>>(context);
     walkAndApplyPatterns(module, std::move(postPatterns2));
+
+    // Restore the dialect attributes of func::CallOp after conversion.
+    restoreFuncCallOpDialectAttrs();
   }
 };
 

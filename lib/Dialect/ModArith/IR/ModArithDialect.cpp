@@ -15,9 +15,8 @@
 #include "mlir/include/mlir/Support/LLVM.h"              // from @llvm-project
 #include "mlir/include/mlir/Support/LogicalResult.h"     // from @llvm-project
 
-// NOLINTBEGIN(misc-include-cleaner): Required to define ModArithDialect,
-// ModArithTypes, ModArithOps, ModArithAttributes
-#include "lib/Dialect/ModArith/IR/ModArithAttributes.h"
+// NOLINTBEGIN(misc-include-cleaner): Required to define
+// ModArithDialect, ModArithTypes, ModArithOps,
 #include "lib/Dialect/ModArith/IR/ModArithOps.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"  // from @llvm-project
@@ -25,9 +24,6 @@
 
 // Generated definitions
 #include "lib/Dialect/ModArith/IR/ModArithDialect.cpp.inc"
-
-#define GET_ATTRDEF_CLASSES
-#include "lib/Dialect/ModArith/IR/ModArithAttributes.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
 #include "lib/Dialect/ModArith/IR/ModArithTypes.cpp.inc"
@@ -43,10 +39,6 @@ void ModArithDialect::initialize() {
   addTypes<
 #define GET_TYPEDEF_LIST
 #include "lib/Dialect/ModArith/IR/ModArithTypes.cpp.inc"
-      >();
-  addAttributes<
-#define GET_ATTRDEF_LIST
-#include "lib/Dialect/ModArith/IR/ModArithAttributes.cpp.inc"
       >();
   addOperations<
 #define GET_OP_LIST
@@ -135,50 +127,103 @@ LogicalResult BarrettReduceOp::verify() {
 }
 
 ParseResult ConstantOp::parse(OpAsmParser &parser, OperationState &result) {
-  APInt parsedValue(64, 0);
+  unsigned minBitwidth = 4;  // bitwidth assigned by parser to integer `1`
   Type parsedType;
+  if (parser.parseOptionalKeyword("dense").succeeded()) {
+    // Dense case
+    // We parse the integers as a list, rather than an ArrayAttr, so we can more
+    // easily convert them to the correct bitwidth (ArrayAttr forces I64)
+    std::vector<APInt> parsedInts;
+    if (parser.parseLess() ||
+        parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Square,
+                                       [&] {
+                                         APInt parsedInt;
+                                         if (parser.parseInteger(parsedInt))
+                                           return failure();
+                                         parsedInts.push_back(parsedInt);
+                                         return success();
+                                       }) ||
+        parser.parseGreater() || parser.parseColonType(parsedType))
+      return failure();
+    if (parsedInts.empty())
+      return parser.emitError(parser.getNameLoc(),
+                              "expected at least one integer in dense list.");
 
-  if (failed(parser.parseInteger(parsedValue))) {
-    parser.emitError(parser.getCurrentLocation(),
-                     "found invalid integer value");
-    return failure();
+    unsigned maxWidth = 0;
+    for (auto &parsedInt : parsedInts) {
+      // zero becomes `i64` when parsed, so truncate back down to minBitwidth
+      parsedInt = parsedInt.isZero() ? parsedInt.trunc(minBitwidth) : parsedInt;
+      maxWidth = std::max(maxWidth, parsedInt.getBitWidth());
+    }
+    for (auto &parsedInt : parsedInts) {
+      parsedInt = parsedInt.zextOrTrunc(maxWidth);
+    }
+    auto attr = DenseIntElementsAttr::get(
+        RankedTensorType::get({static_cast<int64_t>(parsedInts.size())},
+                              IntegerType::get(parser.getContext(), maxWidth)),
+        parsedInts);
+    result.addAttribute("value", attr);
+  } else {
+    // Scalar case
+    APInt parsedInt;
+    if (parser.parseInteger(parsedInt) || parser.parseColonType(parsedType))
+      return failure();
+    // zero becomes `i64` when parsed, so truncate back down to minBitwidth
+    if (parsedInt.isZero()) parsedInt = parsedInt.trunc(minBitwidth);
+    result.addAttribute(
+        "value", IntegerAttr::get(IntegerType::get(parser.getContext(),
+                                                   parsedInt.getBitWidth()),
+                                  parsedInt));
+  }
+  result.addTypes(parsedType);
+  return success();
+}
+
+LogicalResult ConstantOp::verify() {
+  auto shapedType = dyn_cast<ShapedType>(getType());
+  auto modType = dyn_cast<ModArithType>(getElementTypeOrSelf(getType()));
+  auto denseAttr = dyn_cast<DenseIntElementsAttr>(getValue());
+  auto intAttr = dyn_cast<IntegerAttr>(getValue());
+
+  assert(modType &&
+         "return type should be constrained to "
+         "ModArithLike by its ODS definition/type constraints.");
+
+  if (!!shapedType != !!denseAttr)
+    return emitOpError("must have shaped type iff value is `dense`.");
+
+  auto modBW = modType.getModulus().getValue().getBitWidth();
+
+  if (intAttr) {
+    if (intAttr.getValue().getBitWidth() > modBW)
+      return emitOpError(
+          "value's bitwidth must not be larger than underlying type.");
+    return success();
   }
 
-  if (parser.parseColon() || parser.parseType(parsedType)) return failure();
+  if (denseAttr) {
+    assert(denseAttr.getShapedType().hasStaticShape() &&
+           "dense attribute should be guaranteed to have static shape.");
 
-  auto modArithType = dyn_cast<ModArithType>(parsedType);
-  if (!modArithType) return failure();
+    if (!shapedType.hasStaticShape() ||
+        shapedType.getShape() != denseAttr.getShapedType().getShape())
+      return emitOpError("tensor shape must be static and match value shape.");
 
-  auto outputBitWidth =
-      modArithType.getModulus().getType().getIntOrFloatBitWidth();
-  if (parsedValue.getActiveBits() > outputBitWidth)
-    return parser.emitError(parser.getCurrentLocation(),
-                            "constant value is too large for the modulus");
+    if (denseAttr.getElementType().getIntOrFloatBitWidth() > modBW)
+      return emitOpError(
+          "values's bitwidth must not be larger than underlying type");
 
-  auto intValue = IntegerAttr::get(modArithType.getModulus().getType(),
-                                   parsedValue.trunc(outputBitWidth));
-  result.addAttribute(
-      "value", ModArithAttr::get(parser.getContext(), modArithType, intValue));
-  result.addTypes(modArithType);
-  return success();
+    return success();
+  }
+  // anything else: failure
+  return emitOpError("value must be IntegerAttr or DenseIntElementsAttr.");
 }
 
 void ConstantOp::print(OpAsmPrinter &p) {
   p << " ";
-  // getValue chain:
-  // op's ModArithAttribute value
-  //   -> ModArithAttribute's IntegerAttr value
-  //   -> IntegerAttr's APInt value
-  getValue().getValue().getValue().print(p.getStream(), true);
+  p.printAttributeWithoutType(getValue());
   p << " : ";
   p.printType(getOutput().getType());
-}
-
-LogicalResult ConstantOp::inferReturnTypes(
-    mlir::MLIRContext *context, std::optional<mlir::Location> loc,
-    ConstantOpAdaptor adaptor, llvm::SmallVectorImpl<mlir::Type> &returnTypes) {
-  returnTypes.push_back(adaptor.getValue().getType());
-  return success();
 }
 
 }  // namespace mod_arith

@@ -17,7 +17,6 @@
 #include "lib/Dialect/Mgmt/IR/MgmtDialect.h"
 #include "lib/Dialect/Mgmt/IR/MgmtOps.h"
 #include "lib/Dialect/ModArith/IR/ModArithTypes.h"
-#include "lib/Dialect/ModuleAttributes.h"
 #include "lib/Dialect/Polynomial/IR/PolynomialAttributes.h"
 #include "lib/Dialect/RNS/IR/RNSTypes.h"
 #include "lib/Dialect/Secret/IR/SecretDialect.h"
@@ -185,9 +184,6 @@ struct SecretToBGV : public impl::SecretToBGVBase<SecretToBGV> {
     MLIRContext *context = &getContext();
     auto *module = getOperation();
 
-    // Helper for future lowerings that want to know what scheme was used
-    module->setAttr(kBGVSchemeAttrName, UnitAttr::get(context));
-
     // used by LWE type
     int64_t plaintextModulus;
     std::vector<int64_t> primes;
@@ -211,8 +207,11 @@ struct SecretToBGV : public impl::SecretToBGVBase<SecretToBGV> {
       auto maxLevel = getMaxLevel();
       std::vector<double> logPrimes(maxLevel + 1, 45);  // all primes of 45 bits
 
-      auto schemeParam =
-          bgv::SchemeParam::getConcreteSchemeParam(logPrimes, plaintextModulus);
+      // pass option polyModDegree is actually the number of slots
+      // assuming slots = ringDim / 2 for 1-dim vector behavior
+      // TODO(#1402): use a proper name for BGV
+      auto schemeParam = bgv::SchemeParam::getConcreteSchemeParam(
+          logPrimes, plaintextModulus, polyModDegree);
 
       primes = schemeParam.getQi();
 
@@ -296,7 +295,7 @@ struct SecretToBGV : public impl::SecretToBGVBase<SecretToBGV> {
         SecretGenericOpRelinearizeConversion<bgv::RelinearizeOp>,
         SecretGenericOpModulusSwitchConversion<bgv::ModulusSwitchOp>,
         SecretGenericOpConversion<tensor::ExtractOp, bgv::ExtractOp>,
-        SecretGenericOpRotateConversion<bgv::RotateOp>,
+        SecretGenericOpRotateConversion<bgv::RotateColumnsOp>,
         SecretGenericOpCipherPlainConversion<arith::AddIOp, bgv::AddPlainOp>,
         SecretGenericOpCipherPlainConversion<arith::SubIOp, bgv::SubPlainOp>,
         SecretGenericOpCipherPlainConversion<arith::MulIOp, bgv::MulPlainOp>>(

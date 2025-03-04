@@ -59,7 +59,7 @@ def Secret_ConcealOp : Secret_Op<"conceal", [Pure]> {
 
   let arguments = (ins AnyType:$cleartext);
   let results = (outs Secret:$output);
-  let assemblyFormat = "$cleartext attr-dict `:` type($cleartext) `->` type($output)";
+  let assemblyFormat = "$cleartext attr-dict `:` qualified(type($cleartext)) `->` qualified(type($output))";
 
   let builders = [
     // Builder to infer output type from the input type
@@ -84,7 +84,7 @@ def Secret_RevealOp : Secret_Op<"reveal", [Pure]> {
 
   let arguments = (ins Secret:$input);
   let results = (outs AnyType:$cleartext);
-  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($cleartext)";
+  let assemblyFormat = "$input attr-dict `:` qualified(type($input)) `->` qualified(type($cleartext))";
 
   let builders = [
     // Builder to infer output type from the input type
@@ -258,6 +258,13 @@ def Secret_GenericOp : Secret_Op<"generic", [
       return argDict ? argDict.get(name) : nullptr;
     }
 
+    /// Return all of the attributes for the argument at 'index'.
+    ::llvm::ArrayRef<::mlir::NamedAttribute> getArgAttrs(unsigned index) {
+      std::string argName = "arg" + std::to_string(index);
+      auto argDict = this->getOperation()->getAttrOfType<DictionaryAttr>(argName);
+      return argDict ? argDict.getValue() : std::nullopt;
+    }
+
     /// If the an attribute exists with the specified name, change it to the new
     /// value. Otherwise, add a new attribute with the specified name/value.
     void setArgAttr(unsigned index, StringRef name, Attribute value) {
@@ -278,6 +285,12 @@ def Secret_GenericOp : Secret_Op<"generic", [
       }));
 
       this->getOperation()->setAttr(argName, DictionaryAttr::get(getContext(), newAttrs));
+    }
+
+    /// Set the attributes held by the argument at 'index'.
+    void setArgAttrs(unsigned index, ::llvm::ArrayRef<::mlir::NamedAttribute> attributes) {
+      std::string argName = "arg" + std::to_string(index);
+      this->getOperation()->setAttr(argName, DictionaryAttr::get(getContext(), attributes));
     }
 
     // remove the specified attribute, if present, for the argument at 'index',
@@ -304,6 +317,12 @@ def Secret_GenericOp : Secret_Op<"generic", [
         this->getOperation()->setAttr(argName, DictionaryAttr::get(getContext(), newAttrs));
       }
       return attr;
+    }
+
+    /// Remove the attributes held by the argument at 'index'.
+    void removeArgAttrs(unsigned index) {
+      std::string argName = "arg" + std::to_string(index);
+      this->getOperation()->removeAttr(argName);
     }
 
     //===------------------------------------------------------------------===//

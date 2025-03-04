@@ -45,6 +45,7 @@
 #include "lib/Dialect/Secret/Transforms/BufferizableOpInterfaceImpl.h"
 #include "lib/Dialect/Secret/Transforms/Passes.h"
 #include "lib/Dialect/TOSA/Conversions/TosaToSecretArith/TosaToSecretArith.h"
+#include "lib/Dialect/TensorExt/Conversions/TensorExtToTensor/TensorExtToTensor.h"
 #include "lib/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "lib/Dialect/TensorExt/Transforms/Passes.h"
 #include "lib/Dialect/TfheRust/IR/TfheRustDialect.h"
@@ -67,6 +68,7 @@
 #include "lib/Transforms/LinalgCanonicalizations/LinalgCanonicalizations.h"
 #include "lib/Transforms/OperationBalancer/OperationBalancer.h"
 #include "lib/Transforms/OptimizeRelinearization/OptimizeRelinearization.h"
+#include "lib/Transforms/PolynomialApproximation/PolynomialApproximation.h"
 #include "lib/Transforms/SecretInsertMgmt/Passes.h"
 #include "lib/Transforms/Secretize/Passes.h"
 #include "lib/Transforms/StraightLineVectorizer/StraightLineVectorizer.h"
@@ -110,8 +112,6 @@
 #include "mlir/include/mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tosa/IR/TosaOps.h"     // from @llvm-project
-#include "mlir/include/mlir/IR/OpImplementation.h"         // from @llvm-project
-#include "mlir/include/mlir/IR/Region.h"                   // from @llvm-project
 #include "mlir/include/mlir/Pass/PassManager.h"            // from @llvm-project
 #include "mlir/include/mlir/Pass/PassRegistry.h"           // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
@@ -256,6 +256,7 @@ int main(int argc, char **argv) {
   registerUnusedMemRefPasses();
   registerValidateNoisePasses();
   registerOptimizeRelinearizationPasses();
+  registerPolynomialApproximationPasses();
   registerLayoutPropagationPasses();
   registerLinalgCanonicalizationsPasses();
   registerTensorToScalarsPasses();
@@ -299,6 +300,7 @@ int main(int argc, char **argv) {
   lwe::registerLWEToPolynomialPasses();
   ::mlir::heir::linalg::registerLinalgToTensorExtPasses();
   ::mlir::heir::polynomial::registerPolynomialToModArithPasses();
+  tensor_ext::registerTensorExtToTensorPasses();
   registerCGGIToJaxitePasses();
   registerCGGIToTfheRustPasses();
   registerCGGIToTfheRustBoolPasses();
@@ -352,6 +354,12 @@ int main(int argc, char **argv) {
       "Convert a func using standard MLIR dialects to FHE using "
       "BGV.",
       mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::bgvScheme));
+
+  PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
+      "mlir-to-bfv",
+      "Convert a func using standard MLIR dialects to FHE using "
+      "BFV.",
+      mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::bfvScheme));
 
   PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
       "mlir-to-ckks",

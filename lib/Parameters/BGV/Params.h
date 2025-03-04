@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "lib/Dialect/BGV/IR/BGVAttributes.h"
 #include "lib/Parameters/RLWEParams.h"
 #include "llvm/include/llvm/Support/raw_ostream.h"  // from @llvm-project
 
@@ -26,10 +27,14 @@ class SchemeParam : public RLWESchemeParam {
   void print(llvm::raw_ostream &os) const override;
 
   static SchemeParam getConservativeSchemeParam(int level,
-                                                int64_t plaintextModulus);
+                                                int64_t plaintextModulus,
+                                                int slotNumber);
 
   static SchemeParam getConcreteSchemeParam(std::vector<double> logqi,
-                                            int64_t plaintextModulus);
+                                            int64_t plaintextModulus,
+                                            int slotNumber);
+
+  static SchemeParam getSchemeParamFromAttr(SchemeParamAttr attr);
 };
 
 // Parameter for each BGV ciphertext SSA value.
