@@ -37,7 +37,7 @@ struct AnnotateParameters : impl::AnnotateParametersBase<AnnotateParameters> {
       return;
     }
 
-    annotateCountParams(getOperation(), &solver, ringDimension, plaintextModulus);
+    annotateCountParams(getOperation(), &solver, ringDimension, plaintextModulus, algorithm);
   }
 };
 

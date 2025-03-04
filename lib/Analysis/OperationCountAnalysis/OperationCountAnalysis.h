@@ -113,7 +113,7 @@ class OperationCountAnalysis
 };
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
-                         int ringDimension, int plaintextModulus);
+                         int ringDimension, int plaintextModulus, std::string algorithm);
 
 }  // namespace heir
 }  // namespace mlir

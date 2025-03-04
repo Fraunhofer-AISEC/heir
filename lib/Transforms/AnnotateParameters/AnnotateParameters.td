@@ -11,7 +11,8 @@ def AnnotateParameters : Pass<"annotate-parameters"> {
   }];
   let options = [
     Option<"ringDimension", "ring-dimension", "int", "0", "Specify the ring dimension for the parameters">,
-    Option<"plaintextModulus", "plaintext-modulus", "int","0", "Specify the plaintext modulus for the parameters">
+    Option<"plaintextModulus", "plaintext-modulus", "int", "0", "Specify the plaintext modulus for the parameters">,
+    Option<"algorithm", "algorithm", "std::string", "\"OpenFHE\"", "Specify the algorithm to determine the moduli">
   ];
 }
 
