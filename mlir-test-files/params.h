@@ -1,25 +1,48 @@
-#ifndef PARAMS_H
-#define PARAMS_H
+#pragma once
 
-#include "src/pke/include/openfhe.h"  // from @openfhe
+#include <string>
+#include "src/pke/include/openfhe.h" 
 
 using namespace lbcrypto;
 
-void printModulusChain(const CryptoContext<DCRTPoly>& cc) {
-  auto modulusChain = cc->GetCryptoParameters()->GetElementParams()->GetParams();
-  
-  std::cout << "Modulus chain sizes (in bits): [";
-  for (size_t i = 0; i < modulusChain.size(); ++i) {
-    std::cout << modulusChain[i]->GetModulus().GetMSB();
-    if (i != modulusChain.size() - 1) {
-      std::cout << ", ";
-    }
-  }
-  std::cout << "]" << std::endl;
+/**
+ * Converts cryptographic parameters to a JSON string
+ * 
+ * @param cc The cryptographic context
+ * @param testname Name of the test
+ * @param selectionApproach Approach used for parameter selection
+ * @return A JSON string containing the parameters
+ */
+std::string getParamsAsJsonString(const CryptoContext<DCRTPoly>& cc, 
+                                 const std::string& testname,
+                                 const std::string& selectionApproach);
 
-  // Print the total size of the modulus chain
-  std::cout << cc->GetCryptoParameters()->GetElementParams()->GetModulus().GetMSB() << std::endl;
-  
-}
+/**
+ * Prints the modulus chain to standard output (legacy version)
+ * 
+ * @param cc The cryptographic context
+ */
+void printModulusChain(const CryptoContext<DCRTPoly>& cc);
 
-#endif // PARAMS_H
+/**
+ * Prints the modulus chain to standard output
+ *
+ * @param cc The cryptographic context
+ * @param testname Name of the test
+ * @param selectionApproach Approach used for parameter selection
+ */
+void printModulusChain(const CryptoContext<DCRTPoly>& cc,
+                       const std::string& testname,
+                       const std::string& selectionApproach);
+
+/**
+ * Saves parameters to a JSON file
+ * 
+ * @param cc The cryptographic context
+ * @param testname Name of the test
+ * @param selectionApproach Approach used for parameter selection
+ * @return True if file was successfully written, false otherwise
+ */
+bool saveParamsToJsonFile(const CryptoContext<DCRTPoly>& cc, 
+                         const std::string& testname, 
+                         const std::string& selectionApproach);
