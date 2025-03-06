@@ -251,63 +251,321 @@ cc_binary(
 )
 
 cc_library(
-    name = "add-256-0",
-    srcs = ["add-256-0/add-256-0.cpp"],
-    hdrs = ["add-256-0/add-256-0.h"],
+    name = "main_add-64-0_common",
+    srcs = ["add-64-0/main_add-64-0_common.cpp"],
+    hdrs = ["add-64-0/main_add-64-0_common.h"],
     deps = [
-        "@openfhe//:pke"
-    ],
-)
-
-cc_binary(
-    name = "main_add-256-0",
-    srcs = ["add-256-0/main_add-256-0.cpp"],
-    deps = [
-        ":add-256-0",
         ":params",
-        "@openfhe//:core",
         "@openfhe//:pke",
     ],
 )
 
 cc_binary(
-    name = "main_add-256-0_direct",
-    srcs = [
-        "add-256-0/add-256-0_direct.cpp",
-        "add-256-0/add-256-0_direct.h",
-    ],
+    name = "main_add-64-0_bisection",
+    srcs = ["add-64-0/main_add-64-0_bisection.cpp"],
     deps = [
-        "@openfhe//:openfhe",
+        ":main_add-64-0_common",
+        ":add-64-0_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-0_openfhe",
+    srcs = ["add-64-0/main_add-64-0_openfhe.cpp"],
+    deps = [
+        ":main_add-64-0_common",
+        ":add-64-0_openfhe",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-0_direct",
+    srcs = ["add-64-0/main_add-64-0_direct.cpp"],
+    deps = [
+        ":main_add-64-0_common",
+        ":add-64-0_direct",
     ],
 )
 
 cc_library(
-    name = "add-64-3",
-    srcs = ["add-64-3/add-64-3.cpp"],
-    hdrs = ["add-64-3/add-64-3.h"],
+    name = "add-64-0_bisection",
+    srcs = ["add-64-0/add-64-0_bisection.cpp"],
+    hdrs = ["add-64-0/add-64-0_bisection.h"],
     deps = [
-        "@openfhe//:pke"
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-0_openfhe",
+    srcs = ["add-64-0/add-64-0_openfhe.cpp"],
+    hdrs = ["add-64-0/add-64-0_openfhe.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-0_direct",
+    srcs = ["add-64-0/add-64-0_direct.cpp"],
+    hdrs = ["add-64-0/add-64-0_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-64-1_common",
+    srcs = ["add-64-1/main_add-64-1_common.cpp"],
+    hdrs = ["add-64-1/main_add-64-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
     ],
 )
 
 cc_binary(
-    name = "main_add-64-3",
-    srcs = ["add-64-3/main_add-64-3.cpp"],
+    name = "main_add-64-1_bisection",
+    srcs = ["add-64-1/main_add-64-1_bisection.cpp"],
     deps = [
-        ":add-64-3",
-        ":params",
-        "@openfhe//:core",
+        ":main_add-64-1_common",
+        ":add-64-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-1_openfhe",
+    srcs = ["add-64-1/main_add-64-1_openfhe.cpp"],
+    deps = [
+        ":main_add-64-1_common",
+        ":add-64-1_openfhe",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-1_direct",
+    srcs = ["add-64-1/main_add-64-1_direct.cpp"],
+    deps = [
+        ":main_add-64-1_common",
+        ":add-64-1_direct",
+    ],
+)
+
+cc_library(
+    name = "add-64-1_bisection",
+    srcs = ["add-64-1/add-64-1_bisection.cpp"],
+    hdrs = ["add-64-1/add-64-1_bisection.h"],
+    deps = [
         "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-1_openfhe",
+    srcs = ["add-64-1/add-64-1_openfhe.cpp"],
+    hdrs = ["add-64-1/add-64-1_openfhe.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-1_direct",
+    srcs = ["add-64-1/add-64-1_direct.cpp"],
+    hdrs = ["add-64-1/add-64-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-64-2_common",
+    srcs = ["add-64-2/main_add-64-2_common.cpp"],
+    hdrs = ["add-64-2/main_add-64-2_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-2_bisection",
+    srcs = ["add-64-2/main_add-64-2_bisection.cpp"],
+    deps = [
+        ":main_add-64-2_common",
+        ":add-64-2_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-2_openfhe",
+    srcs = ["add-64-2/main_add-64-2_openfhe.cpp"],
+    deps = [
+        ":main_add-64-2_common",
+        ":add-64-2_openfhe",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-2_direct",
+    srcs = ["add-64-2/main_add-64-2_direct.cpp"],
+    deps = [
+        ":main_add-64-2_common",
+        ":add-64-2_direct",
+    ],
+)
+
+cc_library(
+    name = "add-64-2_bisection",
+    srcs = ["add-64-2/add-64-2_bisection.cpp"],
+    hdrs = ["add-64-2/add-64-2_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-2_openfhe",
+    srcs = ["add-64-2/add-64-2_openfhe.cpp"],
+    hdrs = ["add-64-2/add-64-2_openfhe.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-2_direct",
+    srcs = ["add-64-2/add-64-2_direct.cpp"],
+    hdrs = ["add-64-2/add-64-2_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-64-3_common",
+    srcs = ["add-64-3/main_add-64-3_common.cpp"],
+    hdrs = ["add-64-3/main_add-64-3_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-3_bisection",
+    srcs = ["add-64-3/main_add-64-3_bisection.cpp"],
+    deps = [
+        ":main_add-64-3_common",
+        ":add-64-3_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-3_openfhe",
+    srcs = ["add-64-3/main_add-64-3_openfhe.cpp"],
+    deps = [
+        ":main_add-64-3_common",
+        ":add-64-3_openfhe",
     ],
 )
 
 cc_binary(
     name = "main_add-64-3_direct",
-    srcs = [
-        "add-64-3/add-64-3_direct.cpp",
-        "add-64-3/add-64-3_direct.h",
-    ],
+    srcs = ["add-64-3/main_add-64-3_direct.cpp"],
     deps = [
-        "@openfhe//:openfhe",
+        ":main_add-64-3_common",
+        ":add-64-3_direct",
+    ],
+)
+
+cc_library(
+    name = "add-64-3_bisection",
+    srcs = ["add-64-3/add-64-3_bisection.cpp"],
+    hdrs = ["add-64-3/add-64-3_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-3_openfhe",
+    srcs = ["add-64-3/add-64-3_openfhe.cpp"],
+    hdrs = ["add-64-3/add-64-3_openfhe.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-3_direct",
+    srcs = ["add-64-3/add-64-3_direct.cpp"],
+    hdrs = ["add-64-3/add-64-3_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-64-4_common",
+    srcs = ["add-64-4/main_add-64-4_common.cpp"],
+    hdrs = ["add-64-4/main_add-64-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-4_bisection",
+    srcs = ["add-64-4/main_add-64-4_bisection.cpp"],
+    deps = [
+        ":main_add-64-4_common",
+        ":add-64-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-4_openfhe",
+    srcs = ["add-64-4/main_add-64-4_openfhe.cpp"],
+    deps = [
+        ":main_add-64-4_common",
+        ":add-64-4_openfhe",
+    ],
+)
+
+cc_binary(
+    name = "main_add-64-4_direct",
+    srcs = ["add-64-4/main_add-64-4_direct.cpp"],
+    deps = [
+        ":main_add-64-4_common",
+        ":add-64-4_direct",
+    ],
+)
+
+cc_library(
+    name = "add-64-4_bisection",
+    srcs = ["add-64-4/add-64-4_bisection.cpp"],
+    hdrs = ["add-64-4/add-64-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-4_openfhe",
+    srcs = ["add-64-4/add-64-4_openfhe.cpp"],
+    hdrs = ["add-64-4/add-64-4_openfhe.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-64-4_direct",
+    srcs = ["add-64-4/add-64-4_direct.cpp"],
+    hdrs = ["add-64-4/add-64-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
     ],
 )
