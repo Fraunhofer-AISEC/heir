@@ -2,8 +2,8 @@
 #include <iostream>
 #include <vector>
 
-#include "dot8_bisection.h"
-#include "main_dot8_common.h"
+#include "add-64-4_bisection.h"
+#include "main_add-64-4_common.h"
 
 int main(int argc, char* argv[]) {
     return run(
