@@ -6,7 +6,7 @@
 #include "main_dot8_common.h"
 
 int main(int argc, char* argv[]) {
-  return run_dot8_main(
+  return run(
       func__generate_crypto_context,
       func__configure_crypto_context,
       func__encrypt__arg0,
