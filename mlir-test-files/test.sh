@@ -49,6 +49,9 @@ for arg in "$@"; do
     # Replace the include path in the generated C++ files
     run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_bisection.h" "$name/${name}_bisection.cpp" "$name/${name}_openfhe.h" "$name/${name}_openfhe.cpp" "$name/${name}_direct.h" "$name/${name}_direct.cpp"
     
+    # Add FIXEDAUTO scaling technique to direct variant
+    run_command sed -i 's/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/' "$name/${name}_direct.cpp"
+    
     # General command for adding noise eval outputs
     # run_command sed -i 's/^\(\s*\)const auto& \(ct[0-9][0-9]*\) = cc->\(EvalAdd\|EvalRotate\|ModReduce\)\(.*;\)$/\0\n\1std::cout << "\3 operation produced \2" << std::endl;/' /home/ubuntu/heir-aisec/mlir-test-files/${name/${name}.cpp
 
