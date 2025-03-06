@@ -17,7 +17,7 @@
 // Common main function implementation that uses the specified variant's functions
 template <typename FuncGenerator, typename FuncConfigure, typename FuncEncryptArg0,
           typename FuncEncryptArg1, typename FuncCompute, typename FuncDecryptResult>
-int run_dot8_main(FuncGenerator generateCryptoContext,
+int run(FuncGenerator generateCryptoContext,
                   FuncConfigure configureCryptoContext,
                   FuncEncryptArg0 encryptArg0,
                   FuncEncryptArg1 encryptArg1,

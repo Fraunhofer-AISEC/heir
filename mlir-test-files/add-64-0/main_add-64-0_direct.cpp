@@ -2,8 +2,8 @@
 #include <iostream>
 #include <vector>
 
-#include "dot8_bisection.h"
-#include "main_dot8_common.h"
+#include "add-64-0_direct.h"
+#include "main_add-64-0_common.h"
 
 int main(int argc, char* argv[]) {
     return run(
@@ -13,6 +13,6 @@ int main(int argc, char* argv[]) {
       func__encrypt__arg1,
       func,
       func__decrypt__result0,
-      "bisection"
+      "direct"
   );
 }
