@@ -178,10 +178,10 @@ static std::vector<double> computeBoundChain(
     double p, int numPrimes, const std::vector<OperationCount> &levelOpCounts,
     double boundClean, double boundScale, double addedNoiseKeySwitching) {
 
-  std::vector<double> bound(numPrimes + 1);
+  std::vector<double> bound(numPrimes);
   bound[0] = boundClean;
   
-  for (int i = 0; i < numPrimes; ++i) {
+  for (int i = 0; i < numPrimes - 1; ++i) {
     int ciphertextCount = levelOpCounts[numPrimes - i - 1].getCiphertextCount();
     int keySwitchCount = levelOpCounts[numPrimes - i - 1].getKeySwitchCount();
 
@@ -200,7 +200,7 @@ static double computeObjectiveFunction(
   std::vector<double> bound =
       computeBoundChain(p, numPrimes, levelOpCounts, bClean, bScale, nuKS);
 
-  double q = 2 * bound[numPrimes];
+  double q = 2 * bound[numPrimes - 1];
 
   return p + q;
 }
@@ -218,7 +218,7 @@ static double computeFirstModSizeFromChain(
 static double derivativeObjective(
     double p, int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS, double rel_step = 1) {
+    double bClean, double bScale, double nuKS, double rel_step = 1e-4) {
   double h = rel_step * p;
   return (computeObjectiveFunction(p + h, ringDimension, plaintextModulus,
                                    levelOpCounts, numPrimes, bClean, bScale,
@@ -232,9 +232,30 @@ static double derivativeObjective(
 static double findOptimalScalingModSize(
     int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS, double tol = 1e-6,
+    double bClean, double bScale, double nuKS,
     double pLow = 2, double pHigh = pow(2.0, 60)) {
-  // Bisection on the derivative.
+  // Check if bounds are valid (not infinity)
+  auto checkBounds = [&](double p) {
+    std::vector<double> bounds =
+        computeBoundChain(p, numPrimes, levelOpCounts, bClean, bScale, nuKS);
+    for (const auto& b : bounds) {
+      if (std::isinf(b) || std::isnan(b)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Increase pLow until all bounds in the chain are valid
+  while (!checkBounds(pLow) && pLow < pHigh) {
+    pLow *= 2.0;
+    if (pLow > pHigh) {
+      pLow = pHigh * 0.9; // Set to slightly below pHigh as fallback
+      break;
+    }
+  }
+  
+  // Bisection
   while (log2(pHigh - pLow) > 1) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
