@@ -842,7 +842,7 @@ backend by manually calling the relevant compiler passes and setting up a C++
 harness to call into the HEIR-generated functions.&lt;/p>
 &lt;p>Note: other backends are similar, but the different backends are in varying
 stages of development.&lt;/p>
-&lt;p>The input program is in &lt;code>tests/Examples/openfhe/dot_product_8.mlir&lt;/code>. Support for
+&lt;p>The input program is in &lt;code>tests/Examples/common/dot_product_8.mlir&lt;/code>. Support for
 standard input languages like &lt;code>C&lt;/code> and &lt;code>C++&lt;/code> are currently experimental at best,
 but eventually we would use an MLIR-based tool to convert an input language to
 MLIR like in that file. The program is below:&lt;/p>
@@ -865,7 +865,7 @@ MLIR like in that file. The program is below:&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>bazel run //tools:heir-opt -- &lt;span style="color:#4e9a06">\
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#4e9a06">&lt;/span>--mlir-to-bgv&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#4e9a06">&amp;#39;ciphertext-degree=8&amp;#39;&lt;/span>&lt;span style="color:#4e9a06">\
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#4e9a06">&lt;/span>--scheme-to-openfhe&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#4e9a06">&amp;#39;entry-function=dot_product&amp;#39;&lt;/span> &lt;span style="color:#4e9a06">\
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#4e9a06">&lt;/span>&lt;span style="color:#000">$PWD&lt;/span>/tests/Examples/openfhe/dot_product_8.mlir &amp;gt; output.mlir
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#4e9a06">&lt;/span>&lt;span style="color:#000">$PWD&lt;/span>/tests/Examples/common/dot_product_8.mlir &amp;gt; output.mlir
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>This produces a file in the &lt;code>openfhe&lt;/code> exit dialect (part of HEIR).&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">!&lt;/span>&lt;span style="color:#f57900">Z1005037682689_i64_ =&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>mod_arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>int&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1005037682689&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">!&lt;/span>&lt;span style="color:#f57900">Z1032955396097_i64_ =&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>mod_arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>int&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1032955396097&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
@@ -904,7 +904,7 @@ MLIR like in that file. The program is below:&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%9&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>make_packed_plaintext &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%cst&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">(!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#204a87;font-weight:bold">tensor&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">8x&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_pt_L1_
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%10&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>mul_plain &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%8&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%9&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">(!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_pt_L1_&lt;span style="color:#000;font-weight:bold">)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%11&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>rot &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%10&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">index =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">7&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">index&lt;/span>&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">(!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_&lt;span style="color:#000;font-weight:bold">)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%12&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> lwe&lt;span style="color:#000;font-weight:bold">.&lt;/span>reinterpret_underlying_type &lt;span style="color:#000">%11&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_ to &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%12&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> lwe&lt;span style="color:#000;font-weight:bold">.&lt;/span>reinterpret_application_data &lt;span style="color:#000">%11&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_ to &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_1
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%13&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>mod_reduce &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%12&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">(!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L1_1&lt;span style="color:#000;font-weight:bold">)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L0_
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%13&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>rlwe_ct_L0_
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span>
@@ -1094,7 +1094,7 @@ he IR changes with each pass), use &lt;code>python scripts/lit_to_bazel.py&lt;/c
 &lt;p>Getting a visualization of the IR during optimization/transformation might help
 you understand what is going on more easily.&lt;/p>
 &lt;p>Still taking the &lt;code>dot_product_8.mlir&lt;/code> as an example:&lt;/p>
-&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>bazel run --ui_event_filters&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>-info,-debug,-warning,-stderr,-stdout --noshow_progress --logging&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">0&lt;/span> //tools:heir-opt -- --wrap-generic --heir-simd-vectorizer &lt;span style="color:#000">$PWD&lt;/span>/tests/Examples/openfhe/dot_product_8.mlir --view-op-graph 2&amp;gt; dot_product_8.dot
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>bazel run --ui_event_filters&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>-info,-debug,-warning,-stderr,-stdout --noshow_progress --logging&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">0&lt;/span> //tools:heir-opt -- --wrap-generic --heir-simd-vectorizer &lt;span style="color:#000">$PWD&lt;/span>/tests/Examples/common/dot_product_8.mlir --view-op-graph 2&amp;gt; dot_product_8.dot
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>dot -Tpdf dot_product_8.dot &amp;gt; dot_product_8.pdf
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic"># open pdf in your favorite pdf viewer&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>The diagram is also shown below. It demonstrates that the HEIR SIMD vectorizer
@@ -3304,30 +3304,18 @@ arguments in the function body.&lt;/li>
 &lt;/ul>
 &lt;h4 id="statistics">Statistics&lt;/h4>
 &lt;pre tabindex="0">&lt;code>total circuit size : The total circuit size for all optimized circuits, after optimization is done.
-&lt;/code>&lt;/pre></description></item><item><title>Blog: HEIR meeting 2024-11-26</title><link>https://heir.dev/blog/2024/11/26/heir-meeting-2024-11-26/</link><pubDate>Tue, 26 Nov 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/11/26/heir-meeting-2024-11-26/</guid><description>
+&lt;/code>&lt;/pre></description></item><item><title>Blog: HEIR as a Platform for Research (and new YouTube Channel)</title><link>https://heir.dev/blog/2024/12/05/heir-as-a-platform-for-research-and-new-youtube-channel/</link><pubDate>Thu, 05 Dec 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/12/05/heir-as-a-platform-for-research-and-new-youtube-channel/</guid><description>
+&lt;p>On 2024-12-05, the HEIR team presented a talk aimed at giving researchers a
+high-level overview of the HEIR project, brainstorming where new research might
+be needed, and discussing how the HEIR team could help with research projects.&lt;/p>
+&lt;p>The &lt;a href="https://youtu.be/t_XHw7LVy8s">video recording of this talk&lt;/a> is on YouTube,
+and this is the first video posted on the
+&lt;a href="https://www.youtube.com/@HEIRCompiler">new HEIR YouTube channel&lt;/a>.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-09-12</title><link>https://heir.dev/blog/2023/09/13/heir-meeting-2023-09-12/</link><pubDate>Wed, 13 Sep 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/09/13/heir-meeting-2023-09-12/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/10WTpdVaLz4mgmTwlJ3lVMGD4qmiNEl2Uvt3R3h0XFmc/edit?hl=en&amp;amp;forcehl=1&amp;amp;tab=t.0#heading=h.w3lar3vbuip1">notes&lt;/a>,
-&lt;a href="https://drive.google.com/file/d/13yvX_ap09tTqwJsdABDf3WDl79GF3bJx/view?usp=sharing">video recording&lt;/a>,
+&lt;a href="https://docs.google.com/document/d/1gOH1V6ORQwJDDo6I4jrDgCqqNFTsfcQbfpdUR6tv_60/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://docs.google.com/document/d/1s5iXtOSpIDJX3JOEB5gQqUPm5lo1gLpRUM10pBfAdoo/edit?usp=sharing">a transcription of the recording&lt;/a>
-from the HEIR meeting on 2024-11-26.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-07-11</title><link>https://heir.dev/blog/2024/07/11/heir-meeting-2024-07-11/</link><pubDate>Thu, 11 Jul 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/07/11/heir-meeting-2024-07-11/</guid><description>
-&lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1kP1kFKV6qrLVPv4CnIhmqO-7nMDFkCpvhzwIppJEDfU/edit?usp=sharing">notes&lt;/a>
-and
-&lt;a href="https://drive.google.com/file/d/1-f5ZJ5h28FIgk_-LisNsYa77iuWPIAjU/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2024-07-11.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-08-29</title><link>https://heir.dev/blog/2023/09/05/heir-meeting-2023-08-29/</link><pubDate>Tue, 05 Sep 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/09/05/heir-meeting-2023-08-29/</guid><description>
-&lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1Lax8Inby5Mg8BZLkcV_5hUiWH-roL22rtszfc0PBGmE/edit?usp=sharing">notes&lt;/a>
-from the HEIR meeting on 2023-08-29. There was an issue with the recording, so
-there is no video recording this week.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-08-01</title><link>https://heir.dev/blog/2023/08/02/heir-meeting-2023-08-01/</link><pubDate>Wed, 02 Aug 2023 15:46:42 -0700</pubDate><guid>https://heir.dev/blog/2023/08/02/heir-meeting-2023-08-01/</guid><description>
-&lt;p>The fourth HEIR meeting was 2023-08-01
-(&lt;a href="https://docs.google.com/document/d/1gid-MARMUStb3dB9jsXEV_CnPDpf_9cyPXy9uXtZk08/edit?usp=sharing">notes&lt;/a>
-and
-&lt;a href="https://drive.google.com/file/d/1U6HDdKJo3-UHibFPgNrDakU8EpCt5xHZ/view?usp=sharing">video recording&lt;/a>).&lt;/p>
-&lt;p>We&amp;rsquo;re also starting on the Poly and Secret dialects in
-&lt;a href="https://github.com/google/heir/pull/74">#74 (poly)&lt;/a> and
-&lt;a href="https://github.com/google/heir/pull/78">#78 (secret)&lt;/a>, so please join in the
-fun!&lt;/p></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1zFtpBcCCq5d6UD8Nm8r3rfg3sgy-guz7/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2023-09-12.&lt;/p></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
 &lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
 &lt;h1 id="bgv-dialect">&amp;lsquo;bgv&amp;rsquo; Dialect&lt;/h1>
 &lt;p>The BGV dialect defines the types and operations of the BGV and B/FV cryptosystem.&lt;/p>
@@ -11211,13 +11199,14 @@ applied.&lt;/p>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h3 id="lwereinterpret_underlying_type-heirlwereinterpretunderlyingtypeop">&lt;code>lwe.reinterpret_underlying_type&lt;/code> (heir::lwe::ReinterpretUnderlyingTypeOp)&lt;/h3>
+&lt;h3 id="lwereinterpret_application_data-heirlwereinterpretapplicationdataop">&lt;code>lwe.reinterpret_application_data&lt;/code> (heir::lwe::ReinterpretApplicationDataOp)&lt;/h3>
 &lt;p>&lt;em>A placeholder cast from one ciphertext type to another&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `lwe.reinterpret_underlying_type` $input attr-dict `:` qualified(type($input)) `to` qualified(type($output))
-&lt;/code>&lt;/pre>&lt;p>The &lt;code>cast&lt;/code> op is thus used to translate &lt;code>underlying_type&lt;/code> between
-ciphertexts in particular situations , such as when lowering to an API that
-does not keep track of types for you.&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `lwe.reinterpret_application_data` $input attr-dict `:` qualified(type($input)) `to` qualified(type($output))
+&lt;/code>&lt;/pre>&lt;p>The &lt;code>cast&lt;/code> op is thus used to translate application data (e.g., &lt;code>message_type&lt;/code>)
+between ciphertexts in particular situations, such as when the bitwidth of the
+message type changes, but this change is not observed in the plaintext space,
+or when lowering to an API that does not keep track of types.&lt;/p>
 &lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
