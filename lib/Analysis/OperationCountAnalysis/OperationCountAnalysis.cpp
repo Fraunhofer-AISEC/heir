@@ -62,7 +62,7 @@ LogicalResult OperationCountAnalysis::visitOperation(
         SmallVector<OpResult> secretResults;
         getSecretResults(op, secretResults);
         if (secretResults.empty()) {
-         return;
+          return;
         }
 
         OperationCount sumCount(0, 0);
@@ -112,6 +112,12 @@ LogicalResult OperationCountAnalysis::visitOperation(
 
   return mlir::success();
 }
+
+struct NoiseBounds {
+  double boundScale;
+  double boundClean;
+  double addedNoiseKeySwitching;
+};
 
 static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus) {
   uint64_t cyclOrder = 2 * ringDimension;
@@ -173,71 +179,358 @@ static uint64_t findValidScalingModSize(int minModSize, int firstModSize,
   return 0;
 }
 
-// Computes based on the OpenFHE Model the chain of base bounds between level
 static std::vector<double> computeBoundChain(
-    double p, int numPrimes, const std::vector<OperationCount> &levelOpCounts,
-    double boundClean, double boundScale, double addedNoiseKeySwitching) {
+    double scalingMod, int numPrimes, const std::vector<OperationCount> &levelOpCounts,
+    NoiseBounds noiseBounds) {
 
   std::vector<double> bound(numPrimes);
-  bound[0] = boundClean;
+  bound[0] = noiseBounds.boundClean;
   
   for (int i = 0; i < numPrimes - 1; ++i) {
     int ciphertextCount = levelOpCounts[numPrimes - i - 1].getCiphertextCount();
     int keySwitchCount = levelOpCounts[numPrimes - i - 1].getKeySwitchCount();
 
-    double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * addedNoiseKeySwitching);
-    bound[i + 1] = boundScale + (a / p);
+    double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+    bound[i + 1] = noiseBounds.boundScale + (a / scalingMod);
   }
 
   return bound;
 }
 
 static double computeObjectiveFunction(
-    double p, int ringDimension, int plaintextModulus,
+    double scalingMod, int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS) {
+    NoiseBounds noiseBounds) {
 
   std::vector<double> bound =
-      computeBoundChain(p, numPrimes, levelOpCounts, bClean, bScale, nuKS);
+      computeBoundChain(scalingMod, numPrimes, levelOpCounts, noiseBounds);
 
-  double q = 2 * bound[numPrimes - 1];
+  double firstMod = 2 * bound[numPrimes - 1];
 
-  return p + q;
+  return scalingMod + firstMod;
 }
 
 static double computeFirstModSizeFromChain(
     double p, int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS) {
+    NoiseBounds noiseBounds) {
   std::vector<double> bound =
-      computeBoundChain(p, numPrimes, levelOpCounts, bClean, bScale, nuKS);
-  return ceil(log2(2 * bound[numPrimes]));
+      computeBoundChain(p, numPrimes, levelOpCounts,noiseBounds);
+  return ceil(log2(2 * bound[numPrimes - 1]));
 }
 
-// Function to estimate the derivative of the objective function
 static double derivativeObjective(
     double p, int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS, double rel_step = 1e-4) {
-  double h = rel_step * p;
-  return (computeObjectiveFunction(p + h, ringDimension, plaintextModulus,
-                                   levelOpCounts, numPrimes, bClean, bScale,
-                                   nuKS) -
-          computeObjectiveFunction(p - h, ringDimension, plaintextModulus,
-                                   levelOpCounts, numPrimes, bClean, bScale,
-                                   nuKS)) /
-         (2 * h);
+    NoiseBounds noiseBounds, double relStep = 1e-6) {
+  double h = relStep * p;
+  auto highObjective = computeObjectiveFunction(p + h, ringDimension,
+                                               plaintextModulus, levelOpCounts,
+                                               numPrimes, noiseBounds);
+  auto lowObjective = computeObjectiveFunction(p - h, ringDimension,
+                                              plaintextModulus, levelOpCounts,
+                                              numPrimes, noiseBounds); 
+  return (highObjective - lowObjective) / (2 * h);
 }
 
-static double findOptimalScalingModSize(
+static std::vector<double> computeChain(
+    const std::vector<double>& moduli, 
+    const std::vector<OperationCount>& levelOpCounts,
+    NoiseBounds noiseBounds) {
+
+  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
+  std::vector<double> bounds(numberModuli);
+  bounds[0] = noiseBounds.boundClean;
+  
+  for (int i = 0; i < numberModuli - 1; ++i) {
+    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
+    
+    double boundSquare;
+    try {
+      boundSquare = bounds[i] * bounds[i];
+    } catch (...) {
+      boundSquare = std::numeric_limits<double>::infinity();
+    }
+    
+    double A = ciphertextCount * (boundSquare + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+    bounds[i + 1] = noiseBounds.boundScale + (A / moduli[i]);
+  }
+  
+  return bounds;
+}
+
+// Calculate objective function: max(p_list) + q where q = 2 * B[N]
+static std::tuple<double, double, std::vector<double>> computeObjective(
+    const std::vector<double>& moduli,
+    const std::vector<OperationCount>& levelOpCounts,
+    NoiseBounds noiseBounds) {
+  auto bounds = computeChain(moduli, levelOpCounts, noiseBounds);
+  double firstMod = 2 * bounds.back();
+  
+  double sumModuli = 0;
+  for (auto mod : moduli) {
+    sumModuli += mod;
+  }
+  
+  return {sumModuli + firstMod, firstMod, bounds};
+}
+
+// Forward candidate update
+static std::vector<double> candidateForward(
+    const std::vector<double>& moduli,
+    const std::vector<OperationCount>& levelOpCounts,
+    int currentIndex, double factor, int offset,
+    NoiseBounds noiseBounds) {
+    
+  int numberModuli = moduli.size();
+  
+  std::vector<double> newModuli = moduli;
+  double newModuliValue = factor * moduli[currentIndex];
+  
+  if (newModuliValue <= 0) {
+    return {};
+  }
+  
+  newModuli[currentIndex] = newModuliValue;
+  
+  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+  double target = boundsOld[currentIndex + offset + 1];
+  
+  if (target - noiseBounds.boundScale <= 0) {
+    return {};
+  }
+  
+  auto boundsTemp = computeChain(newModuli, levelOpCounts, noiseBounds);
+  
+  double X = boundsTemp[currentIndex + offset];
+  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getKeySwitchCount();
+  
+  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (target - noiseBounds.boundScale);
+  
+  if (newPartnerModuliValue <= 0) {
+    return {};
+  }
+  
+  newModuli[currentIndex + offset] = newPartnerModuliValue;
+  return newModuli;
+}
+
+static std::vector<double> candidateBackward(
+    const std::vector<double>& moduli,
+    const std::vector<OperationCount>& levelOpCounts,
+    int currentIndex, double factor, int offset,
+    NoiseBounds noiseBounds) {
+    
+  int numberModuli = moduli.size();
+
+  std::vector<double> newModuli = moduli;
+  double newModuliValue = factor * moduli[currentIndex];
+  
+  if (newModuliValue <= 0) {
+    return {};
+  }
+  
+  newModuli[currentIndex] = newModuliValue;
+  
+  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+
+  auto bound = boundsOld[currentIndex + 1];
+
+  for (int i = currentIndex; i > currentIndex - offset; i--) {
+    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
+   
+    double numerator = newModuli[i] * (bound - noiseBounds.boundScale);
+    double denominator = ciphertextCount;
+    double insideSqrt = (numerator / denominator) - (keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+
+    bound = sqrt(insideSqrt);
+  }
+  
+  double X = boundsOld[currentIndex - offset];
+  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getKeySwitchCount();
+  
+  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
+  
+  if (newPartnerModuliValue <= 0) {
+    return {};
+  }
+  
+  newModuli[currentIndex - offset] = newPartnerModuliValue;
+  return newModuli;
+}
+
+static std::vector<double> candidateFirstModUpdate(
+    const std::vector<double>& moduli,
+    const std::vector<OperationCount>& levelOpCounts,
+    double factor, int offset,
+    NoiseBounds noiseBounds) {
+    
+  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
+  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+  
+  double currentFirstMod = 2 * boundsOld.back();
+  double newFirstMod = factor * currentFirstMod;
+
+  auto bound = newFirstMod / 2;
+
+  for (int i = numberModuli - 2; i >= numberModuli - offset; i--) {
+    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
+   
+    double numerator = moduli[i] * (bound - noiseBounds.boundScale);
+    double denominator = ciphertextCount;
+    double insideSqrt = (numerator / denominator) - (keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+
+    bound = sqrt(insideSqrt);
+  }
+
+  double X = boundsOld[numberModuli - offset - 1];
+  int ciphertextCount = levelOpCounts[offset].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[offset].getKeySwitchCount();
+  
+  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
+  
+  std::vector<double> newModuli = moduli;
+  newModuli[numberModuli - offset - 1] = newPartnerModuliValue;
+  
+  return newModuli;
+}
+
+
+static std::vector<double> rebalanceSingleModulus(
+    const std::vector<double>& moduli,
+    const std::vector<OperationCount>& levelOpCounts,
+    int currentModuliIndex, double factor,
+   NoiseBounds noiseBounds) {
+    
+  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
+  std::vector<std::tuple<std::vector<double>, double>> candidates;
+  
+  // Forward updates
+  for (int d = 1; d < numberModuli - 1 - currentModuliIndex; ++d) {
+    auto cand = candidateForward(moduli, levelOpCounts, currentModuliIndex, factor, d, 
+                                noiseBounds);
+    if (!cand.empty()) {
+      auto [objective, _, __] = computeObjective(cand, levelOpCounts, 
+                                              noiseBounds);
+      candidates.emplace_back(cand, objective);
+    }
+  }
+
+  // Backward updates
+    for (int d = 1; d <= currentModuliIndex; ++d) {
+      auto cand = candidateBackward(moduli, levelOpCounts, currentModuliIndex, factor, d, noiseBounds);
+      if (!cand.empty()) {
+        auto [objective, _, __] = computeObjective(cand, levelOpCounts, 
+                                                noiseBounds);
+        candidates.emplace_back(cand, objective);
+      }
+    }
+
+  if (candidates.empty()) {
+    return {};
+  }
+  
+  // Find the candidate with lowest objective value
+  auto minCandidate = std::min_element(candidates.begin(), candidates.end(),
+                                [](const auto& a, const auto& b) {
+                                  return std::get<1>(a) < std::get<1>(b);
+                                });
+  
+  return std::get<0>(*minCandidate);
+}
+
+static std::vector<double> rebalancingModuli(
+    const double pInit,
+    const std::vector<OperationCount>& levelOpCounts,
+    NoiseBounds noiseBounds,
+    int maxIter = 100, double tolerance = 0.01, double eps = 1e-6) {
+  
+  int numberModuli = levelOpCounts.size();
+  std::vector<double> moduliCurrent(numberModuli - 1,pInit);
+  
+  std::vector<double> candidateFactors = {0.5, 0.75, 0.9, 1.1, 1.25, 1.5, 2.0};
+
+  auto [objectiveCurrent, firstModCurrent, _] =
+      computeObjective(moduliCurrent, levelOpCounts, noiseBounds);
+
+  int globalIter = 0;
+  while (globalIter < maxIter) {
+    double bestObjective = objectiveCurrent;
+    double bestFirstMod = firstModCurrent;
+    std::vector<double> bestCandidate;
+    
+    // scaling moduli-updates
+    for (int i = 0; i < numberModuli - 1; ++i) {
+      for (double factor : candidateFactors) {
+        auto candidate = rebalanceSingleModulus(moduliCurrent, levelOpCounts, i, factor, 
+                                     noiseBounds);
+        if (candidate.empty()) {
+          continue;
+        }
+
+        auto [objective, firstMod, __] =
+            computeObjective(candidate, levelOpCounts, noiseBounds);
+
+        if (objective < bestObjective) {
+          bestObjective = objective;
+          bestCandidate = candidate;
+          bestFirstMod = firstMod;
+        }
+      }
+    }
+    
+    // first mod-updates
+    for (double factor : candidateFactors) {
+      for (int offset = 1; offset < numberModuli - 1; ++offset) {
+        auto candidate =
+            candidateFirstModUpdate(moduliCurrent, levelOpCounts, factor, offset, noiseBounds);
+        if (candidate.empty()) {
+          continue;
+        }
+
+        auto [objective, firstMod, __] =
+            computeObjective(candidate, levelOpCounts, noiseBounds);
+
+        if (objective < bestObjective) {
+          bestObjective = objective;
+          bestCandidate = candidate;
+          bestFirstMod = firstMod;
+        }
+      }
+    }
+    
+    double improvement = objectiveCurrent - bestObjective;
+    if (improvement > tolerance && !bestCandidate.empty()) {
+      moduliCurrent = bestCandidate;
+      objectiveCurrent = bestObjective;
+      firstModCurrent = bestFirstMod;
+    } else {
+      break;
+    }
+    
+    globalIter++;
+  }
+  
+  std::vector<double> result;
+  result.reserve(moduliCurrent.size() + 1);
+  result.push_back(firstModCurrent);
+  result.insert(result.end(), moduliCurrent.rbegin(), moduliCurrent.rend());
+  
+  return result;
+}
+
+static double findOptimalScalingModSizeBisection(
     int ringDimension, int plaintextModulus,
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
-    double bClean, double bScale, double nuKS,
-    double pLow = 2, double pHigh = pow(2.0, 60)) {
-  // Check if bounds are valid (not infinity)
-  auto checkBounds = [&](double p) {
+    NoiseBounds noiseBounds, double pLow = 2, double pHigh = pow(2.0, 60)) {
+  auto checkBounds = [&](double scalingMod) {
     std::vector<double> bounds =
-        computeBoundChain(p, numPrimes, levelOpCounts, bClean, bScale, nuKS);
+        computeBoundChain(scalingMod, numPrimes, levelOpCounts,noiseBounds);
     for (const auto& b : bounds) {
       if (std::isinf(b) || std::isnan(b)) {
         return false;
@@ -250,8 +543,7 @@ static double findOptimalScalingModSize(
   while (!checkBounds(pLow) && pLow < pHigh) {
     pLow *= 2.0;
     if (pLow > pHigh) {
-      pLow = pHigh * 0.9; // Set to slightly below pHigh as fallback
-      break;
+      throw std::runtime_error("No valid lower bound found for bisection start");
     }
   }
   
@@ -259,12 +551,11 @@ static double findOptimalScalingModSize(
   while (log2(pHigh - pLow) > 1) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
-                            levelOpCounts, numPrimes, bClean, bScale,
-                            nuKS) < 0) {
-      // We are left of the minimizer.
+                            levelOpCounts, numPrimes, noiseBounds) < 0) {
+      // lower then the minimizer.
       pLow = pMid;
     } else {
-      // We are right of the minimizer.
+      // higher then the minimizer.
       pHigh = pMid;
     }
   }
@@ -281,9 +572,8 @@ static double computeLogPQ(int scalingModSize, int firstModSize,
   return logP + logQ;
 };
 
-static void calculateBoundParams(int ringDimension, int plaintextModulus,
-                                 int numPrimes, double &bClean, double &bScale,
-                                 double &nuKS) {
+static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
+                                        int numPrimes) {
   auto phi = ringDimension;  // Pessimistic
   auto beta = pow(2.0, 10);  // TODO Replace by value set through developer
   auto t = plaintextModulus;
@@ -292,9 +582,9 @@ static void calculateBoundParams(int ringDimension, int plaintextModulus,
   auto vKey = 2.0 / 3.0;    // TODO Make adjustable Currently for ternary
   auto vErr = 3.19 * 3.19;  // TODO Make adjustable
 
-  bScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
+  auto boundScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
 
-  bClean = D * t * sqrt(phi * (1.0 / 12.0 + 2 * phi * vErr * vKey + vErr));
+  auto boundClean = D * t * sqrt(phi * (1.0 / 12.0 + 2 * phi * vErr * vKey + vErr));
 
   auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
 
@@ -302,7 +592,116 @@ static void calculateBoundParams(int ringDimension, int plaintextModulus,
       beta * sqrt(numPrimes * log2(t * phi)) /
       (100.0 * beta * sqrt(log(numPrimes * pow(2.0, kMaxBitSize)) / log(beta)));
 
-  nuKS = f0 * boundKeySwitch + bScale;
+  auto addedNoiseKeySwitching = f0 * boundKeySwitch + boundScale;
+
+  return {boundScale, boundClean, addedNoiseKeySwitching};
+}
+
+static int getMaxLevel(secret::GenericOp *op) {
+  int maxLevel = 0;
+
+  op->getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
+    if (op->getNumResults() == 0) {
+      return;
+    }
+    int level = getLevelFromMgmtAttr(op->getResult(0));
+    maxLevel = std::max(maxLevel, level);
+  });
+
+  return maxLevel;
+}
+
+static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
+                                                    DataFlowSolver *solver,
+                                                    int maxLevel) {
+  std::vector<OperationCount> levelOpCounts;
+
+  levelOpCounts.resize(maxLevel + 1, OperationCount(0, 0));
+
+  // Second pass to populate the vector
+  op->getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
+    if (op->getNumResults() == 0) {
+      return;
+    }
+    auto *lattice =
+        solver->lookupState<OperationCountLattice>(op->getResult(0));
+    if (!lattice) {
+      return;
+    }
+
+    auto count = lattice->getValue();
+    if (!count.isInitialized()) {
+      return;
+    }
+
+    // Get the level for the operation's result
+    int level = getLevelFromMgmtAttr(op->getResult(0));
+
+    // Update the max operation count for the level
+    levelOpCounts[level] = OperationCount::max(levelOpCounts[level], count);
+  });
+
+  return levelOpCounts;
+}
+
+static void computeModuliSizesBisection(int &firstModSize, int &scalingModSize,
+                                        int ringDimension, int plaintextModulus,
+                                        const std::vector<OperationCount> &levelOpCounts,
+                                        int numPrimes) {
+  auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+
+  try {
+    double scalingMod = findOptimalScalingModSizeBisection(
+        ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
+    
+    firstModSize = computeFirstModSizeFromChain(
+        scalingMod, ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
+    scalingModSize = ceil(log2(scalingMod));
+  } catch (const std::runtime_error& e) {
+    throw; // Re-throw the exception to be caught in annotateCountParams
+  }
+}
+
+static void computeModuliSizesClosed(
+    int &firstModSize, int &scalingModSize, int ringDimension,
+    int plaintextModulus, const std::vector<OperationCount> &levelOpCounts,
+    int numPrimes) {
+ auto noiseBounds =  calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+
+ // Compute OperationCounts over all levels
+ OperationCount maxCounts(0, 0);
+ for (auto count : levelOpCounts) {
+   maxCounts = OperationCount::max(maxCounts, count);
+ }
+
+ auto boundOptimal =
+     log2(noiseBounds.boundScale +
+          sqrt(noiseBounds.boundScale * noiseBounds.boundScale + (maxCounts.getKeySwitchCount() *
+                                          noiseBounds.addedNoiseKeySwitching)));
+
+ scalingModSize =
+     ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
+ firstModSize = ceil(1 + boundOptimal);
+}
+
+static std::vector<int> computeModuliSizesBalancing(
+    int ringDimension, int plaintextModulus,
+    const std::vector<OperationCount> &levelOpCounts, int numPrimes) {
+  auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+
+  // Use bisection result as init value
+  double pInit = findOptimalScalingModSizeBisection(
+    ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
+
+
+  auto rebalanced = rebalancingModuli(pInit, levelOpCounts, noiseBounds);
+  
+  std::vector<int> moduli;
+
+  for (const auto& p : rebalanced) {
+    moduli.push_back(ceil(log2(p)));
+  }
+  return moduli;
 }
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
@@ -311,108 +710,68 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
     bool isRingDimensionSet = ringDimension != 0;
 
-    // Vector to store max operation counts per level
-    std::vector<OperationCount> levelOpCounts;
-
-    // First pass to determine max level
-    int maxLevel = 0;
-    genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
-      if (op->getNumResults() == 0) {
-        return;
-      }
-      // Find the level for this operation's result
-      int level = getLevelFromMgmtAttr(op->getResult(0));
-      maxLevel = std::max(maxLevel, level);
-    });
-
-    // Initialize vector with appropriate size
-    levelOpCounts.resize(maxLevel + 1, OperationCount(0, 0));
-
-    // Second pass to populate the vector
-    genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
-      if (op->getNumResults() == 0) {
-        return;
-      }
-      auto *lattice =
-          solver->lookupState<OperationCountLattice>(op->getResult(0));
-      if (!lattice) {
-        return;
-      }
-
-      auto count = lattice->getValue();
-      if (!count.isInitialized()) {
-        return;
-      }
-
-      // Get the level for the operation's result
-      int level = getLevelFromMgmtAttr(op->getResult(0));
-
-      // Update the max operation count for the level
-      levelOpCounts[level] = OperationCount::max(levelOpCounts[level], count);
-    });
-
-    auto log2 = [](double x) { return log(x) / log(2); };
+    auto maxLevel = getMaxLevel(&genericOp);
+    auto levelOpCounts = getLevelOpCounts(&genericOp, solver, maxLevel);
 
     auto multiplicativeDepth = maxLevel;
     auto numPrimes = multiplicativeDepth + 1;
 
-    // Modified computeModuliSizes to use find_optimal_p and return optimal
-    // firstModSize
-    auto computeModuliSizes = [&](int ringDimension, int &firstModSize,
-                                  int &scalingModSize) {
-      double boundClean, boundScale, addedNoiseKeySwitching;
-      calculateBoundParams(ringDimension, plaintextModulus, numPrimes,
-                           boundClean, boundScale, addedNoiseKeySwitching);
-
-      auto calculateModulusSizesBisection = [&](int &firstModSize,
-                                                int &scalingModSize) {
-        double p = findOptimalScalingModSize(
-            ringDimension, plaintextModulus, levelOpCounts, numPrimes,
-            boundClean, boundScale, addedNoiseKeySwitching);
-        firstModSize = computeFirstModSizeFromChain(
-            p, ringDimension, plaintextModulus, levelOpCounts, numPrimes,
-            boundClean, boundScale, addedNoiseKeySwitching);
-        scalingModSize = ceil(log2(p));
-      };
-
-      auto calculateModulusSizesClosedForm = [&](int &firstModSize,
-                                                 int &scalingModSize) {
-        // Compute OperationCounts over all levels
-        OperationCount maxCounts(0, 0);
-        for (auto count : levelOpCounts) {
-          maxCounts = OperationCount::max(maxCounts, count);
+    auto computeModuliSizes([&](int ringDimension, int &firstModSize,
+                               int &scalingModSize) {
+      try {
+        if (algorithm == "BISECTION") {
+          computeModuliSizesBisection(firstModSize, scalingModSize, ringDimension,
+                                      plaintextModulus, levelOpCounts, numPrimes);
+          auto moduli = computeModuliSizesBalancing(
+              ringDimension, plaintextModulus, levelOpCounts, numPrimes);
+          // Print moduli information to cerr
+          std::cerr << "Algorithm: BISECTION\n";
+          std::cerr << "First modulus size: " << firstModSize << "\n";
+          std::cerr << "Scaling modulus size: " << scalingModSize << "\n";
+          std::cerr << "Balanced moduli: [";
+          for (size_t i = 0; i < moduli.size(); ++i) {
+            std::cerr << moduli[i];
+            if (i < moduli.size() - 1) {
+              std::cerr << ", ";
+            }
+          }
+          std::cerr << "]\n";
+        } else if (algorithm == "CLOSED") {
+          computeModuliSizesClosed(firstModSize, scalingModSize, ringDimension,
+                                  plaintextModulus, levelOpCounts, numPrimes);
+          auto moduli = computeModuliSizesBalancing(
+              ringDimension, plaintextModulus, levelOpCounts, numPrimes);
+        } else if (algorithm == "BALANCING") {
+          auto moduli = computeModuliSizesBalancing(ringDimension, plaintextModulus, 
+                                                    levelOpCounts, numPrimes);
+          // TODO: Temp fix to adapt to the existing code
+          firstModSize = moduli[0];
+          for (int i = 1; i < moduli.size(); i++) {
+            if (moduli[i] > scalingModSize) {
+              scalingModSize = moduli[i];
+            }
+          }
         }
-        auto boundOptimal =
-            log2(boundScale +
-                 sqrt(boundScale * boundScale + (maxCounts.getKeySwitchCount() *
-                                                 addedNoiseKeySwitching)));
-
-        scalingModSize =
-            ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
-        firstModSize = ceil(1 + boundOptimal);
-      };
-
-      if (algorithm == "BISECTION") {
-        calculateModulusSizesBisection(firstModSize, scalingModSize);
-      } else {
-        calculateModulusSizesClosedForm(firstModSize, scalingModSize);
+      } catch (const std::runtime_error& e) {
+        genericOp->emitOpError() << "Parameter optimization failed: " << e.what();
+        return;
       }
-
+  
       firstModSize =
           findValidFirstModSize(firstModSize, ringDimension, plaintextModulus);
       if (!firstModSize) {
-        top->emitOpError() << "Could not find valid firstModSize\n";
+        genericOp->emitOpError() << "Could not find valid firstModSize\n";
         return;
       }
-
+  
       scalingModSize =
           findValidScalingModSize(scalingModSize, firstModSize, numPrimes,
                                   ringDimension, plaintextModulus);
       if (!scalingModSize) {
-        top->emitOpError() << "Could not find valid scalingModSize\n";
+        genericOp->emitOpError() << "Could not find valid scalingModSize\n";
         return;
       }
-    };
+    });
 
     auto computeRingDimension = [&](int scalingModSize, int firstModSize) {
       auto logQP = computeLogPQ(scalingModSize, firstModSize, numPrimes);
@@ -465,7 +824,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     }
 
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp
-    auto *funcOp = genericOp->getParentOp();
+    auto *funcOp = ((Operation*) genericOp)->getParentOp();
     auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
         funcOp->getContext(), multiplicativeDepth, ringDimension,
         scalingModSize, firstModSize, 0, 0);
