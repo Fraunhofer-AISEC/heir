@@ -49,15 +49,12 @@ int run(FuncGenerator generateCryptoContext,
   for (int i = 0; i < 64; i++) {
     auto pos = i % 64 == 0 ? 1 : 0;
 
-    std::cerr << "pos: " << pos << std::endl;
     sum_per_position += pos;  // Each tensor has value i at all positions
   }
-  std::cerr << "sum_per_position: " << sum_per_position << std::endl;
 
   for (int i = 0; i < 4; i++) {
     sum_per_position *= sum_per_position;
   }
-  std::cerr << "sum_per_position: " << sum_per_position << std::endl;
 
   // The expected result is a vector where each element is sum_per_position^2
   std::vector<int16_t> expected_vector(8, sum_per_position);
