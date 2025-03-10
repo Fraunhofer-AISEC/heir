@@ -394,6 +394,10 @@ static std::vector<double> candidateFirstModUpdate(
   
   double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
   
+  if (newPartnerModuliValue <= 0) {
+    return {};
+  }
+  
   std::vector<double> newModuli = moduli;
   newModuli[numberModuli - offset - 1] = newPartnerModuliValue;
   
@@ -819,7 +823,6 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       } else {
         // New ring dimension is smaller
         ringDimension = newRingDimension;
-        break;
       }
     }
 
