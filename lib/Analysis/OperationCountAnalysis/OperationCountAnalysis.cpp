@@ -766,6 +766,93 @@ static std::vector<int> computeModuliSizesBalancing(
   return moduli;
 }
 
+// Print parameters directly to std::cerr with result tags
+void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension, 
+                               int plaintextModulus, const std::string &testname,
+                               const std::string &selectionApproach) {
+  // Generate Unix timestamp in seconds
+  auto now = std::chrono::system_clock::now();
+  auto unix_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch())
+          .count();
+
+  // Generate JSON without using CryptoContext
+  std::stringstream ss;
+  ss << "{\n";
+  ss << R"(  "testname": ")" << testname << "\",\n";
+  ss << R"(  "selectionApproach": ")" << selectionApproach << "\",\n";
+  ss << R"(  "timestamp": )" << unix_timestamp << ",\n";
+  ss << "  \"modulusSizes\": [";
+  for (size_t i = 0; i < moduli.size(); ++i) {
+    ss << moduli[i];
+    if (i != moduli.size() - 1) {
+      ss << ", ";
+    }
+  }
+  ss << "],\n";
+  ss << "  \"totalSize\": " << std::accumulate(moduli.begin(), moduli.end(), 0) << ",\n";
+  ss << "  \"ringDimension\": " << ringDimension << ",\n";
+  ss << "  \"plaintextModulus\": " << plaintextModulus << "\n";
+  ss << "}";
+
+  std::cerr << "<balancing-result>" << ss.str() << "</balancing-result>" << std::endl;
+}
+
+static void computeAndStoreBalancingModuli(
+    int plaintextModulus, const std::vector<OperationCount> &levelOpCounts,
+    int numPrimes) {
+  int ringDimension = 16384;
+
+  auto newRingDimension = ringDimension;
+
+  auto computeLogPQ = [&](const std::vector<int> &moduli) {
+    auto numPartQ = ComputeNumLargeDigits(0, moduli.size() - 1);
+    auto logQ = std::accumulate(moduli.begin(), moduli.end(), 0);
+    auto logP = ceil(ceil(static_cast<double>(logQ) / numPartQ) / kMaxBitSize) *
+                kMaxBitSize;
+    return logP + logQ;
+  };
+
+  auto computeRingDimension = [&](const std::vector<int> &moduli) {
+    auto logQP = computeLogPQ(moduli);
+    return lbcrypto::StdLatticeParm::FindRingDim(
+        lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
+  };
+  std::vector<int> moduli;
+  while (true) {
+    // Compute param sizes for HYBRID Key Switching
+    moduli = computeModuliSizesBalancing(ringDimension, plaintextModulus,
+                                         levelOpCounts, numPrimes);
+
+    newRingDimension = computeRingDimension(moduli);
+
+    if (newRingDimension == ringDimension) {
+      // Try smaller ring dimension
+      int smallerDimension = ringDimension / 2;
+
+      auto newModuli = computeModuliSizesBalancing(
+          smallerDimension, plaintextModulus, levelOpCounts, numPrimes);
+      newRingDimension = computeRingDimension(newModuli);
+
+      if (newRingDimension == smallerDimension) {
+        ringDimension = smallerDimension;
+        moduli = newModuli;
+      } else {
+        // No further improvement possible
+        break;
+      }
+
+    } else {
+      // New ring dimension is smaller / larger
+      ringDimension = newRingDimension;
+    }
+  }
+  
+  // Print the computed moduli to std::cerr with result tags
+  printParamsWithResultTags(moduli, ringDimension, plaintextModulus, 
+                           "<testname>", "balancing");
+}
+
 using BigInteger = bigintbackend::BigInteger;
 
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
