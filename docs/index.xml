@@ -2454,11 +2454,25 @@ with arbitrary subregions.&lt;/p>
 &lt;p>Scan the IR for affine.for loops and unroll them all.&lt;/p>
 &lt;h3 id="-generate-param-bfv">&lt;code>-generate-param-bfv&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Generate BFV Scheme Parameter&lt;/em>&lt;/p>
-&lt;p>The pass generates the BFV scheme parameter.&lt;/p>
-&lt;p>This pass get the multiplicative depth from the IR and generates the
-moduli chain of that long consisting of 60 bits primes.&lt;/p>
+&lt;p>The pass generates the BFV scheme parameter using a given noise model.&lt;/p>
+&lt;p>There are three noise models available:&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>bfv-noise-by-bound-coeff-average-case{-pk,-sk}&lt;/code>&lt;/li>
+&lt;li>&lt;code>bfv-noise-by-bound-coeff-worst-case{-pk,-sk}&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;p>The &lt;code>-pk&lt;/code>/&lt;code>-sk&lt;/code> suffixes assume the input ciphertexts are
+encrypted using the public/secret key.&lt;/p>
+&lt;p>The first two models are taken from KPZ21, and they work by bounding
+the coefficient embedding of the ciphertexts. The difference
+of the two models is expansion factor used for multiplication
+of the coefficients, the first being $2 \sqrt{N}$ and the second
+being $N$.&lt;/p>
+&lt;p>This pass then generates the moduli chain consisting of primes
+of bits specified by the &lt;code>mod-bits&lt;/code> field.&lt;/p>
+&lt;p>Usually for B/FV &lt;code>mod-bits&lt;/code> is set to 60. But when machine word size is
+small, users may also want to set it to 57.&lt;/p>
 &lt;p>This pass relies on the presence of the &lt;code>mgmt&lt;/code> dialect ops to model
-relinearize/modreduce, and it relies on &lt;code>mgmt.mgmt&lt;/code> attribute to determine
+relinearize, and it relies on &lt;code>mgmt.mgmt&lt;/code> attribute to determine
 the ciphertext level/dimension. These ops and attributes can be added by
 a pass like &lt;code>--secret-insert-mgmt-bgv&lt;/code> and &lt;code>--annotate-mgmt&lt;/code>.&lt;/p>
 &lt;p>User can provide custom scheme parameters by annotating bgv::SchemeParamAttr
@@ -2481,7 +2495,9 @@ at the module level. Note that we reuse bgv::SchemeParamAttr for BFV.&lt;/p>
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic">&lt;/span> &lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-9">Options&lt;/h4>
-&lt;pre tabindex="0">&lt;code>-slot-number : Minimum number of slots for parameter generation.
+&lt;pre tabindex="0">&lt;code>-model : Noise model to validate against.
+-mod-bits : Default number of bits for all prime coefficient modulusto use for the ciphertext space.
+-slot-number : Minimum number of slots for parameter generation.
 -plaintext-modulus : Plaintext modulus.
 &lt;/code>&lt;/pre>&lt;h3 id="-generate-param-bgv">&lt;code>-generate-param-bgv&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Generate BGV Scheme Parameter using a given noise model&lt;/em>&lt;/p>
@@ -2497,8 +2513,8 @@ encrypted using the public/secret key.&lt;/p>
 &lt;p>The first two models are taken from KPZ21, and they work by bounding
 the coefficient embedding of the ciphertexts. The difference
 of the two models is expansion factor used for multiplication
-of the coefficients, the first being &lt;code>2\sqrt{N}&lt;/code> and the second
-being &lt;code>N&lt;/code>.&lt;/p>
+of the coefficients, the first being $2 \sqrt{N}$ and the second
+being $N$.&lt;/p>
 &lt;p>The third model is taken from MP24. It works by tracking the variance
 of the coefficient embedding of the ciphertexts. This gives a more accurate
 noise estimate, but it may give underestimates in some cases. See the paper
@@ -3309,29 +3325,22 @@ arguments in the function body.&lt;/li>
 &lt;a href="https://docs.google.com/document/d/1QUxT00gd1ZSayzdtxY5T5-Wiod-eNnCFGoqVceWQ83Y/edit?usp=sharing">notes&lt;/a>
 and
 &lt;a href="https://drive.google.com/file/d/1Q9a7O7HwxKMDqI23l3154KIOw1ofANkX/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2024-10-31.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-05-30</title><link>https://heir.dev/blog/2024/05/30/heir-meeting-2024-05-30/</link><pubDate>Thu, 30 May 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/05/30/heir-meeting-2024-05-30/</guid><description>
+from the HEIR meeting on 2024-10-31.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-06-27</title><link>https://heir.dev/blog/2024/06/27/heir-meeting-2024-06-27/</link><pubDate>Thu, 27 Jun 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/06/27/heir-meeting-2024-06-27/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1mvigwMRTeVQvdpm2hwiewfU8jcJT94ArQBNvngvgkTc/edit?usp=sharing">notes&lt;/a>
+&lt;a href="https://docs.google.com/document/d/1lc4U2JzHapu99_sigOAYwpjNnfd9_QGrX1HAQ0hle_o/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/1CTIyd7HRiNV857VO2EonquWZZlBhysLM/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2024-05-30.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-08-15</title><link>https://heir.dev/blog/2023/08/16/heir-meeting-2023-08-15/</link><pubDate>Wed, 16 Aug 2023 16:15:47 +0000</pubDate><guid>https://heir.dev/blog/2023/08/16/heir-meeting-2023-08-15/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1-wMytGj3AHi55sA2jb81AsHOU8EcIq6d/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-06-27.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-04-04</title><link>https://heir.dev/blog/2024/04/04/heir-meeting-2024-04-04/</link><pubDate>Thu, 04 Apr 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/04/04/heir-meeting-2024-04-04/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1vZsKJH4wCAZCtyh3o9nNMLRFwlWQiVdvUMvwJnA4cIc/edit?usp=sharing">notes&lt;/a>
+&lt;a href="https://docs.google.com/document/d/121_0mzqYIWYMc7rcW2Et5qS-ux4ut3b-kno1dI9sQq8/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/1DDNepYCSqgi-JlBLBzHrsL5CjjiwqcA_/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2023-08-15.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-06-30</title><link>https://heir.dev/blog/2023/06/30/heir-meeting-2023-06-30/</link><pubDate>Fri, 30 Jun 2023 12:42:22 -0700</pubDate><guid>https://heir.dev/blog/2023/06/30/heir-meeting-2023-06-30/</guid><description>
-&lt;p>The second HEIR meeting was 2023-05-30
-(&lt;a href="https://docs.google.com/document/d/1wxaEtpEDdO2yv5YKmFTc8FVlqHxm49gHzEdcnBFBKWs/edit?usp=sharing">notes&lt;/a>,
+&lt;a href="https://drive.google.com/file/d/1_Ksjx8s8nD4cLsuZp5_KitYI2mPN72Je/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-04-04.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-02-22</title><link>https://heir.dev/blog/2024/02/22/heir-meeting-2024-02-22/</link><pubDate>Thu, 22 Feb 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/02/22/heir-meeting-2024-02-22/</guid><description>
+&lt;p>Here are the
+&lt;a href="https://docs.google.com/document/d/1ktK2Y2-OnadvsIIa94HRch_oHCaQ0D6gbT3CElKmGak/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/1S893iJdeL08BAonLenmkUGNC34PX1qpg/view?usp=sharing">video recording&lt;/a>).&lt;/p>
-&lt;p>There are some initial design discussion threads started on
-&lt;a href="https://github.com/google/heir/discussions">GitHub Discussions&lt;/a> to get the
-design rolling.&lt;/p>
-&lt;ul>
-&lt;li>&lt;a href="https://github.com/google/heir/discussions/53">High-Level FHE Dialect&lt;/a>&lt;/li>
-&lt;li>&lt;a href="https://github.com/google/heir/discussions/54">Scheme Dialects&lt;/a>&lt;/li>
-&lt;li>&lt;a href="https://github.com/google/heir/discussions/55">Poly/Math Dialects&lt;/a>&lt;/li>
-&lt;/ul></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1RDONadr54-7uX5ko5dmUX3s1l7QHeHbM/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-02-22.&lt;/p></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
 &lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
 &lt;h1 id="bgv-dialect">&amp;lsquo;bgv&amp;rsquo; Dialect&lt;/h1>
 &lt;p>The BGV dialect defines the types and operations of the BGV and B/FV cryptosystem.&lt;/p>
