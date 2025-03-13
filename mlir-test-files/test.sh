@@ -59,8 +59,17 @@ for arg in "${expanded_args[@]}"; do
         "$@" || command_failed $? "$*"
     }
 
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
     run_command bazel run //tools:heir-opt -- --secretize --mlir-to-secret-arithmetic --secret-insert-mgmt-bgv "$PWD/$name/$name.mlir" > "$PWD/$name/$name-middle.mlir"
         
+    # Run Hongren approach
+    
+    run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=bgv-noise-by-bound-coeff-worst-case-pk" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap.mlir
+    
+    # Extract BGV parameters from GAP result using Python script
+    run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap.mlir" "$PWD/data/${name}_gap_$TIMESTAMP.json" "$name" "gap"
+
     # First run with BISECTION algorithm
     # Capture the stderr and extract balancing results
     TEMP_FILE=$(mktemp)
@@ -68,7 +77,6 @@ for arg in "${expanded_args[@]}"; do
     
     # Extract balancing results and save to JSON file in data directory with consistent naming
     # Ensure we clean non-printable characters and properly extract the JSON
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     cat "$TEMP_FILE" | tr -cd '\11\12\15\40-\176' | grep -zo "<balancing-result>.*</balancing-result>" | sed 's/<balancing-result>//g' | sed 's/<\/balancing-result>//g' | tr -d '\000-\011\013\014\016-\037\177' | sed "s/<testname>/$name/g" > "$PWD/data/${name}_balancing_$TIMESTAMP.json"
     cat "$TEMP_FILE" >&2  # Forward the original stderr output
     rm "$TEMP_FILE"
