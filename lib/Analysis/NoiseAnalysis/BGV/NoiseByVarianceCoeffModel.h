@@ -1,15 +1,10 @@
 #ifndef INCLUDE_ANALYSIS_NOISEANALYSIS_BGV_NOISEBYVARIANCECOEFFMODEL_H_
 #define INCLUDE_ANALYSIS_NOISEANALYSIS_BGV_NOISEBYVARIANCECOEFFMODEL_H_
 
-#include <algorithm>
 #include <cassert>
-#include <cmath>
-#include <cstdint>
-#include <iomanip>
-#include <optional>
 #include <string>
 
-#include "lib/Analysis/NoiseAnalysis/BGV/Noise.h"
+#include "lib/Analysis/NoiseAnalysis/Noise.h"
 #include "lib/Parameters/BGV/Params.h"
 
 namespace mlir {

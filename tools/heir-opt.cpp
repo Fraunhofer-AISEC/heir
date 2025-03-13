@@ -16,6 +16,7 @@
 #include "lib/Dialect/CKKS/Conversions/CKKSToLWE/CKKSToLWE.h"
 #include "lib/Dialect/CKKS/IR/CKKSDialect.h"
 #include "lib/Dialect/Comb/IR/CombDialect.h"
+#include "lib/Dialect/HEIRInterfaces.h"
 #include "lib/Dialect/Jaxite/IR/JaxiteDialect.h"
 #include "lib/Dialect/LWE/Conversions/LWEToLattigo/LWEToLattigo.h"
 #include "lib/Dialect/LWE/Conversions/LWEToOpenfhe/LWEToOpenfhe.h"
@@ -45,6 +46,7 @@
 #include "lib/Dialect/Secret/Transforms/BufferizableOpInterfaceImpl.h"
 #include "lib/Dialect/Secret/Transforms/Passes.h"
 #include "lib/Dialect/TOSA/Conversions/TosaToSecretArith/TosaToSecretArith.h"
+#include "lib/Dialect/TensorExt/Conversions/TensorExtToTensor/TensorExtToTensor.h"
 #include "lib/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "lib/Dialect/TensorExt/Transforms/Passes.h"
 #include "lib/Dialect/TfheRust/IR/TfheRustDialect.h"
@@ -64,17 +66,18 @@
 #include "lib/Transforms/ForwardInsertToExtract/ForwardInsertToExtract.h"
 #include "lib/Transforms/ForwardStoreToLoad/ForwardStoreToLoad.h"
 #include "lib/Transforms/FullLoopUnroll/FullLoopUnroll.h"
+#include "lib/Transforms/GenerateParam/GenerateParam.h"
 #include "lib/Transforms/LayoutPropagation/LayoutPropagation.h"
 #include "lib/Transforms/LinalgCanonicalizations/LinalgCanonicalizations.h"
 #include "lib/Transforms/OperationBalancer/OperationBalancer.h"
 #include "lib/Transforms/OptimizeRelinearization/OptimizeRelinearization.h"
+#include "lib/Transforms/PolynomialApproximation/PolynomialApproximation.h"
 #include "lib/Transforms/SecretInsertMgmt/Passes.h"
 #include "lib/Transforms/Secretize/Passes.h"
 #include "lib/Transforms/StraightLineVectorizer/StraightLineVectorizer.h"
 #include "lib/Transforms/TensorToScalars/TensorToScalars.h"
 #include "lib/Transforms/UnusedMemRef/UnusedMemRef.h"
 #include "lib/Transforms/ValidateNoise/ValidateNoise.h"
-#include "lib/Utils/Tablegen/AsmInterfaces.h"
 #include "mlir/include/mlir/Conversion/AffineToStandard/AffineToStandard.h"  // from @llvm-project
 #include "mlir/include/mlir/Conversion/ArithToLLVM/ArithToLLVM.h"  // from @llvm-project
 #include "mlir/include/mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"  // from @llvm-project
@@ -112,8 +115,6 @@
 #include "mlir/include/mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tosa/IR/TosaOps.h"     // from @llvm-project
-#include "mlir/include/mlir/IR/OpImplementation.h"         // from @llvm-project
-#include "mlir/include/mlir/IR/Region.h"                   // from @llvm-project
 #include "mlir/include/mlir/Pass/PassManager.h"            // from @llvm-project
 #include "mlir/include/mlir/Pass/PassRegistry.h"           // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
@@ -132,30 +133,6 @@
 using namespace mlir;
 using namespace tosa;
 using namespace heir;
-
-// hack here: another template specialization for FuncOp
-// expect linker to pick this one
-//
-// This is really unsafe as it depends on ::mlir::detail,
-// which is not a expected behavior. However, the current
-// OpAsmOpInterface declaration in MLIR already has a default implementation
-// so we can not provide another implementation for it (MLIR does not
-// support it)
-//
-// for detail, check #1219
-template <>
-void ::mlir::detail::OpAsmOpInterfaceInterfaceTraits::
-    Model<mlir::func::FuncOp>::getAsmBlockArgumentNames(
-        mlir::detail::OpAsmOpInterfaceInterfaceTraits::Concept const *,
-        mlir::Operation *op, mlir::Region &region,
-        ::mlir::OpAsmSetValueNameFn setNameFn) {
-  for (auto &block : region) {
-    for (auto arg : block.getArguments()) {
-      if (auto ty = dyn_cast<TypeAsmInterface>(arg.getType()))
-        setNameFn(arg, ty.suggestedName());
-    }
-  }
-}
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
@@ -277,11 +254,13 @@ int main(int argc, char **argv) {
   registerApplyFoldersPasses();
   registerForwardInsertToExtractPasses();
   registerForwardStoreToLoadPasses();
+  registerGenerateParamPasses();
   registerOperationBalancerPasses();
   registerStraightLineVectorizerPasses();
   registerUnusedMemRefPasses();
   registerValidateNoisePasses();
   registerOptimizeRelinearizationPasses();
+  registerPolynomialApproximationPasses();
   registerLayoutPropagationPasses();
   registerLinalgCanonicalizationsPasses();
   registerTensorToScalarsPasses();
@@ -326,6 +305,7 @@ int main(int argc, char **argv) {
   lwe::registerLWEToPolynomialPasses();
   ::mlir::heir::linalg::registerLinalgToTensorExtPasses();
   ::mlir::heir::polynomial::registerPolynomialToModArithPasses();
+  tensor_ext::registerTensorExtToTensorPasses();
   registerCGGIToJaxitePasses();
   registerCGGIToTfheRustPasses();
   registerCGGIToTfheRustBoolPasses();
@@ -337,12 +317,13 @@ int main(int argc, char **argv) {
   // Interfaces in HEIR
   secret::registerBufferizableOpInterfaceExternalModels(registry);
   rns::registerExternalRNSTypeInterfaces(registry);
+  registerOperandAndResultAttrInterface(registry);
 
-  PassPipelineRegistration<TosaToArithTfheOptions>(
+  PassPipelineRegistration<TosaToArithOptions>(
       "heir-tosa-to-arith",
       "Run passes to lower TOSA models with stripped "
       "quant types to arithmetic",
-      [](OpPassManager &pm, const TosaToArithTfheOptions &options) {
+      [](OpPassManager &pm, const TosaToArithOptions &options) {
         ::mlir::heir::tosaPipelineBuilder(pm, options.unroll);
       });
 
@@ -379,6 +360,12 @@ int main(int argc, char **argv) {
       "Convert a func using standard MLIR dialects to FHE using "
       "BGV.",
       mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::bgvScheme));
+
+  PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
+      "mlir-to-bfv",
+      "Convert a func using standard MLIR dialects to FHE using "
+      "BFV.",
+      mlirToRLWEPipelineBuilder(mlir::heir::RLWEScheme::bfvScheme));
 
   PassPipelineRegistration<mlir::heir::MlirToRLWEPipelineOptions>(
       "mlir-to-ckks",

@@ -9,6 +9,7 @@
 #include "lib/Dialect/Secret/IR/SecretOps.h"
 #include "lib/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/include/llvm/ADT/TypeSwitch.h"              // from @llvm-project
+#include "llvm/include/llvm/Support/Debug.h"               // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"      // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"    // from @llvm-project
@@ -18,6 +19,8 @@
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Visitors.h"                 // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
+
+#define DEBUG_TYPE "AddAndKeySwitchCountAnalysis"
 
 namespace mlir {
 namespace heir {
@@ -103,14 +106,50 @@ LogicalResult CountAnalysis::visitOperation(
       .Case<mgmt::ModReduceOp>([&](auto modReduceOp) {
         // implicitly ensure that the operand is secret
 
+        // should not propagate through mgmt::ModReduceOp, reset
         propagate(modReduceOp.getResult(), CountState(0, 0));
-      });
-  // should not propagate through mgmt::ModReduceOp
+      })
+      .Default(
+          [&](auto &op) {
+            if (!mlir::isa<arith::ConstantOp, arith::ExtSIOp, arith::ExtUIOp,
+                           arith::ExtFOp>(op)) {
+              op.emitError()
+                  << "Unsupported operation for count analysis encountered.";
+            }
+
+            // condition on result secretness
+            SmallVector<OpResult> secretResults;
+            getSecretResults(&op, secretResults);
+            if (secretResults.empty()) {
+              return;
+            }
+
+            SmallVector<OpOperand *> secretOperands;
+            getSecretOperands(&op, secretOperands);
+            if (secretOperands.empty()) {
+              return;
+            }
+
+            // inherit count from the first secret operand
+            CountState first;
+            for (auto *operand : secretOperands) {
+              auto &countState = getLatticeElement(operand->get())->getValue();
+              if (!countState.isInitialized()) {
+                return;
+              }
+              first = countState;
+              break;
+            }
+
+            for (auto result : secretResults) {
+              propagate(result, first);
+            }
+          });
   return success();
 }
 
 void annotateCount(Operation *top, DataFlowSolver *solver) {
-  auto getIntegerAttr = [&](int level) {
+  [[maybe_unused]] auto getIntegerAttr = [&](int level) {
     return IntegerAttr::get(IntegerType::get(top->getContext(), 64), level);
   };
 
@@ -128,27 +167,34 @@ void annotateCount(Operation *top, DataFlowSolver *solver) {
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
     for (auto i = 0; i != genericOp.getBody()->getNumArguments(); ++i) {
       auto blockArg = genericOp.getBody()->getArgument(i);
-      auto [addCount, keySwitchCount] = getCount(blockArg);
-      if (addCount != 0) {
-        genericOp.setArgAttr(i, "addCount", getIntegerAttr(addCount));
-      }
-      if (keySwitchCount != 0) {
-        genericOp.setArgAttr(i, "keySwitchCount",
-                             getIntegerAttr(keySwitchCount));
-      }
+      [[maybe_unused]] auto [addCount, keySwitchCount] = getCount(blockArg);
+      // only annotate each Value when debugging
+      LLVM_DEBUG({
+        if (addCount != 0) {
+          genericOp.setOperandAttr(i, "addCount", getIntegerAttr(addCount));
+        }
+        if (keySwitchCount != 0) {
+          genericOp.setOperandAttr(i, "keySwitchCount",
+                                   getIntegerAttr(keySwitchCount));
+        }
+      });
     }
 
     genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
       if (op->getNumResults() == 0) {
         return;
       }
-      auto [addCount, keySwitchCount] = getCount(op->getResult(0));
-      if (addCount != 0) {
-        op->setAttr("addCount", getIntegerAttr(addCount));
-      }
-      if (keySwitchCount != 0) {
-        op->setAttr("keySwitchCount", getIntegerAttr(keySwitchCount));
-      }
+      [[maybe_unused]] auto [addCount, keySwitchCount] =
+          getCount(op->getResult(0));
+      // only annotate each Value when debugging
+      LLVM_DEBUG({
+        if (addCount != 0) {
+          op->setAttr("openfhe.addCount", getIntegerAttr(addCount));
+        }
+        if (keySwitchCount != 0) {
+          op->setAttr("openfhe.keySwitchCount", getIntegerAttr(keySwitchCount));
+        }
+      });
     });
 
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp

@@ -39,16 +39,16 @@ module attributes {scheme.bgv} {
   // CHECK: [[ct2:[^, ].*]], [[err:.*]] := [[evaluator]].AddNew([[ct]], [[ct1]])
   // CHECK: [[ct3:[^, ].*]], [[err:.*]] := [[evaluator]].MulNew([[ct2]], [[ct1]])
   // CHECK: [[ct4:[^, ].*]], [[err:.*]] := [[evaluator]].RelinearizeNew([[ct3]])
-  // CHECK: [[err:.*]] := [[evaluator]].Rescale([[ct4]], [[ct4]])
-  // CHECK: [[ct5:[^, ].*]] := [[ct4]]
+  // CHECK: [[ct5:[^, ].*]] := [[ct4]].CopyNew()
+  // CHECK: [[err:.*]] := [[evaluator]].Rescale([[ct4]], [[ct5]])
   // CHECK: [[ct6:[^, ].*]], [[err:.*]] := [[evaluator]].RotateColumnsNew([[ct5]], 1)
   // CHECK: return [[ct6]]
   func.func @compute(%evaluator : !evaluator, %ct1 : !ct, %ct2 : !ct) -> (!ct) {
-    %added = lattigo.bgv.add %evaluator, %ct1, %ct2 : (!evaluator, !ct, !ct) -> !ct
-    %mul = lattigo.bgv.mul %evaluator, %added, %ct2 : (!evaluator, !ct, !ct) -> !ct
-    %relin = lattigo.bgv.relinearize %evaluator, %mul : (!evaluator, !ct) -> !ct
-    %rescale = lattigo.bgv.rescale %evaluator, %relin : (!evaluator, !ct) -> !ct
-    %rotate = lattigo.bgv.rotate_columns %evaluator, %rescale {offset = 1} : (!evaluator, !ct) -> !ct
+    %added = lattigo.bgv.add_new %evaluator, %ct1, %ct2 : (!evaluator, !ct, !ct) -> !ct
+    %mul = lattigo.bgv.mul_new %evaluator, %added, %ct2 : (!evaluator, !ct, !ct) -> !ct
+    %relin = lattigo.bgv.relinearize_new %evaluator, %mul : (!evaluator, !ct) -> !ct
+    %rescale = lattigo.bgv.rescale_new %evaluator, %relin : (!evaluator, !ct) -> !ct
+    %rotate = lattigo.bgv.rotate_columns_new %evaluator, %rescale {offset = 1} : (!evaluator, !ct) -> !ct
     return %rotate : !ct
   }
 
@@ -68,19 +68,17 @@ module attributes {scheme.bgv} {
   // CHECK: [[enc:[^, ].*]] := rlwe.NewEncryptor([[param]], [[pk]])
   // CHECK: [[encSk:[^, ].*]] := rlwe.NewEncryptor([[param]], [[sk]])
   // CHECK: [[dec:[^, ].*]] := rlwe.NewDecryptor([[param]], [[sk]])
-  // CHECK: [[eval:[^, ].*]] := bgv.NewEvaluator([[param]], [[evalKeySet]])
+  // CHECK: [[eval:[^, ].*]] := bgv.NewEvaluator([[param]], [[evalKeySet]], false)
   // CHECK: [[value1:[^, ].*]] := []int64
   // CHECK: [[value2:[^, ].*]] := []int64
   // CHECK: [[pt1:[^, ].*]] := bgv.NewPlaintext([[param]], [[param]].MaxLevel())
   // CHECK: [[pt2:[^, ].*]] := bgv.NewPlaintext([[param]], [[param]].MaxLevel())
   // CHECK: [[value1Packed:[^, ].*]][i] = int64([[value1]][i % len([[value1]])])
   // CHECK: [[encoder]].Encode([[value1Packed]], [[pt1]])
-  // CHECK: [[pt3:[^, ].*]] := [[pt1]]
   // CHECK: [[value2Packed:[^, ].*]][i] = int64([[value2]][i % len([[value2]])])
   // CHECK: [[encoder]].Encode([[value2Packed]], [[pt2]])
-  // CHECK: [[pt4:[^, ].*]] := [[pt2]]
-  // CHECK: [[ct1:[^, ].*]], [[err:.*]] := [[enc]].EncryptNew([[pt3]])
-  // CHECK: [[ct2:[^, ].*]], [[err:.*]] := [[enc]].EncryptNew([[pt4]])
+  // CHECK: [[ct1:[^, ].*]], [[err:.*]] := [[enc]].EncryptNew([[pt1]])
+  // CHECK: [[ct2:[^, ].*]], [[err:.*]] := [[enc]].EncryptNew([[pt2]])
   // CHECK: [[res:[^, ].*]] := compute([[eval]], [[ct1]], [[ct2]])
   // CHECK: [[pt5:[^, ].*]] := [[dec]].DecryptNew([[res]])
   // CHECK: [[value3:[^, ].*]] := []int64
@@ -161,10 +159,28 @@ module attributes {scheme.bgv} {
 !evaluator = !lattigo.bgv.evaluator
 
 // CHECK-LABEL: test_new_evaluator_no_key_set
-// CHECK: bgv.NewEvaluator([[params:[^, ].*]], nil)
+// CHECK: bgv.NewEvaluator([[params:[^, ].*]], nil, false)
 module attributes {scheme.bgv} {
   func.func @test_new_evaluator_no_key_set(%params : !params) -> (!evaluator) {
     %evaluator = lattigo.bgv.new_evaluator %params : (!params) -> !evaluator
     return %evaluator : !evaluator
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func dot_product
+// CHECK: ["bound"] = "50"
+// CHECK: ["complex"] = "{test = 1.200000e+00 : f64}"
+// CHECK: ["random"] = "3 : i64"
+// CHECK: ["secret.secret"] = "unit"
+// CHECK: ["asm.is_block_arg"] = "1"
+// CHECK: ["asm.result_ssa_format"]
+
+module attributes {scheme.bgv} {
+  func.func private @__heir_debug_0(!lattigo.bgv.evaluator, !lattigo.bgv.parameter, !lattigo.bgv.encoder, !lattigo.rlwe.decryptor, !lattigo.rlwe.ciphertext)
+  func.func @dot_product(%evaluator: !lattigo.bgv.evaluator, %param: !lattigo.bgv.parameter, %encoder: !lattigo.bgv.encoder, %decryptor: !lattigo.rlwe.decryptor, %ct: !lattigo.rlwe.ciphertext, %ct_0: !lattigo.rlwe.ciphertext) -> !lattigo.rlwe.ciphertext attributes {mgmt.openfhe_params = #mgmt.openfhe_params<evalAddCount = 8, keySwitchCount = 15>} {
+    call @__heir_debug_0(%evaluator, %param, %encoder, %decryptor, %ct) {bound = "50", random = 3, complex = {test = 1.2}, secret.secret} : (!lattigo.bgv.evaluator, !lattigo.bgv.parameter, !lattigo.bgv.encoder, !lattigo.rlwe.decryptor, !lattigo.rlwe.ciphertext) -> ()
+    return %ct : !lattigo.rlwe.ciphertext
   }
 }

@@ -11,13 +11,13 @@ cc_library(
     hdrs = [
     ],
     deps = [
-        ":Noise",
         ":NoiseByBoundCoeffModel",
         ":NoiseByVarianceCoeffModel",
         "@heir//lib/Analysis:Utils",
         "@heir//lib/Analysis/DimensionAnalysis",
         "@heir//lib/Analysis/LevelAnalysis",
         "@heir//lib/Analysis/NoiseAnalysis",
+        "@heir//lib/Analysis/NoiseAnalysis:Noise",
         "@heir//lib/Dialect/Mgmt/IR:Dialect",
         "@heir//lib/Dialect/Secret/IR:Dialect",
         "@heir//lib/Dialect/TensorExt/IR:Dialect",
@@ -40,7 +40,7 @@ cc_library(
         "NoiseByBoundCoeffModel.h",
     ],
     deps = [
-        ":Noise",
+        "@heir//lib/Analysis/NoiseAnalysis:Noise",
         "@heir//lib/Parameters/BGV:Params",
     ],
 )
@@ -54,19 +54,7 @@ cc_library(
         "NoiseByVarianceCoeffModel.h",
     ],
     deps = [
-        ":Noise",
+        "@heir//lib/Analysis/NoiseAnalysis:Noise",
         "@heir//lib/Parameters/BGV:Params",
-    ],
-)
-
-cc_library(
-    name = "Noise",
-    srcs = ["Noise.cpp"],
-    hdrs = [
-        "Noise.h",
-    ],
-    deps = [
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
     ],
 )

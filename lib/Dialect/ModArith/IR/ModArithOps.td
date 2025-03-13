@@ -2,7 +2,6 @@
 #define LIB_DIALECT_MODARITH_IR_MODARITHOPS_TD_
 
 include "lib/Dialect/ModArith/IR/ModArithDialect.td"
-include "lib/Dialect/ModArith/IR/ModArithAttributes.td"
 include "lib/Dialect/ModArith/IR/ModArithTypes.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/CommonTypeConstraints.td"
@@ -84,7 +83,7 @@ def ModArith_ModSwitchOp : ModArith_Op<"mod_switch", [Pure, SameOperandsAndResul
 }
 
 def ModArith_ConstantOp : Op<ModArith_Dialect, "constant",
-    [Pure, InferTypeOpAdaptor]> {
+    [Pure, ConstantLike]> {
   let summary = "Define a constant value via an attribute.";
   let description = [{
     Example:
@@ -93,15 +92,12 @@ def ModArith_ConstantOp : Op<ModArith_Dialect, "constant",
     %0 = mod_arith.constant 123 : !mod_arith.int<65537:i32>
     ```
   }];
-  let arguments = (ins ModArith_ModArithAttr:$value);
-  let results = (outs ModArith_ModArithType:$output);
+  let arguments = (ins TypedAttrInterface:$value);
+  let results = (outs ModArithLike:$output);
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+  let hasFolder = 1;
 
-  let builders = [
-    OpBuilder<(ins "::mlir::heir::mod_arith::ModArithType":$ty, "int64_t":$value), [{
-      return build($_builder, $_state, ty, mod_arith::ModArithAttr::get(ty, value));
-    }]>
-  ];
 }
 
 
@@ -146,6 +142,8 @@ def ModArith_AddOp : ModArith_BinaryOp<"add", [Commutative]> {
     Unless otherwise specified, the operation assumes both inputs are canonical
     representatives and guarantees the output being canonical representative.
   }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 def ModArith_SubOp : ModArith_BinaryOp<"sub"> {
@@ -156,6 +154,8 @@ def ModArith_SubOp : ModArith_BinaryOp<"sub"> {
     Unless otherwise specified, the operation assumes both inputs are canonical
     representatives and guarantees the output being canonical representative.
   }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 def ModArith_MulOp : ModArith_BinaryOp<"mul", [Commutative]> {
@@ -166,6 +166,8 @@ def ModArith_MulOp : ModArith_BinaryOp<"mul", [Commutative]> {
     Unless otherwise specified, the operation assumes both inputs are canonical
     representatives and guarantees the output being canonical representative.
   }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 def ModArith_MacOp : ModArith_Op<"mac", [SameOperandsAndResultType, Pure, ElementwiseMappable]> {

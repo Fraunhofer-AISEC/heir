@@ -1,12 +1,13 @@
 #include "lib/Dialect/Lattigo/Transforms/ConfigureCryptoContext.h"
 
-#include <cmath>
 #include <cstdint>
 #include <set>
 #include <string>
 
 #include "lib/Dialect/BGV/IR/BGVAttributes.h"
 #include "lib/Dialect/BGV/IR/BGVDialect.h"
+#include "lib/Dialect/CKKS/IR/CKKSAttributes.h"
+#include "lib/Dialect/CKKS/IR/CKKSDialect.h"
 #include "lib/Dialect/Lattigo/IR/LattigoAttributes.h"
 #include "lib/Dialect/Lattigo/IR/LattigoOps.h"
 #include "lib/Dialect/Lattigo/IR/LattigoTypes.h"
@@ -18,6 +19,7 @@
 #include "mlir/include/mlir/IR/BuiltinOps.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"          // from @llvm-project
 #include "mlir/include/mlir/IR/ImplicitLocOpBuilder.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/MLIRContext.h"           // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Types.h"                 // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                 // from @llvm-project
@@ -35,7 +37,8 @@ namespace lattigo {
 bool hasRelinOp(func::FuncOp op) {
   bool result = false;
   op.walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (isa<BGVRelinearizeOp, CKKSRelinearizeOp>(op)) {
+    if (isa<BGVRelinearizeOp, BGVRelinearizeNewOp, CKKSRelinearizeOp,
+            CKKSRelinearizeNewOp>(op)) {
       result = true;
       return WalkResult::interrupt();
     }
@@ -48,11 +51,19 @@ bool hasRelinOp(func::FuncOp op) {
 // TODO(#1186): handle rotate rows
 SmallVector<int64_t> findAllRotIndices(func::FuncOp op) {
   std::set<int64_t> distinctRotIndices;
+  op.walk([&](BGVRotateColumnsNewOp rotOp) {
+    distinctRotIndices.insert(rotOp.getOffset().getInt());
+    return WalkResult::advance();
+  });
   op.walk([&](BGVRotateColumnsOp rotOp) {
     distinctRotIndices.insert(rotOp.getOffset().getInt());
     return WalkResult::advance();
   });
   op.walk([&](CKKSRotateOp rotOp) {
+    distinctRotIndices.insert(rotOp.getOffset().getInt());
+    return WalkResult::advance();
+  });
+  op.walk([&](CKKSRotateNewOp rotOp) {
     distinctRotIndices.insert(rotOp.getOffset().getInt());
     return WalkResult::advance();
   });
@@ -80,6 +91,7 @@ RLWEEncryptorType findEncryptorType(ModuleOp module) {
   return RLWEEncryptorType::get(module.getContext(), /*publicKey*/ true);
 }
 
+template <bool IsBFV>
 struct LattigoBGVScheme {
   using EvaluatorType = BGVEvaluatorType;
   using ParameterType = BGVParameterType;
@@ -133,6 +145,12 @@ struct LattigoBGVScheme {
       moduleOp->removeAttr(bgv::BGVDialect::kSchemeParamAttrName);
     }
   }
+
+  static Value getNewEvaluatorOp(ImplicitLocOpBuilder &builder, Value params,
+                                 Value evalKeySet) {
+    return builder.create<NewEvaluatorOp>(
+        EvaluatorType::get(builder.getContext()), params, evalKeySet, IsBFV);
+  }
 };
 
 struct LattigoCKKSScheme {
@@ -143,11 +161,29 @@ struct LattigoCKKSScheme {
   using NewParametersFromLiteralOp = CKKSNewParametersFromLiteralOp;
   using NewEncoderOp = CKKSNewEncoderOp;
   using NewEvaluatorOp = CKKSNewEvaluatorOp;
+  using SchemeParamAttrType = ckks::SchemeParamAttr;
 
-  static int getLogN(Operation *moduleOp) { return 14; }
+  static int getLogN(Operation *moduleOp) {
+    auto schemeParamAttr = getSchemeParamAttr(moduleOp);
+    if (schemeParamAttr) {
+      return schemeParamAttr.getLogN();
+    }
+    // default logN
+    return 14;
+  }
 
   static ParametersLiteralAttrType getParametersLiteralAttr(
       MLIRContext *ctx, Operation *moduleOp) {
+    auto schemeParamAttr = getSchemeParamAttr(moduleOp);
+    if (schemeParamAttr) {
+      auto logN = schemeParamAttr.getLogN();
+      auto Q = schemeParamAttr.getQ();
+      auto P = schemeParamAttr.getP();
+      auto logDefaultScale = schemeParamAttr.getLogDefaultScale();
+      return ParametersLiteralAttrType::get(ctx, logN, Q, P,
+                                            /*logQ*/ nullptr, /*logP*/ nullptr,
+                                            logDefaultScale);
+    }
     // 128-bit secure parameters enabling depth-7 circuits.
     // LogN:14, LogQP: 431.
     return ParametersLiteralAttrType::get(
@@ -159,9 +195,23 @@ struct LattigoCKKSScheme {
         /*logDefaultScale*/ 45);
   }
 
-  static Attribute getSchemeParamAttr(Operation *moduleOp) { return nullptr; }
+  static SchemeParamAttrType getSchemeParamAttr(Operation *moduleOp) {
+    return moduleOp->getAttrOfType<ckks::SchemeParamAttr>(
+        ckks::CKKSDialect::kSchemeParamAttrName);
+  }
 
-  static void cleanSchemeParamAttr(Operation *moduleOp) {}
+  static void cleanSchemeParamAttr(Operation *moduleOp) {
+    auto schemeParamAttr = getSchemeParamAttr(moduleOp);
+    if (schemeParamAttr) {
+      moduleOp->removeAttr(ckks::CKKSDialect::kSchemeParamAttrName);
+    }
+  }
+
+  static Value getNewEvaluatorOp(ImplicitLocOpBuilder &builder, Value params,
+                                 Value evalKeySet) {
+    return builder.create<NewEvaluatorOp>(
+        EvaluatorType::get(builder.getContext()), params, evalKeySet);
+  }
 };
 
 template <typename LattigoScheme>
@@ -172,7 +222,6 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
   using NewParametersFromLiteralOp =
       typename LattigoScheme::NewParametersFromLiteralOp;
   using NewEncoderOp = typename LattigoScheme::NewEncoderOp;
-  using NewEvaluatorOp = typename LattigoScheme::NewEvaluatorOp;
 
   auto module = op->getParentOfType<ModuleOp>();
   std::string configFuncName("");
@@ -241,7 +290,11 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
   // generate Galois Keys on demand
   auto rotIndices = findAllRotIndices(op);
   for (auto rotIndex : rotIndices) {
-    auto galoisElement = static_cast<int>(pow(5, rotIndex)) % (1 << (logN + 1));
+    auto galoisElement = 1;
+    while (rotIndex > 0) {
+      galoisElement = (galoisElement * 5) % (1 << (logN + 1));
+      rotIndex--;
+    }
     auto galoisElementAttr = IntegerAttr::get(
         IntegerType::get(builder.getContext(), 64), galoisElement);
     auto gkType =
@@ -259,8 +312,8 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
   }
 
   // evalKeySet is optional so nulltpr is acceptable
-  auto evaluator =
-      builder.create<NewEvaluatorOp>(evaluatorType, params, evalKeySet);
+  Value evaluator =
+      LattigoScheme::getNewEvaluatorOp(builder, params, evalKeySet);
 
   SmallVector<Value> results = {evaluator, params, encoder, encryptor,
                                 decryptor};
@@ -271,7 +324,10 @@ LogicalResult convertFuncForScheme(func::FuncOp op) {
 LogicalResult convertFunc(func::FuncOp op) {
   auto module = op->getParentOfType<ModuleOp>();
   if (moduleIsBGV(module)) {
-    return convertFuncForScheme<LattigoBGVScheme>(op);
+    return convertFuncForScheme<LattigoBGVScheme</*IsBFV*/ false>>(op);
+  }
+  if (moduleIsBFV(module)) {
+    return convertFuncForScheme<LattigoBGVScheme</*IsBFV*/ true>>(op);
   }
   if (moduleIsCKKS(module)) {
     return convertFuncForScheme<LattigoCKKSScheme>(op);

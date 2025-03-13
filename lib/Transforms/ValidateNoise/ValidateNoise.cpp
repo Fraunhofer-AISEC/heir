@@ -1,7 +1,13 @@
 #include "lib/Transforms/ValidateNoise/ValidateNoise.h"
 
+#include <algorithm>
+#include <cmath>
+#include <map>
+#include <vector>
+
 #include "lib/Analysis/DimensionAnalysis/DimensionAnalysis.h"
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
+#include "lib/Analysis/NoiseAnalysis/BFV/NoiseByBoundCoeffModel.h"
 #include "lib/Analysis/NoiseAnalysis/BGV/NoiseByBoundCoeffModel.h"
 #include "lib/Analysis/NoiseAnalysis/BGV/NoiseByVarianceCoeffModel.h"
 #include "lib/Analysis/NoiseAnalysis/NoiseAnalysis.h"
@@ -15,11 +21,11 @@
 #include "mlir/include/mlir/Analysis/DataFlow/DeadCodeAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"     // from @llvm-project
+#include "mlir/include/mlir/IR/BuiltinAttributes.h"        // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Visitors.h"                 // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
-#include "mlir/include/mlir/Transforms/Passes.h"           // from @llvm-project
 
 #define DEBUG_TYPE "ValidateNoise"
 
@@ -76,14 +82,30 @@ struct ValidateNoise : impl::ValidateNoiseBase<ValidateNoise> {
 
     auto budget = NoiseModel::toLogBudget(localParam, noiseState);
 
+    auto boundString = NoiseModel::toLogBoundString(localParam, noiseState);
+    auto budgetString = NoiseModel::toLogBudgetString(localParam, noiseState);
+    auto totalString = NoiseModel::toLogTotalString(localParam);
+
     LLVM_DEBUG({
-      auto boundString = NoiseModel::toLogBoundString(localParam, noiseState);
-      auto budgetString = NoiseModel::toLogBudgetString(localParam, noiseState);
-      auto totalString = NoiseModel::toLogTotalString(localParam);
       llvm::dbgs() << "Noise Bound: " << boundString
                    << " Budget: " << budgetString << " Total: " << totalString
                    << " for value: " << value << " " << "\n";
     });
+
+    if (annotateNoiseBound) {
+      auto boundStringAttr = StringAttr::get(&getContext(), boundString);
+      if (auto blockArg = mlir::dyn_cast<BlockArgument>(value)) {
+        auto *parentOp = blockArg.getOwner()->getParentOp();
+        auto genericOp = dyn_cast<secret::GenericOp>(parentOp);
+        if (genericOp) {
+          genericOp.setOperandAttr(blockArg.getArgNumber(), "noise.bound",
+                                   boundStringAttr);
+        }
+      } else {
+        auto *parentOp = value.getDefiningOp();
+        parentOp->setAttr("noise.bound", boundStringAttr);
+      }
+    }
 
     if (budget < 0) {
       return failure();
@@ -124,140 +146,43 @@ struct ValidateNoise : impl::ValidateNoiseBase<ValidateNoise> {
   }
 
   template <typename NoiseAnalysis>
-  typename NoiseAnalysis::SchemeParamType generateParamByGap(
-      DataFlowSolver *solver,
-      const typename NoiseAnalysis::SchemeParamType &schemeParam) {
-    using NoiseModel = typename NoiseAnalysis::NoiseModel;
-    using NoiseLatticeType = typename NoiseAnalysis::LatticeType;
-    using LocalParamType = typename NoiseAnalysis::LocalParamType;
+  void run() {
+    int maxLevel = getMaxLevel();
 
-    // for level i, the biggest gap observed.
-    std::map<int, double> levelToGap;
-
-    auto updateLevelToGap = [&](int level, double gap) {
-      if (levelToGap.count(level) == 0) {
-        levelToGap[level] = gap;
-      } else {
-        levelToGap[level] = std::max(levelToGap.at(level), gap);
-      }
-    };
-
-    auto getLocalParam = [&](Value value) {
-      auto level = getLevelFromMgmtAttr(value);
-      auto dimension = getDimensionFromMgmtAttr(value);
-      return LocalParamType(&schemeParam, level, dimension);
-    };
-
-    auto getBound = [&](Value value) {
-      auto localParam = getLocalParam(value);
-      auto noiseLattice = solver->lookupState<NoiseLatticeType>(value);
-      return NoiseModel::toLogBound(localParam, noiseLattice->getValue());
-    };
-
-    auto firstModSize = 0;
-
-    getOperation()->walk([&](secret::GenericOp genericOp) {
-      // gaps caused by mod reduce
-      genericOp.getBody()->walk([&](mgmt::ModReduceOp op) {
-        auto operandBound = getBound(op.getOperand());
-        auto resultBound = getBound(op.getResult());
-        // the gap between the operand and result
-        updateLevelToGap(getLevelFromMgmtAttr(op.getOperand()),
-                         operandBound - resultBound);
-        return WalkResult::advance();
-      });
-
-      // find the max noise for the first level
-      genericOp.getBody()->walk([&](Operation *op) {
-        for (Value result : op->getResults()) {
-          if (getLevelFromMgmtAttr(result) == 0) {
-            auto bound = getBound(result);
-            firstModSize = std::max(firstModSize, 1 + int(ceil(bound)));
-          }
-        }
-        return WalkResult::advance();
-      });
-    });
-
-    auto maxLevel = levelToGap.size() + 1;
-    auto qiSize = std::vector<double>(maxLevel, 0);
-    qiSize[0] = firstModSize;
-
-    for (auto &[level, gap] : levelToGap) {
-      qiSize[level] = int(ceil(gap));
+    auto schemeParamAttr = getOperation()->getAttrOfType<bgv::SchemeParamAttr>(
+        bgv::BGVDialect::kSchemeParamAttrName);
+    if (!schemeParamAttr) {
+      getOperation()->emitOpError() << "No scheme param found.\n";
+      signalPassFailure();
+      return;
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "Gap logqi: ";
-      for (auto size : qiSize) {
-        llvm::dbgs() << static_cast<int>(size) << " ";
-      }
-      llvm::dbgs() << "\n";
-    });
+    auto schemeParam =
+        NoiseAnalysis::SchemeParamType::getSchemeParamFromAttr(schemeParamAttr);
+    if (schemeParam.getLevel() < maxLevel) {
+      getOperation()->emitOpError()
+          << "The level in the scheme param is smaller than the max level.\n";
+      signalPassFailure();
+      return;
+    }
 
-    auto concreteSchemeParam =
-        NoiseAnalysis::SchemeParamType::getConcreteSchemeParam(
-            schemeParam.getPlaintextModulus(), qiSize);
-
-    LLVM_DEBUG(llvm::dbgs() << "Concrete Scheme Param:\n"
-                            << concreteSchemeParam << "\n");
-
-    return concreteSchemeParam;
-  }
-
-  template <typename NoiseAnalysis>
-  void run() {
     DataFlowSolver solver;
     solver.load<dataflow::DeadCodeAnalysis>();
     solver.load<dataflow::SparseConstantPropagation>();
     // NoiseAnalysis depends on SecretnessAnalysis
     solver.load<SecretnessAnalysis>();
 
-    int maxLevel = getMaxLevel();
-
-    // plaintext modulus from command line option
-    auto schemeParam =
-        NoiseAnalysis::SchemeParamType::getConservativeSchemeParam(
-            maxLevel, plaintextModulus);
-
-    LLVM_DEBUG(llvm::dbgs() << "Conservative Scheme Param:\n"
-                            << schemeParam << "\n");
-
     solver.load<NoiseAnalysis>(schemeParam);
 
     if (failed(solver.initializeAndRun(getOperation()))) {
       getOperation()->emitOpError() << "Failed to run the analysis.\n";
       signalPassFailure();
-      return;
     }
 
     if (failed(validate<NoiseAnalysis>(&solver, schemeParam))) {
       getOperation()->emitOpError() << "Noise validation failed.\n";
       signalPassFailure();
-      return;
     }
-
-    auto concreteSchemeParam =
-        generateParamByGap<NoiseAnalysis>(&solver, schemeParam);
-
-    if (failed(validate<NoiseAnalysis>(&solver, concreteSchemeParam))) {
-      getOperation()->emitOpError()
-          << "Noise validation failed for generated param.\n";
-      signalPassFailure();
-      return;
-    }
-
-    // annotate scheme param
-    getOperation()->setAttr(
-        bgv::BGVDialect::kSchemeParamAttrName,
-        bgv::SchemeParamAttr::get(
-            &getContext(), log2(concreteSchemeParam.getRingDim()),
-
-            DenseI64ArrayAttr::get(&getContext(),
-                                   ArrayRef(concreteSchemeParam.getQi())),
-            DenseI64ArrayAttr::get(&getContext(),
-                                   ArrayRef(concreteSchemeParam.getPi())),
-            concreteSchemeParam.getPlaintextModulus()));
   }
 
   void runOnOperation() override {
@@ -273,6 +198,14 @@ struct ValidateNoise : impl::ValidateNoiseBase<ValidateNoise> {
       run<NoiseAnalysis<bgv::NoiseByVarianceCoeffPkModel>>();
     } else if (model == "bgv-noise-by-variance-coeff-sk") {
       run<NoiseAnalysis<bgv::NoiseByVarianceCoeffSkModel>>();
+    } else if (model == "bfv-noise-by-bound-coeff-worst-case-pk") {
+      run<NoiseAnalysis<bfv::NoiseByBoundCoeffWorstCasePkModel>>();
+    } else if (model == "bfv-noise-by-bound-coeff-average-case-pk") {
+      run<NoiseAnalysis<bfv::NoiseByBoundCoeffAverageCasePkModel>>();
+    } else if (model == "bfv-noise-by-bound-coeff-worst-case-sk") {
+      run<NoiseAnalysis<bfv::NoiseByBoundCoeffWorstCaseSkModel>>();
+    } else if (model == "bfv-noise-by-bound-coeff-average-case-sk") {
+      run<NoiseAnalysis<bfv::NoiseByBoundCoeffAverageCaseSkModel>>();
     } else {
       getOperation()->emitOpError() << "Unknown noise model.\n";
       signalPassFailure();

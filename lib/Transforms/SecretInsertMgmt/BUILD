@@ -8,6 +8,7 @@ package(
 cc_library(
     name = "SecretInsertMgmt",
     srcs = [
+        "SecretInsertMgmtBFV.cpp",
         "SecretInsertMgmtBGV.cpp",
         "SecretInsertMgmtCKKS.cpp",
     ],
@@ -17,10 +18,10 @@ cc_library(
     deps = [
         ":SecretInsertMgmtPatterns",
         ":pass_inc_gen",
-        "@heir//lib/Analysis/AddAndKeySwitchCountAnalysis",
         "@heir//lib/Analysis/LevelAnalysis",
         "@heir//lib/Analysis/MulResultAnalysis",
         "@heir//lib/Analysis/SecretnessAnalysis",
+        "@heir//lib/Dialect:ModuleAttributes",
         "@heir//lib/Dialect/Mgmt/IR:Dialect",
         "@heir//lib/Dialect/Mgmt/Transforms",
         "@heir//lib/Dialect/Mgmt/Transforms:AnnotateMgmt",
@@ -29,7 +30,6 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",

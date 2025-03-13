@@ -1,4 +1,3 @@
-# Tablegen helpers for dialect and op definitions
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 
 package(
@@ -9,44 +8,44 @@ package(
 td_library(
     name = "td_files",
     srcs = [
-        "AsmInterfaces.td",
+        "InplaceOpInterface.td",
     ],
     # include from the heir-root to enable fully-qualified include-paths
     includes = ["../../../.."],
 )
 
 cc_library(
-    name = "AsmInterfaces",
+    name = "InplaceOpInterface",
     srcs = [
-        "AsmInterfaces.cpp",
+        "InplaceOpInterface.cpp",
     ],
     hdrs = [
-        "AsmInterfaces.h",
+        "InplaceOpInterface.h",
     ],
     deps = [
-        ":asm_interfaces_inc_gen",
+        ":inplace_op_interface_inc_gen",
         "@llvm-project//mlir:IR",
     ],
 )
 
 gentbl_cc_library(
-    name = "asm_interfaces_inc_gen",
+    name = "inplace_op_interface_inc_gen",
     tbl_outs = [
         (
-            ["--gen-type-interface-decls"],
-            "AsmInterfaces.h.inc",
+            ["--gen-op-interface-decls"],
+            "InplaceOpInterface.h.inc",
         ),
         (
-            ["--gen-type-interface-defs"],
-            "AsmInterfaces.cpp.inc",
+            ["--gen-op-interface-defs"],
+            "InplaceOpInterface.cpp.inc",
         ),
         (
-            ["-gen-type-interface-docs"],
-            "AsmInterfaces.md",
+            ["-gen-op-interface-docs"],
+            "InplaceOpInterface.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "AsmInterfaces.td",
+    td_file = "InplaceOpInterface.td",
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
     ],

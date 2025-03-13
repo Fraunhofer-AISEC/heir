@@ -9,10 +9,6 @@ include "mlir/IR/OpBase.td"
 
 class BGV_Attribute<string attrName, string attrMnemonic>
     : AttrDef<BGV_Dialect, attrName> {
-    let summary = "Attribute for BGV";
-    let description = [{
-        This attribute represents the values for BGV.
-    }];
     let mnemonic = attrMnemonic;
     let assemblyFormat = "`<` struct(params) `>`";
 }

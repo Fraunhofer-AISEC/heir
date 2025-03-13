@@ -9,7 +9,10 @@ package(
 cc_library(
     name = "Dialect",
     srcs = [
+        "LWEAttributes.cpp",
         "LWEDialect.cpp",
+        "LWEOps.cpp",
+        "LWETypes.cpp",
     ],
     hdrs = [
         "LWEAttributes.h",
@@ -27,7 +30,7 @@ cc_library(
         "@heir//lib/Dialect/ModArith/IR:Dialect",
         "@heir//lib/Dialect/Polynomial/IR:Dialect",
         "@heir//lib/Dialect/RNS/IR:Dialect",
-        "@heir//lib/Utils/Tablegen:AsmInterfaces",
+        "@heir//lib/Utils:APIntUtils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
@@ -63,7 +66,6 @@ td_library(
     # include from the heir-root to enable fully-qualified include-paths
     includes = ["../../../.."],
     deps = [
-        "@heir//lib/Utils/Tablegen:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",

@@ -5,7 +5,6 @@
 #include "mlir/include/mlir/IR/MLIRContext.h"              // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
 #include "mlir/include/mlir/IR/PatternMatch.h"             // from @llvm-project
-#include "mlir/include/mlir/Pass/AnalysisManager.h"        // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
 
 namespace mlir {
@@ -48,6 +47,20 @@ struct ModReduceBefore : public OpRewritePattern<Op> {
   bool includeFirstMul;
   Operation *top;
   DataFlowSolver *solver;
+};
+
+template <typename Op>
+struct RemoveOp : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+
+  RemoveOp(MLIRContext *context)
+      : OpRewritePattern<Op>(context, /*benefit=*/1) {}
+
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override;
+
+ private:
+  Operation *top;
 };
 
 // when reached a certain depth (water line), bootstrap

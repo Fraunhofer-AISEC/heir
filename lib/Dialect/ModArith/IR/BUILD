@@ -1,7 +1,7 @@
 # ModArith dialect
 
 load("@heir//lib/Dialect:dialect.bzl", "add_heir_dialect_library")
-load("@llvm-project//mlir:tblgen.bzl", "td_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 
 package(
     default_applicable_licenses = ["@heir//:license"],
@@ -14,18 +14,18 @@ cc_library(
         "ModArithDialect.cpp",
     ],
     hdrs = [
-        "ModArithAttributes.h",
         "ModArithDialect.h",
         "ModArithOps.h",
         "ModArithTypes.h",
     ],
     deps = [
-        ":attributes_inc_gen",
+        ":canonicalization_inc_gen",
         ":dialect_inc_gen",
         ":ops_inc_gen",
         ":types_inc_gen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:CommonFolders",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:Support",
@@ -35,7 +35,7 @@ cc_library(
 td_library(
     name = "td_files",
     srcs = [
-        "ModArithAttributes.td",
+        "ModArithCanonicalization.td",
         "ModArithDialect.td",
         "ModArithOps.td",
         "ModArithTypes.td",
@@ -62,16 +62,6 @@ add_heir_dialect_library(
 )
 
 add_heir_dialect_library(
-    name = "attributes_inc_gen",
-    dialect = "ModArith",
-    kind = "attribute",
-    td_file = "ModArithAttributes.td",
-    deps = [
-        ":td_files",
-    ],
-)
-
-add_heir_dialect_library(
     name = "types_inc_gen",
     dialect = "ModArith",
     kind = "type",
@@ -88,5 +78,21 @@ add_heir_dialect_library(
     td_file = "ModArithOps.td",
     deps = [
         ":td_files",
+    ],
+)
+
+gentbl_cc_library(
+    name = "canonicalization_inc_gen",
+    tbl_outs = [
+        (
+            ["-gen-rewriters"],
+            "ModArithCanonicalization.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ModArithCanonicalization.td",
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:ArithOpsTdFiles",
     ],
 )

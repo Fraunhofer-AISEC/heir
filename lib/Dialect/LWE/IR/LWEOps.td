@@ -10,7 +10,6 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/CommonAttrConstraints.td"
-include "mlir/IR/OpAsmInterface.td"
 
 class HasEncoding<
   string encodingHolder,
@@ -86,20 +85,10 @@ class KeyAndCiphertextMatch<
 
 // LWE Operations are always Pure by design
 class LWE_Op<string mnemonic, list<Trait> traits = []> :
-        Op<LWE_Dialect, mnemonic,  traits # [Pure, OpAsmOpInterface]> {
+        Op<LWE_Dialect, mnemonic,  traits # [Pure]> {
   let cppNamespace = "::mlir::heir::lwe";
   let assemblyFormat = [{
     operands attr-dict `:`  functional-type(operands, results)
-  }];
-
-  let extraClassDeclaration = [{
-    // OpAsmOpInterface Methods
-    void getAsmResultNames(::mlir::OpAsmSetValueNameFn setNameFn) {
-      for (auto result : getOperation()->getResults()) {
-        if (auto ty = dyn_cast<TypeAsmInterface>(result.getType()))
-          setNameFn(result, ty.suggestedName());
-      }
-    }
   }];
 }
 
@@ -163,14 +152,14 @@ def LWE_AddOp : LWE_BinOp<"add", [SameOperandsAndResultType,Commutative]> {
   let summary = "Add two LWE ciphertexts";
 }
 
-def LWE_RAddOp : LWE_BinOp<"radd", [SameOperandsAndResultRings, InferTypeOpAdaptor, Commutative]> {
+def LWE_RAddOp : LWE_BinOp<"radd", [SameOperandsAndResultRings, SameOperandsAndResultPlaintextTypes, InferTypeOpAdaptor, Commutative]> {
   let summary = "Add two RLWE ciphertexts";
   let assemblyFormat = [{
     operands attr-dict `:`  functional-type(operands, results)
   }];
 }
 
-def LWE_RSubOp : LWE_BinOp<"rsub", [SameOperandsAndResultRings, InferTypeOpAdaptor]> {
+def LWE_RSubOp : LWE_BinOp<"rsub", [SameOperandsAndResultRings, SameOperandsAndResultPlaintextTypes, InferTypeOpAdaptor]> {
   let summary = "Subtract two RLWE ciphertexts";
   let assemblyFormat = [{
     operands attr-dict `:`  functional-type(operands, results)
@@ -275,12 +264,13 @@ def LWE_RLWEDecryptOp : LWE_Op<"rlwe_decrypt", [
   let results = (outs NewLWEPlaintext:$output);
 }
 
-def ReinterpretUnderlyingTypeOp : LWE_Op<"reinterpret_underlying_type", []> {
+def ReinterpretApplicationDataOp : LWE_Op<"reinterpret_application_data", []> {
   let summary = "A placeholder cast from one ciphertext type to another";
   let description = [{
-    The `cast` op is thus used to translate `underlying_type` between
-    ciphertexts in particular situations , such as when lowering to an API that
-    does not keep track of types for you.
+    The `cast` op is thus used to translate application data (e.g., `message_type`)
+    between ciphertexts in particular situations, such as when the bitwidth of the
+    message type changes, but this change is not observed in the plaintext space,
+    or when lowering to an API that does not keep track of types.
   }];
 
   let arguments = (ins NewLWECiphertext:$input);

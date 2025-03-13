@@ -7,7 +7,9 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-WORKSPACE_PATH = ""
+# changed from "heir" (or nothing) in bazel 8
+# https://bazel.build/remote/output-directories#layout-diagram
+WORKSPACE_PATH = "_main/"
 
 # Custom `mlir-opt` replacement that links our dialect and passes
 cc_binary(
@@ -34,6 +36,10 @@ cc_binary(
     }),
     includes = ["include"],
     deps = [
+        "@heir//lib/Analysis/NoiseAnalysis",  # buildcleaner: keep
+        "@heir//lib/Analysis/NoiseAnalysis/BFV:NoiseCoeffModelAnalysis",  # buildcleaner: keep
+        "@heir//lib/Analysis/NoiseAnalysis/BGV:NoiseCoeffModelAnalysis",  # buildcleaner: keep
+        "@heir//lib/Dialect:HEIRInterfaces",
         "@heir//lib/Dialect/Arith/Conversions/ArithToCGGI",
         "@heir//lib/Dialect/Arith/Conversions/ArithToCGGIQuart",
         "@heir//lib/Dialect/Arith/Conversions/ArithToModArith",
@@ -57,6 +63,7 @@ cc_binary(
         "@heir//lib/Dialect/LWE/Transforms:AddClientInterface",
         "@heir//lib/Dialect/Lattigo/IR:Dialect",
         "@heir//lib/Dialect/Lattigo/Transforms",
+        "@heir//lib/Dialect/Lattigo/Transforms:AllocToInplace",
         "@heir//lib/Dialect/Lattigo/Transforms:ConfigureCryptoContext",
         "@heir//lib/Dialect/LinAlg/Conversions/LinalgToTensorExt",
         "@heir//lib/Dialect/Mgmt/IR:Dialect",
@@ -68,6 +75,7 @@ cc_binary(
         "@heir//lib/Dialect/Openfhe/IR:Dialect",
         "@heir//lib/Dialect/Openfhe/Transforms",
         "@heir//lib/Dialect/Openfhe/Transforms:ConfigureCryptoContext",
+        "@heir//lib/Dialect/Openfhe/Transforms:CountAddAndKeySwitch",
         "@heir//lib/Dialect/Polynomial/Conversions/PolynomialToModArith",
         "@heir//lib/Dialect/Polynomial/IR:Dialect",
         "@heir//lib/Dialect/Polynomial/Transforms",
@@ -82,6 +90,7 @@ cc_binary(
         "@heir//lib/Dialect/Secret/Transforms:BufferizableOpInterface",
         "@heir//lib/Dialect/Secret/Transforms:DistributeGeneric",
         "@heir//lib/Dialect/TOSA/Conversions/TosaToSecretArith",
+        "@heir//lib/Dialect/TensorExt/Conversions/TensorExtToTensor",
         "@heir//lib/Dialect/TensorExt/IR:Dialect",
         "@heir//lib/Dialect/TensorExt/Transforms",
         "@heir//lib/Dialect/TensorExt/Transforms:CollapseInsertionChains",
@@ -105,19 +114,20 @@ cc_binary(
         "@heir//lib/Transforms/ForwardInsertToExtract",
         "@heir//lib/Transforms/ForwardStoreToLoad",
         "@heir//lib/Transforms/FullLoopUnroll",
+        "@heir//lib/Transforms/GenerateParam",
         "@heir//lib/Transforms/LayoutPropagation",
         "@heir//lib/Transforms/LinalgCanonicalizations",
         "@heir//lib/Transforms/MemrefToArith:ExpandCopy",
         "@heir//lib/Transforms/MemrefToArith:MemrefToArithRegistration",
         "@heir//lib/Transforms/OperationBalancer",
         "@heir//lib/Transforms/OptimizeRelinearization",
+        "@heir//lib/Transforms/PolynomialApproximation",
         "@heir//lib/Transforms/SecretInsertMgmt",
         "@heir//lib/Transforms/Secretize",
         "@heir//lib/Transforms/StraightLineVectorizer",
         "@heir//lib/Transforms/TensorToScalars",
         "@heir//lib/Transforms/UnusedMemRef",
         "@heir//lib/Transforms/ValidateNoise",
-        "@heir//lib/Utils/Tablegen:AsmInterfaces",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandard",
@@ -234,19 +244,19 @@ cc_binary(
 bzl_library(
     name = "heir_translate_bzl",
     srcs = ["heir-translate.bzl"],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
 
 bzl_library(
     name = "heir_opt_bzl",
     srcs = ["heir-opt.bzl"],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
 
 bzl_library(
     name = "heir_jaxite_bzl",
     srcs = ["heir-jaxite.bzl"],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
     deps = [
         ":heir_opt_bzl",
         ":heir_translate_bzl",

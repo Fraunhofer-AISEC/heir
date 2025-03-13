@@ -42,19 +42,24 @@ def Lattigo_BGVNewEncoderOp : Lattigo_BGVOp<"new_encoder"> {
   let results = (outs Lattigo_BGVEncoder:$encoder);
 }
 
-def Lattigo_BGVEncodeOp : Lattigo_BGVOp<"encode"> {
+def Lattigo_BGVEncodeOp : Lattigo_BGVOp<"encode", [InplaceOpInterface]> {
   let summary = "Encode a plaintext value in the Lattigo BGV dialect";
   let description = [{
     This operation encodes a plaintext value using the specified encoder in the Lattigo BGV dialect.
 
     The input value tensor should have elements of integer type.
+
+    The `scale` attribute indicates the scaling factor for encoding.
   }];
   let arguments = (ins
     Lattigo_BGVEncoder:$encoder,
     RankedTensorOf<[AnyInteger]>:$value,
-    Lattigo_RLWEPlaintext:$plaintext
+    Lattigo_RLWEPlaintext:$plaintext,
+    DefaultValuedAttr<I64Attr, "1">:$scale
   );
   let results = (outs Lattigo_RLWEPlaintext:$encoded);
+
+  let extraClassDeclaration = "int getInplaceOperandIndex() { return 2; }";
 }
 
 def Lattigo_BGVDecodeOp : Lattigo_BGVOp<"decode", [AllTypesMatch<["value", "decoded"]>]> {
@@ -68,7 +73,11 @@ def Lattigo_BGVDecodeOp : Lattigo_BGVOp<"decode", [AllTypesMatch<["value", "deco
     Lattigo_BGVEncoder:$encoder,
     Lattigo_RLWEPlaintext:$plaintext,
     RankedTensorOf<[AnyInteger]>:$value
+    // Rely on Lattigo internal tracking of scale for decoding.
+    // DefaultValuedAttr<I64Attr, "1">:$scale
   );
+  // although bgv.Decode is also an inplace operation as bgv.Encode, as there are post-processing
+  // steps in emitter, we mark it as a normal operation.
   let results = (outs RankedTensorOf<[AnyInteger]>:$decoded);
 }
 
@@ -82,10 +91,14 @@ def Lattigo_BGVNewEvaluatorOp : Lattigo_BGVOp<"new_evaluator"> {
 
     To support operations that require evaluation keys,
     the optional evaluation key set should be provided.
+
+    The scaleInvariant flag is used to indicate whether the evaluator is for B/FV or BGV.
+    If it is set to true, the evaluator will evaluate operations in B/FV style.
   }];
   let arguments = (ins
     Lattigo_BGVParameter:$params,
-    Optional<Lattigo_RLWEEvaluationKeySet>:$evaluationKeySet
+    Optional<Lattigo_RLWEEvaluationKeySet>:$evaluationKeySet,
+    DefaultValuedAttr<BoolAttr, "false">:$scaleInvariant
   );
   let results = (outs Lattigo_BGVEvaluator:$evaluator);
 }
@@ -102,24 +115,69 @@ class Lattigo_BGVBinaryOp<string mnemonic> :
   let results = (outs Lattigo_RLWECiphertext:$output);
 }
 
-def Lattigo_BGVAddOp : Lattigo_BGVBinaryOp<"add"> {
+def Lattigo_BGVAddNewOp : Lattigo_BGVBinaryOp<"add_new"> {
   let summary = "Add two ciphertexts in the Lattigo BGV dialect";
   let description = [{
     This operation adds two ciphertext values in the Lattigo BGV dialect.
   }];
 }
 
-def Lattigo_BGVSubOp : Lattigo_BGVBinaryOp<"sub"> {
+def Lattigo_BGVSubNewOp : Lattigo_BGVBinaryOp<"sub_new"> {
   let summary = "Subtract two ciphertexts in the Lattigo BGV dialect";
   let description = [{
     This operation subtracts one ciphertext value from another in the Lattigo BGV dialect.
   }];
 }
 
-def Lattigo_BGVMulOp : Lattigo_BGVBinaryOp<"mul"> {
+def Lattigo_BGVMulNewOp : Lattigo_BGVBinaryOp<"mul_new"> {
   let summary = "Multiply two ciphertexts in the Lattigo BGV dialect";
   let description = [{
     This operation multiplies two ciphertext values in the Lattigo BGV dialect.
+  }];
+}
+
+class Lattigo_BGVBinaryInplaceOp<string mnemonic> :
+        Lattigo_BGVOp<mnemonic, [InplaceOpInterface]> {
+  let arguments = (ins
+    Lattigo_BGVEvaluator:$evaluator,
+    Lattigo_RLWECiphertext:$lhs,
+    Lattigo_RLWECiphertextOrPlaintext:$rhs,
+    // Lattigo API is like bgv.Add(lhs, rhs, out) but for MLIR we need to
+    // satisfy the SSA form, so we still have a separate output.
+    Lattigo_RLWECiphertext:$inplace
+  );
+  let results = (outs Lattigo_RLWECiphertext:$output);
+
+  let extraClassDeclaration = "int getInplaceOperandIndex() { return 3; }";
+}
+
+def Lattigo_BGVAddOp : Lattigo_BGVBinaryInplaceOp<"add"> {
+  let summary = "Add two ciphertexts in the Lattigo BGV dialect";
+  let description = [{
+    This operation adds two ciphertext values in the Lattigo BGV dialect.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
+  }];
+}
+
+def Lattigo_BGVSubOp : Lattigo_BGVBinaryInplaceOp<"sub"> {
+  let summary = "Subtract two ciphertexts in the Lattigo BGV dialect";
+  let description = [{
+    This operation subtracts one ciphertext value from another in the Lattigo BGV dialect.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
+  }];
+}
+
+def Lattigo_BGVMulOp : Lattigo_BGVBinaryInplaceOp<"mul"> {
+  let summary = "Multiply two ciphertexts in the Lattigo BGV dialect";
+  let description = [{
+    This operation multiplies two ciphertext values in the Lattigo BGV dialect.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
   }];
 }
 
@@ -132,21 +190,21 @@ class Lattigo_BGVUnaryOp<string mnemonic> :
   let results = (outs Lattigo_RLWECiphertext:$output);
 }
 
-def Lattigo_BGVRelinearizeOp : Lattigo_BGVUnaryOp<"relinearize"> {
+def Lattigo_BGVRelinearizeNewOp : Lattigo_BGVUnaryOp<"relinearize_new"> {
   let summary = "Relinearize a ciphertext in the Lattigo BGV dialect";
   let description = [{
     This operation relinearizes a ciphertext value in the Lattigo BGV dialect.
   }];
 }
 
-def Lattigo_BGVRescaleOp : Lattigo_BGVUnaryOp<"rescale"> {
+def Lattigo_BGVRescaleNewOp : Lattigo_BGVUnaryOp<"rescale_new"> {
   let summary = "Rescale a ciphertext in the Lattigo BGV dialect";
   let description = [{
     This operation rescales a ciphertext value in the Lattigo BGV dialect.
   }];
 }
 
-def Lattigo_BGVRotateColumnsOp : Lattigo_BGVOp<"rotate_columns"> {
+def Lattigo_BGVRotateColumnsNewOp : Lattigo_BGVOp<"rotate_columns_new"> {
   let summary = "Rotate columns of a ciphertext in the Lattigo BGV dialect";
   let description = [{
     This operation rotates the columns of a ciphertext value in the Lattigo BGV dialect.
@@ -163,12 +221,78 @@ def Lattigo_BGVRotateColumnsOp : Lattigo_BGVOp<"rotate_columns"> {
   let results = (outs Lattigo_RLWECiphertext:$output);
 }
 
-def Lattigo_BGVRotateRowsOp : Lattigo_BGVUnaryOp<"rotate_rows"> {
+def Lattigo_BGVRotateRowsNewOp : Lattigo_BGVUnaryOp<"rotate_rows_new"> {
   let summary = "Rotate rows of a ciphertext in the Lattigo BGV dialect";
   let description = [{
     This operation swap the rows of a ciphertext value in the Lattigo BGV dialect.
 
     Lattigo exposes the SIMD slot of BGV as a N/2 x 2 matrix, where 2 is the row.
+  }];
+}
+
+class Lattigo_BGVUnaryInplaceOp<string mnemonic> :
+        Lattigo_BGVOp<mnemonic, [InplaceOpInterface]> {
+  let arguments = (ins
+    Lattigo_BGVEvaluator:$evaluator,
+    Lattigo_RLWECiphertext:$input,
+    // see BinaryInplaceOp above
+    Lattigo_RLWECiphertext:$inplace
+  );
+  let results = (outs Lattigo_RLWECiphertext:$output);
+
+  let extraClassDeclaration = "int getInplaceOperandIndex() { return 2; }";
+}
+
+def Lattigo_BGVRelinearizeOp : Lattigo_BGVUnaryInplaceOp<"relinearize"> {
+  let summary = "Relinearize a ciphertext in the Lattigo BGV dialect";
+  let description = [{
+    This operation relinearizes a ciphertext value in the Lattigo BGV dialect.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
+  }];
+}
+
+def Lattigo_BGVRescaleOp : Lattigo_BGVUnaryInplaceOp<"rescale"> {
+  let summary = "Rescale a ciphertext in the Lattigo BGV dialect";
+  let description = [{
+    This operation rescales a ciphertext value in the Lattigo BGV dialect.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
+  }];
+}
+
+def Lattigo_BGVRotateColumnsOp : Lattigo_BGVUnaryInplaceOp<"rotate_columns"> {
+  let summary = "Rotate columns of a ciphertext in the Lattigo BGV dialect";
+  let description = [{
+    This operation rotates the columns of a ciphertext value in the Lattigo BGV dialect.
+
+    Lattigo exposes the SIMD slot of BGV as a N/2 x 2 matrix, where N/2 is the column.
+
+    Offset is valid for both positive and negative number.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
+  }];
+  let arguments = (ins
+    Lattigo_BGVEvaluator:$evaluator,
+    Lattigo_RLWECiphertext:$input,
+    Lattigo_RLWECiphertext:$inplace,
+    Builtin_IntegerAttr:$offset
+  );
+  let results = (outs Lattigo_RLWECiphertext:$output);
+}
+
+def Lattigo_BGVRotateRowsOp : Lattigo_BGVUnaryInplaceOp<"rotate_rows"> {
+  let summary = "Rotate rows of a ciphertext in the Lattigo BGV dialect";
+  let description = [{
+    This operation swap the rows of a ciphertext value in the Lattigo BGV dialect.
+
+    Lattigo exposes the SIMD slot of BGV as a N/2 x 2 matrix, where 2 is the row.
+
+    The result will be written to the `inplace` operand. The `output`result is
+    a transitive reference to the `inplace` operand for sake of the MLIR SSA form.
   }];
 }
 

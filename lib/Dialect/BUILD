@@ -14,6 +14,7 @@ cc_library(
     hdrs = ["HEIRInterfaces.h"],
     deps = [
         ":interfaces_inc_gen",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -24,18 +25,6 @@ cc_library(
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Support",
-    ],
-)
-
-cc_library(
-    name = "FHEHelpers",
-    hdrs = ["FHEHelpers.h"],
-    deps = [
-        "@heir//lib/Dialect/LWE/IR:Dialect",
-        "@heir//lib/Dialect/ModArith/IR:Dialect",
-        "@heir//lib/Dialect/RNS/IR:Dialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
     ],

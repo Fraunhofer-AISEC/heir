@@ -22,11 +22,11 @@
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"   // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Attributes.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"      // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypeInterfaces.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"           // from @llvm-project
 #include "mlir/include/mlir/IR/PatternMatch.h"           // from @llvm-project
-#include "mlir/include/mlir/IR/SymbolTable.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/TypeUtilities.h"          // from @llvm-project
 #include "mlir/include/mlir/Support/LLVM.h"              // from @llvm-project
 #include "mlir/include/mlir/Support/LogicalResult.h"     // from @llvm-project
@@ -94,14 +94,7 @@ struct AddCryptoContextArg : public OpConversionPattern<func::FuncOp> {
 
     auto cryptoContextType = openfhe::CryptoContextType::get(getContext());
     rewriter.modifyOpInPlace(op, [&] {
-      if (op.isDeclaration()) {
-        auto newFuncType = op.getTypeWithArgsAndResults(
-            ArrayRef<unsigned int>{0}, ArrayRef<Type>{cryptoContextType}, {},
-            {});
-        op.setType(newFuncType);
-      } else {
-        op.insertArgument(0, cryptoContextType, nullptr, op.getLoc());
-      }
+      op.insertArgument(0, cryptoContextType, nullptr, op.getLoc());
     });
 
     return success();
@@ -131,8 +124,9 @@ struct ConvertFuncCallOp : public OpConversionPattern<func::CallOp> {
       newOperands.push_back(operand);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes,
-                                              newOperands);
+    rewriter
+        .replaceOpWithNewOp<func::CallOp>(op, callee, resultTypes, newOperands)
+        ->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
 };
@@ -148,11 +142,6 @@ struct ConvertEncryptOp : public OpConversionPattern<lwe::RLWEEncryptOp> {
       ConversionPatternRewriter &rewriter) const override {
     FailureOr<Value> result = getContextualCryptoContext(op.getOperation());
     if (failed(result)) return result;
-
-    auto keyType = dyn_cast<lwe::NewLWEPublicKeyType>(op.getKey().getType());
-    if (!keyType)
-      return op.emitError()
-             << "OpenFHE only supports public key encryption for LWE.";
 
     Value cryptoContext = result.value();
     rewriter.replaceOp(op,
@@ -298,7 +287,41 @@ struct ConvertBootstrapOp : public OpConversionPattern<ckks::BootstrapOp> {
 }  // namespace
 
 struct LWEToOpenfhe : public impl::LWEToOpenfheBase<LWEToOpenfhe> {
+  // See https://github.com/llvm/llvm-project/pull/127772
+  // During dialect conversion, the attribute of the func::CallOp is not
+  // preserved. We save the dialect attributes of func::CallOp before
+  // conversion and restore them after conversion.
+  //
+  // Note that this is not safe as after conversion the order of func::CallOp
+  // may change. However, this is the best we can do for now as we do not have
+  // a map from the old func::CallOp to the new func::CallOp.
+  SmallVector<SmallVector<NamedAttribute>> funcCallOpDialectAttrs;
+
+  void saveFuncCallOpDialectAttrs() {
+    funcCallOpDialectAttrs.clear();
+    auto *module = getOperation();
+    module->walk([&](func::CallOp callOp) {
+      SmallVector<NamedAttribute> dialectAttrs;
+      for (auto namedAttr : callOp->getDialectAttrs()) {
+        dialectAttrs.push_back(namedAttr);
+      }
+      funcCallOpDialectAttrs.push_back(dialectAttrs);
+    });
+  }
+
+  void restoreFuncCallOpDialectAttrs() {
+    auto *module = getOperation();
+    auto *funcCallOpDialectAttrsIter = funcCallOpDialectAttrs.begin();
+    module->walk([&](func::CallOp callOp) {
+      callOp->setDialectAttrs(*funcCallOpDialectAttrsIter);
+      ++funcCallOpDialectAttrsIter;
+    });
+  }
+
   void runOnOperation() override {
+    // Save the dialect attributes of func::CallOp before conversion.
+    saveFuncCallOpDialectAttrs();
+
     MLIRContext *context = &getContext();
     auto *module = getOperation();
     ToOpenfheTypeConverter typeConverter(context);
@@ -309,7 +332,7 @@ struct LWEToOpenfhe : public impl::LWEToOpenfheBase<LWEToOpenfhe> {
     target.addIllegalDialect<ckks::CKKSDialect>();
     target.addIllegalDialect<lwe::LWEDialect>();
     // We can keep the following ops, which the emitter can handle directly
-    target.addLegalOp<lwe::ReinterpretUnderlyingTypeOp, lwe::RLWEDecodeOp>();
+    target.addLegalOp<lwe::ReinterpretApplicationDataOp, lwe::RLWEDecodeOp>();
 
     RewritePatternSet patterns(context);
     addStructuralConversionPatterns(typeConverter, patterns, target);
@@ -383,7 +406,7 @@ struct LWEToOpenfhe : public impl::LWEToOpenfheBase<LWEToOpenfhe> {
         ConvertCiphertextPlaintextOp<ckks::MulPlainOp, openfhe::MulPlainOp>,
 
         // Rotate
-        ConvertRotateOp<bgv::RotateOp, openfhe::RotOp>,
+        ConvertRotateOp<bgv::RotateColumnsOp, openfhe::RotOp>,
         ConvertRotateOp<ckks::RotateOp, openfhe::RotOp>,
         // Relin
         ConvertRelinOp<bgv::RelinearizeOp, openfhe::RelinOp>,
@@ -392,6 +415,9 @@ struct LWEToOpenfhe : public impl::LWEToOpenfheBase<LWEToOpenfhe> {
         lwe::ConvertModulusSwitchOp<bgv::ModulusSwitchOp>,
         // Rescale (CKKS version of Modulus Switch)
         lwe::ConvertModulusSwitchOp<ckks::RescaleOp>,
+        // Level Reduce
+        lwe::ConvertLevelReduceOp<bgv::LevelReduceOp>,
+        lwe::ConvertLevelReduceOp<ckks::LevelReduceOp>,
         // Bootstrap (CKKS only)
         ConvertBootstrapOp
         // End of Pattern List
@@ -400,6 +426,9 @@ struct LWEToOpenfhe : public impl::LWEToOpenfheBase<LWEToOpenfhe> {
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Restore the dialect attributes of func::CallOp after conversion.
+    restoreFuncCallOpDialectAttrs();
   }
 };
 

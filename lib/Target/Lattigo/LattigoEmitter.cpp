@@ -23,6 +23,7 @@
 #include "mlir/include/mlir/IR/Attributes.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"      // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinOps.h"             // from @llvm-project
+#include "mlir/include/mlir/IR/BuiltinTypeInterfaces.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/Diagnostics.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/DialectRegistry.h"        // from @llvm-project
 #include "mlir/include/mlir/IR/TypeUtilities.h"          // from @llvm-project
@@ -64,17 +65,21 @@ LogicalResult LattigoEmitter::translate(Operation &op) {
               RLWENewEncryptorOp, RLWENewDecryptorOp, RLWENewKeyGeneratorOp,
               RLWEGenKeyPairOp, RLWEGenRelinearizationKeyOp, RLWEGenGaloisKeyOp,
               RLWENewEvaluationKeySetOp, RLWEEncryptOp, RLWEDecryptOp,
+              RLWELevelReduceNewOp, RLWELevelReduceOp,
               // BGV
               BGVNewParametersFromLiteralOp, BGVNewEncoderOp, BGVNewEvaluatorOp,
-              BGVNewPlaintextOp, BGVEncodeOp, BGVDecodeOp, BGVAddOp, BGVSubOp,
-              BGVMulOp, BGVRelinearizeOp, BGVRescaleOp, BGVRotateColumnsOp,
-              BGVRotateRowsOp,
+              BGVNewPlaintextOp, BGVEncodeOp, BGVDecodeOp, BGVAddNewOp,
+              BGVSubNewOp, BGVMulNewOp, BGVAddOp, BGVSubOp, BGVMulOp,
+              BGVRelinearizeOp, BGVRescaleOp, BGVRotateColumnsOp,
+              BGVRotateRowsOp, BGVRelinearizeNewOp, BGVRescaleNewOp,
+              BGVRotateColumnsNewOp, BGVRotateRowsNewOp,
               // CKKS
               CKKSNewParametersFromLiteralOp, CKKSNewEncoderOp,
               CKKSNewEvaluatorOp, CKKSNewPlaintextOp, CKKSEncodeOp,
-              CKKSDecodeOp, CKKSAddOp, CKKSSubOp, CKKSMulOp, CKKSRelinearizeOp,
-              CKKSRescaleOp, CKKSRotateOp>(
-              [&](auto op) { return printOperation(op); })
+              CKKSDecodeOp, CKKSAddNewOp, CKKSSubNewOp, CKKSMulNewOp, CKKSAddOp,
+              CKKSSubOp, CKKSMulOp, CKKSRelinearizeOp, CKKSRescaleOp,
+              CKKSRotateOp, CKKSRelinearizeNewOp, CKKSRescaleNewOp,
+              CKKSRotateNewOp>([&](auto op) { return printOperation(op); })
           .Default([&](Operation &) {
             return emitError(op.getLoc(), "unable to find printer for op");
           });
@@ -89,7 +94,7 @@ LogicalResult LattigoEmitter::translate(Operation &op) {
 LogicalResult LattigoEmitter::printOperation(ModuleOp moduleOp) {
   os << "package " << packageName << "\n";
 
-  if (moduleIsBGV(moduleOp)) {
+  if (moduleIsBGVOrBFV(moduleOp)) {
     os << kModulePreludeBGVTemplate;
   } else if (moduleIsCKKS(moduleOp)) {
     os << kModulePreludeCKKSTemplate;
@@ -164,12 +169,46 @@ LogicalResult LattigoEmitter::printOperation(func::ReturnOp op) {
 }
 
 LogicalResult LattigoEmitter::printOperation(func::CallOp op) {
+  // build debug attribute map for debug call
+  auto debugAttrMapName = getDebugAttrMapName();
+  if (isDebugPort(op.getCallee())) {
+    os << debugAttrMapName << " := make(map[string]string)\n";
+    for (auto attr : op->getAttrs()) {
+      // callee is also an attribute internally, skip it
+      if (attr.getName().getValue() == "callee") {
+        continue;
+      }
+      os << debugAttrMapName << "[\"" << attr.getName().getValue()
+         << "\"] = \"";
+      // Use AsmPrinter to print Attribute
+      if (mlir::isa<StringAttr>(attr.getValue())) {
+        os << mlir::cast<StringAttr>(attr.getValue()).getValue() << "\"\n";
+      } else {
+        os << attr.getValue() << "\"\n";
+      }
+    }
+    auto ciphertext = op->getOperand(op->getNumOperands() - 1);
+    os << debugAttrMapName << R"(["asm.is_block_arg"] = ")"
+       << isa<BlockArgument>(ciphertext) << "\"\n";
+    if (auto *definingOp = ciphertext.getDefiningOp()) {
+      os << debugAttrMapName << R"(["asm.op_name"] = ")"
+         << definingOp->getName() << "\"\n";
+    }
+    // Use AsmPrinter to print Value
+    os << debugAttrMapName << R"(["asm.result_ssa_format"] = ")" << ciphertext
+       << "\"\n";
+  }
+
   if (op.getNumResults() > 0) {
     os << getCommaSeparatedNames(op.getResults());
     os << " := ";
   }
   os << canonicalizeDebugPort(op.getCallee()) << "(";
   os << getCommaSeparatedNames(op.getOperands());
+  // pass debug attribute map
+  if (isDebugPort(op.getCallee())) {
+    os << ", " << debugAttrMapName;
+  }
   os << ")\n";
   return success();
 }
@@ -298,6 +337,28 @@ LogicalResult LattigoEmitter::printOperation(RLWEDecryptOp op) {
                             {op.getCiphertext()}, "DecryptNew", false);
 }
 
+LogicalResult LattigoEmitter::printOperation(RLWELevelReduceNewOp op) {
+  // there is no LevelReduceNew method in Lattigo, manually create new
+  // ciphertext
+  os << getName(op.getOutput()) << " := " << getName(op.getInput())
+     << ".CopyNew()\n";
+  os << getName(op.getOutput()) << ".Resize(" << getName(op.getOutput())
+     << ".Degree(), " << getName(op.getOutput()) << ".Level()-"
+     << op.getLevelToDrop() << ")\n";
+  return success();
+}
+
+LogicalResult LattigoEmitter::printOperation(RLWELevelReduceOp op) {
+  if (getName(op.getOutput()) != getName(op.getInput())) {
+    os << getName(op.getInput()) << ".Copy(" << getName(op.getOutput())
+       << ")\n";
+  }
+  os << getName(op.getOutput()) << ".Resize(" << getName(op.getOutput())
+     << ".Degree(), " << getName(op.getOutput()) << ".Level()-"
+     << op.getLevelToDrop() << ")\n";
+  return success();
+}
+
 // BGV
 
 LogicalResult LattigoEmitter::printOperation(BGVNewEncoderOp op) {
@@ -314,7 +375,13 @@ LogicalResult LattigoEmitter::printOperation(BGVNewEvaluatorOp op) {
     // no evaluation key set, use empty Value for 'nil'
     operands.push_back(Value());
   }
-  return printNewMethod(op.getResult(), operands, "bgv.NewEvaluator", false);
+  os << getName(op.getResult());
+  os << " := bgv.NewEvaluator(";
+  os << getCommaSeparatedNames(operands);
+  os << ", ";
+  os << (op.getScaleInvariant() ? "true" : "false");
+  os << ")\n";
+  return success();
 }
 
 LogicalResult LattigoEmitter::printOperation(BGVNewPlaintextOp op) {
@@ -337,7 +404,8 @@ LogicalResult LattigoEmitter::printOperation(BGVEncodeOp op) {
   }
   auto maxSlotsName = getName(newPlaintextOp.getParams()) + ".MaxSlots()";
 
-  auto packedName = getName(op.getValue()) + "_packed";
+  auto packedName =
+      getName(op.getValue()) + "_" + getName(op.getPlaintext()) + "_packed";
   os << packedName << " := make([]int64, ";
   os << maxSlotsName << ")\n";
   os << "for i := range " << packedName << " {\n";
@@ -347,11 +415,16 @@ LogicalResult LattigoEmitter::printOperation(BGVEncodeOp op) {
   os.unindent();
   os << "}\n";
 
+  // set the scale of plaintext
+  // Enable this part only when we have scale management
+  // auto scale = op.getScale();
+  // os << getName(op.getPlaintext()) << ".Scale = ";
+  // os << getName(newPlaintextOp.getParams()) << ".NewScale(";
+  // os << scale << ")\n";
+
   os << getName(op.getEncoder()) << ".Encode(";
   os << packedName << ", ";
   os << getName(op.getPlaintext()) << ")\n";
-  os << getName(op.getEncoded()) << " := " << getName(op.getPlaintext())
-     << "\n";
   return success();
 }
 
@@ -375,32 +448,53 @@ LogicalResult LattigoEmitter::printOperation(BGVDecodeOp op) {
   return success();
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVAddOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVAddNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "AddNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVSubOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVSubNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "SubNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVMulOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVMulNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "MulNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVRelinearizeOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVAddOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Add", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVSubOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Sub", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVMulOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Mul", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVRelinearizeNewOp op) {
   return printEvalNewMethod(op.getOutput(), op.getEvaluator(), op.getInput(),
                             "RelinearizeNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVRescaleOp op) {
-  return printEvalInplaceMethod(op.getOutput(), op.getEvaluator(),
-                                op.getInput(), op.getInput(), "Rescale", true);
+LogicalResult LattigoEmitter::printOperation(BGVRescaleNewOp op) {
+  // there is no RescaleNew method in Lattigo, manually create new ciphertext
+  os << getName(op.getOutput()) << " := " << getName(op.getInput())
+     << ".CopyNew()\n";
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getOutput()}, "Rescale", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVRotateColumnsOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVRotateColumnsNewOp op) {
   auto errName = getErrName();
   os << getName(op.getOutput()) << ", " << errName
      << " := " << getName(op.getEvaluator()) << ".RotateColumnsNew(";
@@ -410,9 +504,34 @@ LogicalResult LattigoEmitter::printOperation(BGVRotateColumnsOp op) {
   return success();
 }
 
-LogicalResult LattigoEmitter::printOperation(BGVRotateRowsOp op) {
+LogicalResult LattigoEmitter::printOperation(BGVRotateRowsNewOp op) {
   return printEvalNewMethod(op.getOutput(), op.getEvaluator(), {op.getInput()},
                             "RotateRowsNew", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVRelinearizeOp op) {
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getInplace()}, "Relinearize", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVRescaleOp op) {
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getInplace()}, "Rescale", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVRotateColumnsOp op) {
+  auto errName = getErrName();
+  os << errName << " := " << getName(op.getEvaluator()) << ".RotateColumns(";
+  os << getName(op.getInput()) << ", ";
+  os << op.getOffset().getInt() << ", ";
+  os << getName(op.getInplace()) << ")\n";
+  printErrPanic(errName);
+  return success();
+}
+
+LogicalResult LattigoEmitter::printOperation(BGVRotateRowsOp op) {
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getInplace()}, "RotateRows", true);
 }
 
 std::string printDenseI32ArrayAttr(DenseI32ArrayAttr attr) {
@@ -496,7 +615,8 @@ LogicalResult LattigoEmitter::printOperation(CKKSEncodeOp op) {
   }
   auto maxSlotsName = getName(newPlaintextOp.getParams()) + ".MaxSlots()";
 
-  auto packedName = getName(op.getValue()) + "_packed";
+  auto packedName =
+      getName(op.getValue()) + "_" + getName(op.getPlaintext()) + "_packed";
   os << packedName << " := make([]float64, ";
   os << maxSlotsName << ")\n";
   os << "for i := range " << packedName << " {\n";
@@ -506,11 +626,16 @@ LogicalResult LattigoEmitter::printOperation(CKKSEncodeOp op) {
   os.unindent();
   os << "}\n";
 
+  // set the scale of plaintext
+  // Enable this part only when we have scale management
+  // auto scale = op.getScale();
+  // os << getName(op.getPlaintext()) << ".Scale = ";
+  // os << getName(newPlaintextOp.getParams()) << ".NewScale(math.Pow(2, ";
+  // os << scale << "))\n";
+
   os << getName(op.getEncoder()) << ".Encode(";
   os << packedName << ", ";
   os << getName(op.getPlaintext()) << ")\n";
-  os << getName(op.getEncoded()) << " := " << getName(op.getPlaintext())
-     << "\n";
   return success();
 }
 
@@ -534,37 +659,78 @@ LogicalResult LattigoEmitter::printOperation(CKKSDecodeOp op) {
   return success();
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSAddOp op) {
+LogicalResult LattigoEmitter::printOperation(CKKSAddNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "AddNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSSubOp op) {
+LogicalResult LattigoEmitter::printOperation(CKKSSubNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "SubNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSMulOp op) {
+LogicalResult LattigoEmitter::printOperation(CKKSMulNewOp op) {
   return printEvalNewMethod(op.getResult(), op.getEvaluator(),
                             {op.getLhs(), op.getRhs()}, "MulNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSRelinearizeOp op) {
+LogicalResult LattigoEmitter::printOperation(CKKSAddOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Add", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSSubOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Sub", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSMulOp op) {
+  return printEvalInplaceMethod(op.getEvaluator(),
+                                {op.getLhs(), op.getRhs(), op.getInplace()},
+                                "Mul", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSRelinearizeNewOp op) {
   return printEvalNewMethod(op.getOutput(), op.getEvaluator(), op.getInput(),
                             "RelinearizeNew", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSRescaleOp op) {
-  return printEvalInplaceMethod(op.getOutput(), op.getEvaluator(),
-                                op.getInput(), op.getInput(), "Rescale", true);
+LogicalResult LattigoEmitter::printOperation(CKKSRescaleNewOp op) {
+  // there is no RescaleNew method in Lattigo, manually create new ciphertext
+  os << getName(op.getOutput()) << " := " << getName(op.getInput())
+     << ".CopyNew()\n";
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getOutput()}, "Rescale", true);
 }
 
-LogicalResult LattigoEmitter::printOperation(CKKSRotateOp op) {
+LogicalResult LattigoEmitter::printOperation(CKKSRotateNewOp op) {
   auto errName = getErrName();
   os << getName(op.getOutput()) << ", " << errName
      << " := " << getName(op.getEvaluator()) << ".RotateNew(";
   os << getName(op.getInput()) << ", ";
   os << op.getOffset().getInt() << ")\n";
+  printErrPanic(errName);
+  return success();
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSRelinearizeOp op) {
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getInplace()}, "Relinearize", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSRescaleOp op) {
+  return printEvalInplaceMethod(
+      op.getEvaluator(), {op.getInput(), op.getInplace()}, "Rescale", true);
+}
+
+LogicalResult LattigoEmitter::printOperation(CKKSRotateOp op) {
+  auto errName = getErrName();
+  os << errName << " := " << getName(op.getEvaluator()) << ".Rotate(";
+  os << getName(op.getInput()) << ", ";
+  os << op.getOffset().getInt() << ", ";
+  os << getName(op.getInplace()) << ")\n";
   printErrPanic(errName);
   return success();
 }
@@ -623,21 +789,17 @@ LogicalResult LattigoEmitter::printNewMethod(::mlir::Value result,
 }
 
 LogicalResult LattigoEmitter::printEvalInplaceMethod(
-    ::mlir::Value result, ::mlir::Value evaluator, ::mlir::Value operand,
-    ::mlir::Value operandInplace, std::string_view op, bool err) {
+    ::mlir::Value evaluator, ::mlir::ValueRange operands, std::string_view op,
+    bool err) {
   std::string errName = getErrName();
   if (err) {
     os << errName << " := ";
   }
-  os << getName(evaluator) << "." << op << "(" << getName(operand) << ", "
-     << getName(operandInplace) << ");\n";
+  os << getName(evaluator) << "." << op << "("
+     << getCommaSeparatedNames(operands) << ");\n";
   if (err) {
     printErrPanic(errName);
   }
-  // for inplace operation, operandInplace is actually a pointer in GO
-  // so assigning it is not costly, but for lowering pass to Lattigo, they
-  // should ensure the operandInplace is only used once
-  os << getName(result) << " := " << getName(operandInplace) << "\n";
   return success();
 }
 

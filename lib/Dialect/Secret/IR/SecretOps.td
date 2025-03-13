@@ -3,6 +3,7 @@
 
 include "SecretDialect.td"
 include "SecretTypes.td"
+include "lib/Dialect/HEIRInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -59,7 +60,7 @@ def Secret_ConcealOp : Secret_Op<"conceal", [Pure]> {
 
   let arguments = (ins AnyType:$cleartext);
   let results = (outs Secret:$output);
-  let assemblyFormat = "$cleartext attr-dict `:` type($cleartext) `->` type($output)";
+  let assemblyFormat = "$cleartext attr-dict `:` qualified(type($cleartext)) `->` qualified(type($output))";
 
   let builders = [
     // Builder to infer output type from the input type
@@ -84,7 +85,7 @@ def Secret_RevealOp : Secret_Op<"reveal", [Pure]> {
 
   let arguments = (ins Secret:$input);
   let results = (outs AnyType:$cleartext);
-  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($cleartext)";
+  let assemblyFormat = "$input attr-dict `:` qualified(type($input)) `->` qualified(type($cleartext))";
 
   let builders = [
     // Builder to infer output type from the input type
@@ -112,7 +113,8 @@ def Secret_YieldOp : Secret_Op<"yield", [
 def Secret_GenericOp : Secret_Op<"generic", [
   SingleBlock,
   SingleBlockImplicitTerminator<"YieldOp">,
-  OpAsmOpInterface
+  OpAsmOpInterface,
+  OperandAndResultAttrInterface
 ]> {
   let summary = "Lift a plaintext computation to operate on secrets.";
   let description = [{
@@ -246,65 +248,8 @@ def Secret_GenericOp : Secret_Op<"generic", [
       inlineInPlaceDroppingSecrets(rewriter, getOperands());
     }
 
-    //===------------------------------------------------------------------===//
-    // Argument Attributes
-    //===------------------------------------------------------------------===//
-
-    /// Return the specified attribute, if present, for the argument at 'index',
-    /// null otherwise.
-    Attribute getArgAttr(unsigned index, StringRef name) {
-      std::string argName = "arg" + std::to_string(index);
-      auto argDict = this->getOperation()->getAttrOfType<DictionaryAttr>(argName);
-      return argDict ? argDict.get(name) : nullptr;
-    }
-
-    /// If the an attribute exists with the specified name, change it to the new
-    /// value. Otherwise, add a new attribute with the specified name/value.
-    void setArgAttr(unsigned index, StringRef name, Attribute value) {
-      llvm::MapVector<StringAttr, Attribute> newAttrMap;
-      newAttrMap.insert({StringAttr::get(getContext(), name), value});
-
-      std::string argName = "arg" + std::to_string(index);
-      auto argDict = this->getOperation()->getAttrOfType<DictionaryAttr>(argName);
-      if (argDict) {
-        for (const auto &attr : argDict) {
-          newAttrMap.insert({attr.getName(), attr.getValue()});
-        }
-      }
-
-      auto newAttrs = llvm::to_vector(llvm::map_range(
-        newAttrMap, [](std::pair<StringAttr, Attribute> attrPair) {
-        return NamedAttribute(attrPair.first, attrPair.second);
-      }));
-
-      this->getOperation()->setAttr(argName, DictionaryAttr::get(getContext(), newAttrs));
-    }
-
-    // remove the specified attribute, if present, for the argument at 'index',
-    // return the removed attribute, null otherwise.
-    Attribute removeArgAttr(unsigned index, StringRef name) {
-      std::string argName = "arg" + std::to_string(index);
-      auto argDict = this->getOperation()->getAttrOfType<DictionaryAttr>(argName);
-      if (!argDict)
-        return nullptr;
-
-      auto attr = argDict.get(name);
-      if (!attr)
-        return nullptr;
-
-      SmallVector<NamedAttribute> newAttrs;
-      for (auto &attr : argDict) {
-        if (attr.getName().getValue() != name)
-          newAttrs.push_back(attr);
-      }
-
-      if (newAttrs.empty()) {
-        this->getOperation()->removeAttr(argName);
-      } else {
-        this->getOperation()->setAttr(argName, DictionaryAttr::get(getContext(), newAttrs));
-      }
-      return attr;
-    }
+    GenericOp cloneWithNewResultTypes(TypeRange newTypes, PatternRewriter &rewriter,
+                                      bool preserveAttrs = false);
 
     //===------------------------------------------------------------------===//
     // OpAsmOpInterface Methods

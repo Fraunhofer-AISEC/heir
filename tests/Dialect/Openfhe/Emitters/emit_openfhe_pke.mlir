@@ -40,7 +40,7 @@
 // CHECK-NEXT:      const auto& [[v9:.*]] = [[CC]]->EvalMult([[v7]], [[const]]);
 // CHECK-NEXT:      const auto& [[v10:.*]] = [[CC]]->Relinearize([[v9]]);
 // CHECK-NEXT:      const auto& [[v11:.*]] = [[CC]]->ModReduce([[v10]]);
-// CHECK-NEXT:      const auto& [[v12:.*]] = [[CC]]->LevelReduce([[v11]]);
+// CHECK-NEXT:      const auto& [[v12:.*]] = [[CC]]->LevelReduce([[v11]], nullptr, 1);
 // CHECK-NEXT:      const auto& [[v13:.*]] = [[CC]]->EvalRotate([[v12]], 4);
 // CHECK-NEXT:      std::map<uint32_t, EvalKeyT> [[v14_evalkeymap:.*]] = {{[{][{]}}0, [[ARG4]]{{[}][}]}};
 // CHECK-NEXT:      const auto& [[v14:.*]] = [[CC]]->EvalAutomorphism([[v13]], 0, [[v14_evalkeymap]]);
@@ -120,7 +120,7 @@ module attributes {scheme.ckks} {
     %15 = openfhe.make_packed_plaintext %arg0, %cst : (!openfhe.crypto_context, tensor<32xi16>) -> !tensor_pt_ty
     %16 = openfhe.mul_plain %arg0, %14, %15 : (!openfhe.crypto_context, !tensor_ct_ty, !tensor_pt_ty) -> !tensor_ct_ty
     %18 = openfhe.rot %arg0, %16 { index = 31 } : (!openfhe.crypto_context, !tensor_ct_ty) -> !tensor_ct_ty
-    %19 = lwe.reinterpret_underlying_type %18 : !tensor_ct_ty to !scalar_ct_ty
+    %19 = lwe.reinterpret_application_data %18 : !tensor_ct_ty to !scalar_ct_ty
     return %19 : !scalar_ct_ty
   }
   func.func @simple_sum__encrypt(%arg0: !openfhe.crypto_context, %arg1: tensor<32xi16>, %arg2: !openfhe.public_key) -> !tensor_ct_ty {
@@ -149,12 +149,12 @@ module attributes {scheme.ckks} {
 // -----
 
 // CHECK-LABEL: test_constant
-// CHECK-NEXT:  std::vector<float> [[splat:.*]](2, 1.500000e+00);
+// CHECK-NEXT:  std::vector<float> [[splat:.*]](2, 1.5);
 // CHECK-NEXT:  std::vector<int32_t> [[ints:.*]] = {1, 2};
-// CHECK-NEXT:  std::vector<float> [[floats:.*]] = {1.500000e+00, 2.500000e+00};
+// CHECK-NEXT:  std::vector<float> [[floats:.*]] = {1.5, 2.5};
 // CHECK-NEXT:  std::vector<double> [[double1:.*]](16, -0.38478666543960571);
 // CHECK-NEXT:  std::vector<double> [[double2:.*]](16, -1.1268185335211456E-4);
-// CHECK-NEXT:  std::vector<double> [[multidim:.*]] = {1.500000e+00, 2.500000e+00};
+// CHECK-NEXT:  std::vector<double> [[multidim:.*]] = {1.5, 2.5};
 // CHECK-NEXT:  return [[splat]];
 module attributes {scheme.bgv} {
   func.func @test_constant() -> tensor<2xf32> {
@@ -177,5 +177,79 @@ module attributes {scheme.ckks} {
     %0 = openfhe.gen_params  {insecure = false, mulDepth = 2 : i64, plainMod = 0 : i64, evalAddCount = 0 : i64, keySwitchCount = 0 : i64} : () -> !openfhe.cc_params
     %1 = openfhe.gen_context %0 {supportFHE = false} : (!openfhe.cc_params) -> !openfhe.crypto_context
     return %1 : !openfhe.crypto_context
+  }
+}
+
+// -----
+
+!Z2147565569_i64_ = !mod_arith.int<2147565569 : i64>
+!Z65537_i64_ = !mod_arith.int<65537 : i64>
+#full_crt_packing_encoding = #lwe.full_crt_packing_encoding<scaling_factor = 0>
+#key = #lwe.key<>
+#modulus_chain_L0_C0_ = #lwe.modulus_chain<elements = <2147565569 : i64>, current = 0>
+!rns_L0_ = !rns.rns<!Z2147565569_i64_>
+#ring_Z65537_i64_1_x8_ = #polynomial.ring<coefficientType = !Z65537_i64_, polynomialModulus = <1 + x**8>>
+#plaintext_space = #lwe.plaintext_space<ring = #ring_Z65537_i64_1_x8_, encoding = #full_crt_packing_encoding>
+#ring_rns_L0_1_x8_ = #polynomial.ring<coefficientType = !rns_L0_, polynomialModulus = <1 + x**8>>
+!pt = !lwe.new_lwe_plaintext<application_data = <message_type = i16>, plaintext_space = #plaintext_space>
+#ciphertext_space_L0_ = #lwe.ciphertext_space<ring = #ring_rns_L0_1_x8_, encryption_type = lsb>
+!ct_L0_ = !lwe.new_lwe_ciphertext<application_data = <message_type = i16>, plaintext_space = #plaintext_space, ciphertext_space = #ciphertext_space_L0_, key = #key, modulus_chain = #modulus_chain_L0_C0_>
+
+// CHECK: __heir_debug(CryptoContextT, PrivateKeyT, CiphertextT, const std::map<std::string, std::string>&)
+// CHECK: ["bound"] = "50"
+// CHECK: ["complex"] = "{test = 1.200000e+00 : f64}"
+// CHECK: ["random"] = "3 : i64"
+// CHECK: ["secret.secret"] = "unit"
+// CHECK: ["asm.is_block_arg"] = "1"
+// CHECK: ["asm.result_ssa_format"]
+
+module attributes {scheme.bgv} {
+  func.func private @__heir_debug_0(!openfhe.crypto_context, !openfhe.private_key, !ct_L0_)
+  func.func @add(%cc: !openfhe.crypto_context, %sk: !openfhe.private_key, %ct: !ct_L0_) -> !ct_L0_ {
+    call @__heir_debug_0(%cc, %sk, %ct) {bound = "50", random = 3, complex = {test = 1.2}, secret.secret} : (!openfhe.crypto_context, !openfhe.private_key, !ct_L0_) -> ()
+    return %ct : !ct_L0_
+  }
+}
+
+// -----
+
+!Z1095233372161_i64_ = !mod_arith.int<1095233372161 : i64>
+!Z65537_i64_ = !mod_arith.int<65537 : i64>
+
+!rns_L0_ = !rns.rns<!Z1095233372161_i64_>
+#ring_Z65537_i64_1_x32_ = #polynomial.ring<coefficientType = !Z65537_i64_, polynomialModulus = <1 + x**32>>
+#ring_rns_L0_1_x32_ = #polynomial.ring<coefficientType = !rns_L0_, polynomialModulus = <1 + x**32>>
+
+#full_crt_packing_encoding = #lwe.full_crt_packing_encoding<scaling_factor = 0>
+#key = #lwe.key<>
+
+#modulus_chain_L5_C0_ = #lwe.modulus_chain<elements = <1095233372161 : i64, 1032955396097 : i64, 1005037682689 : i64, 998595133441 : i64, 972824936449 : i64, 959939837953 : i64>, current = 0>
+
+#plaintext_space = #lwe.plaintext_space<ring = #ring_Z65537_i64_1_x32_, encoding = #full_crt_packing_encoding>
+
+#ciphertext_space_L0_ = #lwe.ciphertext_space<ring = #ring_rns_L0_1_x32_, encryption_type = lsb>
+
+!ct_L0_ = !lwe.new_lwe_ciphertext<application_data = <message_type = tensor<32xi16>>, plaintext_space = #plaintext_space, ciphertext_space = #ciphertext_space_L0_, key = #key, modulus_chain = #modulus_chain_L5_C0_>
+
+module attributes {scheme.ckks} {
+  // CHECK-LABEL: test_func_call
+  // CHECK: const auto& [[v0:.*]] = callee_secret
+  func.func private @callee_secret(!openfhe.crypto_context, !ct_L0_) -> !ct_L0_
+  func.func @test_func_call(%cc: !openfhe.crypto_context, %arg0: !ct_L0_) -> !ct_L0_ {
+    %1 = call @callee_secret(%cc, %arg0) : (!openfhe.crypto_context, !ct_L0_) -> !ct_L0_
+    return %1 : !ct_L0_
+  }
+}
+
+
+// -----
+
+module attributes {scheme.ckks} {
+  // CHECK-LABEL: test_extract_slice
+  // CHECK-SAME: std::vector<float> [[v0:.*]], size_t [[v1:.*]]) {
+  // CHECK: std::vector<float> [[v2:.*]](std::begin([[v0]]) + [[v1]] * 1, std::end([[v0]]) + [[v1]] * 1 + 1024);
+  func.func @test_extract_slice(%arg0: tensor<1x1024xf32>, %arg1: index) -> tensor<1024xf32> {
+    %1 = tensor.extract_slice %arg0[%arg1, 0] [1, 1024] [1, 1] : tensor<1x1024xf32> to tensor<1024xf32>
+    return %1 : tensor<1024xf32>
   }
 }

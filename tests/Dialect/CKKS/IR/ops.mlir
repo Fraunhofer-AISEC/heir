@@ -13,7 +13,7 @@
 #ring_rns_L0_1_x1024_ = #polynomial.ring<coefficientType = !rns_L0_, polynomialModulus = <1 + x**1024>>
 #ring_rns_L1_1_x1024_ = #polynomial.ring<coefficientType = !rns_L1_, polynomialModulus = <1 + x**1024>>
 
-#inverse_canonical_encoding = #lwe.inverse_canonical_encoding<scaling_factor = 1024>
+#inverse_canonical_encoding = #lwe.inverse_canonical_encoding<scaling_factor = 0>
 #key = #lwe.key<>
 
 #modulus_chain_L5_C0_ = #lwe.modulus_chain<elements = <1095233372161 : i64, 1032955396097 : i64, 1005037682689 : i64, 998595133441 : i64, 972824936449 : i64, 959939837953 : i64>, current = 0>
@@ -35,7 +35,7 @@
 !ct_scalar = !lwe.new_lwe_ciphertext<application_data = <message_type = i16>, plaintext_space = #plaintext_space, ciphertext_space = #ciphertext_space_L1_, key = #key, modulus_chain = #modulus_chain_L5_C1_>
 
 // CHECK: module
-module {
+module attributes {ckks.schemeParam = #ckks.scheme_param<logN = 14, Q = [36028797019389953, 35184372121601, 35184372744193, 35184373006337, 35184373989377, 35184374874113], P = [36028797019488257, 36028797020209153], logDefaultScale = 45>} {
   // CHECK-LABEL: @test_multiply
   func.func @test_multiply(%arg0 : !ct, %arg1: !ct) -> !ct {
     %add = ckks.add %arg0, %arg1 : (!ct, !ct) -> !ct

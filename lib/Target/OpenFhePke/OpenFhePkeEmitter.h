@@ -1,13 +1,22 @@
 #ifndef LIB_TARGET_OPENFHEPKE_OPENFHEPKEEMITTER_H_
 #define LIB_TARGET_OPENFHEPKE_OPENFHEPKEEMITTER_H_
 
+#include <cstdint>
+#include <map>
+#include <string>
 #include <string_view>
+#include <vector>
 
+#include "include/cereal/cereal.hpp"        // from @cereal
+#include "include/cereal/types/map.hpp"     // from @cereal
+#include "include/cereal/types/string.hpp"  // from @cereal
+#include "include/cereal/types/vector.hpp"  // from @cereal
 #include "lib/Analysis/SelectVariableNames/SelectVariableNames.h"
 #include "lib/Dialect/LWE/IR/LWEOps.h"
 #include "lib/Dialect/Openfhe/IR/OpenfheOps.h"
 #include "lib/Target/OpenFhePke/OpenFheUtils.h"
-#include "llvm/include/llvm/Support/raw_ostream.h"       // from @llvm-project
+#include "llvm/include/llvm/Support/raw_ostream.h"  // from @llvm-project
+#include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"   // from @llvm-project
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"  // from @llvm-project
@@ -26,14 +35,33 @@ namespace heir {
 namespace openfhe {
 
 /// Translates the given operation to OpenFhePke.
-::mlir::LogicalResult translateToOpenFhePke(
-    ::mlir::Operation *op, llvm::raw_ostream &os,
-    const OpenfheImportType &importType);
+::mlir::LogicalResult translateToOpenFhePke(::mlir::Operation *op,
+                                            llvm::raw_ostream &os,
+                                            const OpenfheImportType &importType,
+                                            const std::string &weightsFile);
+
+// A map from the SSA value name of a 1-D dense element constants to its value.
+// Note that multidimensional shapes are handled as flattened 1-D vectors.
+struct Weights {
+  std::map<std::string, std::vector<float>> floats;
+  std::map<std::string, std::vector<double>> doubles;
+  std::map<std::string, std::vector<int64_t>> int64_ts;
+  std::map<std::string, std::vector<int32_t>> int32_ts;
+  std::map<std::string, std::vector<int16_t>> int16_ts;
+  std::map<std::string, std::vector<int8_t>> int8_ts;
+
+  template <class Archive>
+  void serialize(Archive &archive) {
+    archive(CEREAL_NVP(floats), CEREAL_NVP(doubles), CEREAL_NVP(int64_ts),
+            CEREAL_NVP(int32_ts), CEREAL_NVP(int16_ts), CEREAL_NVP(int8_ts));
+  }
+};
 
 class OpenFhePkeEmitter {
  public:
   OpenFhePkeEmitter(raw_ostream &os, SelectVariableNames *variableNames,
-                    const OpenfheImportType &importType);
+                    const OpenfheImportType &importType,
+                    const std::string &weightsFile);
 
   LogicalResult translate(::mlir::Operation &operation);
 
@@ -47,14 +75,25 @@ class OpenFhePkeEmitter {
   /// values.
   SelectVariableNames *variableNames;
 
+  /// Set of values that are mutable and don't need assign prefixes.
+  llvm::DenseSet<::mlir::Value> mutableValues;
+
+  // Module containing global weights
+  Weights weightsMap_;
+
+  const std::string &weightsFile_;
+
   // Functions for printing individual ops
   LogicalResult printOperation(::mlir::ModuleOp op);
+  LogicalResult printOperation(::mlir::affine::AffineForOp op);
+  LogicalResult printOperation(::mlir::affine::AffineYieldOp op);
   LogicalResult printOperation(::mlir::arith::ConstantOp op);
   LogicalResult printOperation(::mlir::arith::ExtSIOp op);
   LogicalResult printOperation(::mlir::arith::ExtFOp op);
   LogicalResult printOperation(::mlir::arith::IndexCastOp op);
   LogicalResult printOperation(::mlir::tensor::EmptyOp op);
   LogicalResult printOperation(::mlir::tensor::ExtractOp op);
+  LogicalResult printOperation(::mlir::tensor::ExtractSliceOp op);
   LogicalResult printOperation(::mlir::tensor::InsertOp op);
   LogicalResult printOperation(::mlir::tensor::SplatOp op);
   LogicalResult printOperation(::mlir::func::FuncOp op);
@@ -62,7 +101,7 @@ class OpenFhePkeEmitter {
   LogicalResult printOperation(::mlir::func::ReturnOp op);
   LogicalResult printOperation(::mlir::heir::lwe::RLWEDecodeOp op);
   LogicalResult printOperation(
-      ::mlir::heir::lwe::ReinterpretUnderlyingTypeOp op);
+      ::mlir::heir::lwe::ReinterpretApplicationDataOp op);
   LogicalResult printOperation(AddOp op);
   LogicalResult printOperation(AddPlainOp op);
   LogicalResult printOperation(AutomorphOp op);
@@ -97,15 +136,23 @@ class OpenFhePkeEmitter {
                                 ::mlir::ValueRange nonEvalOperands,
                                 std::string_view op);
 
-  // Emit an OpenFhe type
-  LogicalResult emitType(::mlir::Type type, ::mlir::Location loc);
+  // Emit an OpenFhe type, using a const specifier.
+  LogicalResult emitType(::mlir::Type type, ::mlir::Location loc,
+                         bool constant = true);
 
   // Canonicalize Debug Port
+  bool isDebugPort(::llvm::StringRef debugPortName);
   ::llvm::StringRef canonicalizeDebugPort(::llvm::StringRef debugPortName);
+
+  std::string getDebugAttrMapName() {
+    static int debugAttrMapCount = 0;
+    return "debugAttrMap" + std::to_string(debugAttrMapCount++);
+  }
 
   void emitAutoAssignPrefix(::mlir::Value result);
   LogicalResult emitTypedAssignPrefix(::mlir::Value result,
-                                      ::mlir::Location loc);
+                                      ::mlir::Location loc,
+                                      bool constant = true);
 };
 
 }  // namespace openfhe

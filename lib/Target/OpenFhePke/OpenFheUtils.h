@@ -12,7 +12,7 @@ namespace mlir {
 namespace heir {
 namespace openfhe {
 
-enum class OpenfheScheme { BGV, CKKS };
+enum class OpenfheScheme { BGV, BFV, CKKS };
 
 // OpenFHE's installation process moves headers around in the install directory,
 // as well as changing the import paths from the development repository. This
@@ -34,9 +34,12 @@ enum class OpenfheImportType {
 std::string getModulePrelude(OpenfheScheme scheme,
                              OpenfheImportType importType);
 
-/// Convert a type to a string.
+std::string getWeightsPrelude();
+
+/// Convert a type to a string, using a const specifier if constant is true.
 ::mlir::FailureOr<std::string> convertType(::mlir::Type type,
-                                           ::mlir::Location loc);
+                                           ::mlir::Location loc,
+                                           bool constant = true);
 
 /// Find the CryptoContext SSA value in the input operation's parent func
 /// arguments.

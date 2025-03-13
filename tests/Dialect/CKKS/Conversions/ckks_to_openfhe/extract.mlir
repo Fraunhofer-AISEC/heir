@@ -8,7 +8,7 @@
 #ring_Z65537_i64_1_x32_ = #polynomial.ring<coefficientType = !Z65537_i64_, polynomialModulus = <1 + x**32>>
 #ring_rns_L0_1_x32_ = #polynomial.ring<coefficientType = !rns_L0_, polynomialModulus = <1 + x**32>>
 
-#inverse_canonical_encoding = #lwe.inverse_canonical_encoding<scaling_factor = 1024>
+#inverse_canonical_encoding = #lwe.inverse_canonical_encoding<scaling_factor = 0>
 #key = #lwe.key<>
 
 #modulus_chain_L5_C0_ = #lwe.modulus_chain<elements = <1095233372161 : i64, 1032955396097 : i64, 1005037682689 : i64, 998595133441 : i64, 972824936449 : i64, 959939837953 : i64>, current = 0>
@@ -27,7 +27,7 @@ func.func @test_lower_extract(%arg0: !ty1) -> !ty2 {
   // CHECK: openfhe.make_ckks_packed_plaintext
   // CHECK: openfhe.mul_plain
   // CHECK: openfhe.rot
-  // CHECK: lwe.reinterpret_underlying_type
+  // CHECK: lwe.reinterpret_application_data
   // CHECK: return
   %c4 = arith.constant 4 : index
   %0 = ckks.extract %arg0, %c4 : (!ty1, index) -> !ty2

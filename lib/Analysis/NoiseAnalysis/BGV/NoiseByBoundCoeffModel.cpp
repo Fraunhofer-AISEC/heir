@@ -25,7 +25,7 @@ double Model<W, P>::toLogBound(const LocalParamType &param,
   auto t = param.getSchemeParam()->getPlaintextModulus();
   // StateType only stores e in (m + t * e), so when we want to print the bound
   // we need to multiply t back
-  return log(t * noise.getValue()) / log(2);
+  return log2(t * noise.getValue());
 }
 
 template <bool W, bool P>
@@ -228,8 +228,8 @@ typename Model<W, P>::StateType Model<W, P>::evalRelinearizeHYBRID(
   // log(qiq_{i+1}...), the digit size for a certain digit
   // we use log(pip_{i+1}...) as an approximation,
   // as we often choose P > each digit
-  auto logqi = inputParam.getSchemeParam()->getLogqi();
-  double logDigitSize = std::accumulate(logqi.begin(), logqi.end(), 0.0);
+  auto logpi = inputParam.getSchemeParam()->getLogpi();
+  double logDigitSize = std::accumulate(logpi.begin(), logpi.end(), 0.0);
   // omega in literature
   auto digitSize = pow(2.0, logDigitSize);
 

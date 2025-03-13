@@ -2,12 +2,11 @@
 
 #include <string>
 
-#include "lib/Dialect/LWE/IR/LWEOps.h"
 #include "lib/Dialect/LWE/IR/LWETypes.h"
 #include "lib/Utils/TransformUtils.h"
 #include "llvm/include/llvm/ADT/STLExtras.h"            // from @llvm-project
-#include "llvm/include/llvm/ADT/TypeSwitch.h"           // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Attributes.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinOps.h"            // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"          // from @llvm-project
 #include "mlir/include/mlir/IR/ImplicitLocOpBuilder.h"  // from @llvm-project
@@ -85,10 +84,43 @@ LogicalResult insertExternalCall(func::FuncOp op, Type lwePrivateKeyType) {
       if (!typeToInt.count(valueType)) {
         typeToInt[valueType] = typeToInt.size();
       }
+
+      // get attribute associated with value
+      SmallVector<NamedAttribute> attrs;
+      if (auto blockArg = dyn_cast<BlockArgument>(value)) {
+        auto *parentOp = blockArg.getOwner()->getParentOp();
+        auto funcOp = dyn_cast<FunctionOpInterface>(parentOp);
+        if (funcOp) {
+          // always dialect attr
+          for (auto namedAttr : funcOp.getArgAttrs(blockArg.getArgNumber())) {
+            attrs.push_back(namedAttr);
+          }
+        }
+      } else {
+        auto *parentOp = value.getDefiningOp();
+        for (auto namedAttr : parentOp->getDialectAttrs()) {
+          attrs.push_back(namedAttr);
+        }
+      }
+
+      auto messageType =
+          lweCiphertextType.getApplicationData().getMessageType();
+      auto messageSize = 1;
+      if (auto tensorMessageType = dyn_cast<TensorType>(messageType)) {
+        auto shape = tensorMessageType.getShape();
+        if (shape.size() != 1) {
+          op->emitWarning("Only support 1D tensor for message type");
+        }
+        messageSize = shape[0];
+      }
+      attrs.push_back(b.getNamedAttr(
+          "message.size", b.getStringAttr(std::to_string(messageSize))));
+
       b.create<func::CallOp>(
-          getOrCreateExternalDebugFunc(module, lwePrivateKeyType,
-                                       lweCiphertextType, typeToInt),
-          ArrayRef<Value>{privateKey, value});
+           getOrCreateExternalDebugFunc(module, lwePrivateKeyType,
+                                        lweCiphertextType, typeToInt),
+           ArrayRef<Value>{privateKey, value})
+          ->setDialectAttrs(attrs);
     }
   };
 

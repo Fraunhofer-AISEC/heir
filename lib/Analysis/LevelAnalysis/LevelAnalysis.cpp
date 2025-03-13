@@ -111,7 +111,8 @@ static int getMaxLevel(Operation *top, DataFlowSolver *solver) {
   return maxLevel;
 }
 
-void annotateLevel(Operation *top, DataFlowSolver *solver) {
+/// baseLevel is for B/FV scheme, where all the analysis result would be 0
+void annotateLevel(Operation *top, DataFlowSolver *solver, int baseLevel) {
   auto maxLevel = getMaxLevel(top, solver);
 
   auto getIntegerAttr = [&](int level) {
@@ -121,14 +122,15 @@ void annotateLevel(Operation *top, DataFlowSolver *solver) {
   // use L to 0 instead of 0 to L
   auto getLevel = [&](Value value) {
     return maxLevel -
-           solver->lookupState<LevelLattice>(value)->getValue().getLevel();
+           solver->lookupState<LevelLattice>(value)->getValue().getLevel() +
+           baseLevel;
   };
 
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
     for (auto i = 0; i != genericOp.getBody()->getNumArguments(); ++i) {
       auto blockArg = genericOp.getBody()->getArgument(i);
       auto level = getLevel(blockArg);
-      genericOp.setArgAttr(i, "level", getIntegerAttr(level));
+      genericOp.setOperandAttr(i, "level", getIntegerAttr(level));
     }
 
     genericOp.getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
@@ -150,8 +152,8 @@ LevelState::LevelType getLevelFromMgmtAttr(Value value) {
     auto *parentOp = blockArg.getOwner()->getParentOp();
     auto genericOp = dyn_cast<secret::GenericOp>(parentOp);
     if (genericOp) {
-      attr = genericOp.getArgAttr(blockArg.getArgNumber(),
-                                  mgmt::MgmtDialect::kArgMgmtAttrName);
+      attr = genericOp.getOperandAttr(blockArg.getArgNumber(),
+                                      mgmt::MgmtDialect::kArgMgmtAttrName);
     }
   } else {
     auto *parentOp = value.getDefiningOp();

@@ -4,6 +4,7 @@
 include "lib/Dialect/Polynomial/IR/PolynomialDialect.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/OpAsmInterface.td"
 
 class Polynomial_Attr<string name, string attrMnemonic, list<Trait> traits = []>
     : AttrDef<Polynomial_Dialect, name, traits> {
@@ -56,7 +57,7 @@ def Polynomial_FloatPolynomialAttr : Polynomial_Attr<"FloatPolynomial", "float_p
 }
 
 def Polynomial_TypedIntPolynomialAttr : Polynomial_Attr<
-    "TypedIntPolynomial", "typed_int_polynomial", [TypedAttrInterface]> {
+    "TypedIntPolynomial", "typed_int_polynomial"> {
   let summary = "a typed int_polynomial";
   let description = [{
     Example:
@@ -83,12 +84,12 @@ def Polynomial_TypedIntPolynomialAttr : Polynomial_Attr<
     }]>
   ];
   let extraClassDeclaration = [{
-    using ValueType = ::mlir::Attribute;
+    using ValueType = ::mlir::heir::polynomial::IntPolynomialAttr;
   }];
 }
 
 def Polynomial_TypedFloatPolynomialAttr : Polynomial_Attr<
-    "TypedFloatPolynomial", "typed_float_polynomial", [TypedAttrInterface]> {
+    "TypedFloatPolynomial", "typed_float_polynomial"> {
   let summary = "a typed float_polynomial";
   let description = [{
     Example:
@@ -115,11 +116,11 @@ def Polynomial_TypedFloatPolynomialAttr : Polynomial_Attr<
     }]>
   ];
   let extraClassDeclaration = [{
-    using ValueType = ::mlir::Attribute;
+    using ValueType = ::mlir::heir::polynomial::FloatPolynomialAttr;
   }];
 }
 
-def Polynomial_RingAttr : Polynomial_Attr<"Ring", "ring"> {
+def Polynomial_RingAttr : Polynomial_Attr<"Ring", "ring", [OpAsmAttrInterface]> {
   let summary = "an attribute specifying a polynomial ring";
   let description = [{
     A ring describes the domain in which polynomial arithmetic occurs. The ring
@@ -169,6 +170,14 @@ def Polynomial_RingAttr : Polynomial_Attr<"Ring", "ring"> {
         polynomialModulusAttr);
     }]>,
   ];
+
+  let extraClassDeclaration = [{
+    // Helper method for other Type/Attribute containing this Attribute.
+    void getAliasSuffix(::llvm::raw_ostream& os) const;
+
+    // OpAsmAttrInterface methods.
+    ::mlir::OpAsmDialectInterface::AliasResult getAlias(::llvm::raw_ostream &os) const;
+  }];
 }
 
 def Polynomial_PrimitiveRootAttr: Polynomial_Attr<"PrimitiveRoot", "primitive_root"> {

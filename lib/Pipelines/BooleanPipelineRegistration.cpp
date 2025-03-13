@@ -16,7 +16,6 @@
 #include "lib/Transforms/FullLoopUnroll/FullLoopUnroll.h"
 #include "lib/Transforms/MemrefToArith/MemrefToArith.h"
 #include "lib/Transforms/Secretize/Passes.h"
-#include "lib/Transforms/StraightLineVectorizer/StraightLineVectorizer.h"
 #include "lib/Transforms/UnusedMemRef/UnusedMemRef.h"
 #include "lib/Transforms/YosysOptimizer/YosysOptimizer.h"
 #include "llvm/include/llvm/ADT/SmallVector.h"        // from @llvm-project
@@ -46,9 +45,6 @@ void tosaToCGGIPipelineBuilder(OpPassManager &pm,
                                const std::string &yosysFilesPath,
                                const std::string &abcPath,
                                bool abcBooleanGates) {
-  // Secretize inputs
-  pm.addPass(createSecretize(SecretizeOptions{options.entryFunction}));
-
   // TOSA to linalg
   ::mlir::heir::tosaToLinalg(pm);
 

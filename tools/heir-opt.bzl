@@ -5,7 +5,10 @@ def executable_attr(label):
     return attr.label(
         default = Label(label),
         executable = True,
-        cfg = "exec",
+        # commenting this out breaks cross-compilation, but this should not be a problem
+        # for developer builds
+        # cfg = "exec",
+        cfg = "target",
     )
 
 _HEIR_OPT = "@heir//tools:heir-opt"
@@ -18,7 +21,7 @@ def _heir_opt_impl(ctx):
     args.add(ctx.file.src)
     env_vars = {}
     if ctx.attr.HEIR_YOSYS:
-        HEIR_BASE_PATH = "heir/"
+        HEIR_BASE_PATH = "_main/"
         runtime_dir = ctx.executable._heir_opt_binary.path + ".runfiles"
         yosys_scripts_dir = runtime_dir + "/" + HEIR_BASE_PATH + "lib/Transforms/YosysOptimizer/yosys"
         abc_path = runtime_dir + "/edu_berkeley_abc/abc"

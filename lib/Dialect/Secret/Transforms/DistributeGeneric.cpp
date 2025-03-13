@@ -11,6 +11,7 @@
 #include "lib/Dialect/Secret/IR/SecretOps.h"
 #include "lib/Dialect/Secret/IR/SecretPatterns.h"
 #include "lib/Dialect/Secret/IR/SecretTypes.h"
+#include "lib/Utils/AttributeUtils.h"
 #include "llvm/include/llvm/ADT/STLExtras.h"    // from @llvm-project
 #include "llvm/include/llvm/ADT/SmallVector.h"  // from @llvm-project
 #include "llvm/include/llvm/Support/Casting.h"  // from @llvm-project
@@ -19,6 +20,7 @@
 #include "mlir/include/mlir/Analysis/DataFlow/DeadCodeAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"     // from @llvm-project
+#include "mlir/include/mlir/IR/Attributes.h"               // from @llvm-project
 #include "mlir/include/mlir/IR/Block.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Builders.h"                 // from @llvm-project
 #include "mlir/include/mlir/IR/Dominance.h"                // from @llvm-project
@@ -27,6 +29,7 @@
 #include "mlir/include/mlir/IR/MLIRContext.h"              // from @llvm-project
 #include "mlir/include/mlir/IR/OpDefinition.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
+#include "mlir/include/mlir/IR/OperationSupport.h"         // from @llvm-project
 #include "mlir/include/mlir/IR/PatternMatch.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Types.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
@@ -605,7 +608,7 @@ void moveMgmtAttrAnnotationToFuncArgument(Operation *top) {
         auto funcOp =
             dyn_cast<func::FuncOp>(funcBlockArg.getOwner()->getParentOp());
         auto mgmtAttr =
-            genericOp.removeArgAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName);
+            genericOp.removeOperandAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName);
         if (mgmtAttr) {
           funcOp.setArgAttr(funcBlockArg.getArgNumber(),
                             mgmt::MgmtDialect::kArgMgmtAttrName, mgmtAttr);
@@ -616,6 +619,9 @@ void moveMgmtAttrAnnotationToFuncArgument(Operation *top) {
   // some unused func secret type arg should also be annotated with mgmt attr,
   // inferred from other used arg
   top->walk([&](func::FuncOp funcOp) {
+    if (funcOp.isDeclaration()) {
+      return;
+    }
     Attribute firstMgmtAttr;
     for (auto i = 0; i != funcOp.getNumArguments(); ++i) {
       firstMgmtAttr = funcOp.getArgAttr(i, mgmt::MgmtDialect::kArgMgmtAttrName);
@@ -632,6 +638,33 @@ void moveMgmtAttrAnnotationToFuncArgument(Operation *top) {
       }
     }
   });
+
+  // Now handle returned values -> func op result attrs
+  copyReturnOperandAttrsToFuncResultAttrs(top,
+                                          mgmt::MgmtDialect::kArgMgmtAttrName);
+}
+
+// should be called right before all splitting, after
+// moveMgmtAttrAnnotationToFuncArgument
+void moveDialectAttrsToFuncArgument(Operation *top) {
+  top->walk([&](secret::GenericOp genericOp) {
+    for (auto i = 0; i != genericOp->getNumOperands(); ++i) {
+      auto operand = genericOp.getOperand(i);
+      auto funcBlockArg = dyn_cast<BlockArgument>(operand);
+      if (isa<SecretType>(operand.getType()) && funcBlockArg) {
+        auto funcOp =
+            dyn_cast<func::FuncOp>(funcBlockArg.getOwner()->getParentOp());
+        NamedAttrList attrs(genericOp.removeOperandAttrDict(i));
+        // only set attr using name with dialect prefix
+        for (auto &namedAttr : attrs) {
+          if (namedAttr.getName().getValue().find(".") != StringRef::npos) {
+            funcOp.setArgAttr(funcBlockArg.getArgNumber(), namedAttr.getName(),
+                              namedAttr.getValue());
+          }
+        }
+      }
+    }
+  });
 }
 
 // should be called when done with all splitting
@@ -641,7 +674,11 @@ void moveMgmtAttrAnnotationFromInnerToOuter(Operation *top) {
     auto *innerOp = &genericOp.getBody()->front();
     auto mgmtAttr = innerOp->removeAttr(mgmt::MgmtDialect::kArgMgmtAttrName);
     if (mgmtAttr) {
-      genericOp->setAttr(mgmt::MgmtDialect::kArgMgmtAttrName, mgmtAttr);
+      // only support a single result on the inner op
+      assert(genericOp->getNumResults() == 1 &&
+             "Only supporting single-result inner ops; file an issue if you "
+             "need multi-result ops here!");
+      genericOp.setResultAttr(0, mgmt::MgmtDialect::kArgMgmtAttrName, mgmtAttr);
     }
   });
 }
@@ -681,6 +718,8 @@ struct DistributeGeneric
 
     // used by secret-to-<scheme> lowering
     moveMgmtAttrAnnotationToFuncArgument(getOperation());
+    // move dialect attrs from secret generic op arg to func arg
+    moveDialectAttrsToFuncArgument(getOperation());
 
     patterns.add<SplitGeneric>(context, opsToDistribute, &solver);
     // These patterns are shared with canonicalization

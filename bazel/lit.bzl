@@ -56,6 +56,8 @@ def lit_test(name = None, src = None, size = "small", tags = None, data = None):
         data = data,
         srcs = ["@llvm-project//llvm:lit"],
         main = "lit.py",
+        # needed for Python 3.11+, cf. https://github.com/llvm/llvm-project/pull/87022
+        deps = [Label("@llvm-project//llvm:lit")],
         tags = tags,
     )
 
@@ -89,7 +91,7 @@ def glob_lit_tests(
     size_override = size_override or dict()
     tags_override = tags_override or dict()
     default_tags = default_tags or []
-    tests = native.glob(["*." + ext for ext in test_file_exts], exclude = exclude)
+    tests = native.glob(["*." + ext for ext in test_file_exts], exclude = exclude, allow_empty = True)
 
     for curr_test in tests:
         lit_test(
