@@ -552,7 +552,7 @@ static double findOptimalScalingModSizeBisection(
   }
   
   // Bisection
-  while (log2(pHigh - pLow) > 1) {
+  while (log2(pHigh) - log2(pLow) > 1) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
                             levelOpCounts, numPrimes, noiseBounds) < 0) {
