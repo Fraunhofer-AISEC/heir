@@ -136,48 +136,58 @@ static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus
   return pow2ptm * plaintextModulus;
 }
 
-static uint64_t findValidFirstModSize(int minModSize, int ringDimension, int plaintextModulus) {
-  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
-
-  while (minModSize < kMaxBitSize) {
-    try {
-      lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize, modulusOrder);
-      return minModSize;
-    } catch (lbcrypto::OpenFHEException &e) {
-      minModSize += 1;
-    }
-  }
-  return 0;
-}
-
-static uint64_t findValidScalingModSize(int minModSize, int firstModSize,
+static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int firstModSize,
                                         int numPrimes, int ringDimension,
                                         int plaintextModulus) {
+  if (firstModSize > kMaxBitSize || scalingModSize > kMaxBitSize) {
+    return {0, 0};
+  }                           
+
   uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
 
-  lbcrypto::NativeInteger firstModulus = 0;
-  if (firstModSize < minModSize) {
-    firstModulus = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
-                                                                modulusOrder);
-  }
+  lbcrypto::NativeInteger firstMod = 0;
 
-  while (minModSize < kMaxBitSize) {
+  // Find valid firstModulusSize and respective firstModulus prime
+  while (true) {
     try {
-      auto q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minModSize,
-                                                            modulusOrder);
-      for (int i = 1; i < numPrimes; i++) {
-        q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
-        if (q == firstModulus) {
-          minModSize += 1;
-          continue;
-        }
-      }
-      return minModSize;
+      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
+      break;
     } catch (lbcrypto::OpenFHEException &e) {
-      minModSize += 1;
+      firstModSize += 1;
+      if (firstModSize > kMaxBitSize) {
+        return {0, 0};
+      }
     }
   }
-  return 0;
+
+  while (scalingModSize <= kMaxBitSize) {
+    try {
+      lbcrypto::NativeInteger q;
+      if (firstModSize == scalingModSize){
+        firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
+                                                            modulusOrder);
+        q = firstMod;
+      } else {
+        q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
+                                                         modulusOrder);
+      }
+      bool allFound = false;
+      for (int i = 1; i < numPrimes; i++) {
+        q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
+        if (q == firstMod) {
+          firstModSize += 1;
+          break;
+        }
+        allFound = true;
+        }
+      if (allFound || numPrimes == 1) {
+        return {firstModSize, scalingModSize};
+      }
+    } catch (lbcrypto::OpenFHEException &e) {
+      scalingModSize += 1;
+    }
+  }
+  return {0,0};
 }
 
 static std::vector<double> computeBoundChain(
@@ -783,20 +793,13 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         return;
       }
   
-      firstModSize =
-          findValidFirstModSize(firstModSize, ringDimension, plaintextModulus);
-      if (!firstModSize) {
-        genericOp->emitOpError() << "Could not find valid firstModSize\n";
+      auto modSizes = findValidPrimes(scalingModSize, firstModSize, numPrimes, ringDimension, plaintextModulus);
+      if (!modSizes.first || !modSizes.second) {
+        genericOp->emitOpError() << "Could not find valid primes for modulus sizes!\n";
         return;
       }
-  
-      scalingModSize =
-          findValidScalingModSize(scalingModSize, firstModSize, numPrimes,
-                                  ringDimension, plaintextModulus);
-      if (!scalingModSize) {
-        genericOp->emitOpError() << "Could not find valid scalingModSize\n";
-        return;
-      }
+      firstModSize = modSizes.first;
+      scalingModSize = modSizes.second;
     });
 
     auto computeRingDimension = [&](int scalingModSize, int firstModSize) {
