@@ -118,8 +118,8 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     evalAddCount = openfheParamsAttr.getEvalAddCount();
     keySwitchCount = openfheParamsAttr.getKeySwitchCount();
     ringDimensionAttr = openfheParamsAttr.getRingDimension();
-    firstModSizeAttr = openfheParamsAttr.getScalingModSize();
-    scalingModSizeAttr = openfheParamsAttr.getFirstModSize();
+    firstModSizeAttr = openfheParamsAttr.getFirstModSize();
+    scalingModSizeAttr = openfheParamsAttr.getScalingModSize();
     multDepthAttr = openfheParamsAttr.getMultiplicativeDepth();
     // remove the attribute after reading
     op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
@@ -127,7 +127,7 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
 
   Type openfheParamsType = openfhe::CCParamsType::get(builder.getContext());
   Value ccParams = builder.create<openfhe::GenParamsOp>(
-      openfheParamsType, mulDepth, plainMod, ringDimensionAttr, firstModSizeAttr, scalingModSizeAttr, insecure, evalAddCount, keySwitchCount);
+      openfheParamsType, mulDepth, plainMod, ringDimensionAttr,scalingModSizeAttr, firstModSizeAttr, insecure, evalAddCount, keySwitchCount);
   Value cryptoContext = builder.create<openfhe::GenContextOp>(
       openfheContextType, ccParams,
       BoolAttr::get(builder.getContext(), hasBootstrapOp));

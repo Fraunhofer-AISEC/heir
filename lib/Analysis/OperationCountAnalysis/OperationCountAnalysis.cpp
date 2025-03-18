@@ -2,6 +2,7 @@
 #include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
 
+#include <any>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -603,12 +604,11 @@ static double computeLogPQ(int scalingModSize, int firstModSize,
 static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
                                         int numPrimes) {
   auto phi = ringDimension;  // Pessimistic
-  auto beta = pow(2.0, 10);  // TODO Replace by value set through developer
   auto t = plaintextModulus;
   auto D = 6.0;
 
-  auto vKey = 2.0 / 3.0;    // TODO Make adjustable Currently for ternary
-  auto vErr = 3.19 * 3.19;  // TODO Make adjustable
+  auto vKey = 2.0 / 3.0;   
+  auto vErr = 3.19 * 3.19; 
 
   auto boundScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
 
@@ -616,9 +616,7 @@ static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
 
   auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
 
-  auto f0 =
-      beta * sqrt(numPrimes * log2(t * phi)) /
-      (100.0 * beta * sqrt(log(numPrimes * pow(2.0, kMaxBitSize)) / log(beta)));
+  auto f0 = 1;
 
   auto addedNoiseKeySwitching = f0 * boundKeySwitch + boundScale;
 
