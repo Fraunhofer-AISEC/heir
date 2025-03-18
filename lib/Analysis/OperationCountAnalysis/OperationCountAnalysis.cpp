@@ -216,7 +216,11 @@ static double computeFirstModSizeFromChain(
     NoiseBounds noiseBounds) {
   std::vector<double> bound =
       computeBoundChain(p, numPrimes, levelOpCounts,noiseBounds);
-  return ceil(log2(2 * bound[numPrimes - 1]));
+  auto firstModSize = ceil(log2(2 * bound[numPrimes - 1]));
+  if (std::isnan(firstModSize) || std::isinf(firstModSize)){
+    return 0;
+  }
+  return firstModSize;
 }
 
 static double derivativeObjective(
@@ -404,6 +408,10 @@ static std::vector<double> candidateFirstModUpdate(
   return newModuli;
 }
 
+static bool anyModuliNegative(const std::vector<double>& moduli) {
+  return std::any_of(moduli.begin(), moduli.end(), [](double val) { return val <= 0; });
+}
+
 
 static std::vector<double> rebalanceSingleModulus(
     const std::vector<double>& moduli,
@@ -419,8 +427,14 @@ static std::vector<double> rebalanceSingleModulus(
     auto cand = candidateForward(moduli, levelOpCounts, currentModuliIndex, factor, d, 
                                 noiseBounds);
     if (!cand.empty()) {
-      auto [objective, _, __] = computeObjective(cand, levelOpCounts, 
+      if (anyModuliNegative(cand)) {
+        continue;
+      }
+      auto [objective, firstMod, __] = computeObjective(cand, levelOpCounts, 
                                               noiseBounds);
+      if (log2(firstMod) <= 0) {
+        continue;
+      }
       candidates.emplace_back(cand, objective);
     }
   }
@@ -429,8 +443,14 @@ static std::vector<double> rebalanceSingleModulus(
     for (int d = 1; d <= currentModuliIndex; ++d) {
       auto cand = candidateBackward(moduli, levelOpCounts, currentModuliIndex, factor, d, noiseBounds);
       if (!cand.empty()) {
-        auto [objective, _, __] = computeObjective(cand, levelOpCounts, 
+        if (anyModuliNegative(cand)) {
+          continue;
+        }
+        auto [objective, firstMod, __] = computeObjective(cand, levelOpCounts, 
                                                 noiseBounds);
+        if (log2(firstMod) <= 0) {
+          continue;
+        }
         candidates.emplace_back(cand, objective);
       }
     }
@@ -493,12 +513,16 @@ static std::vector<double> rebalancingModuli(
       for (int offset = 1; offset < numberModuli - 1; ++offset) {
         auto candidate =
             candidateFirstModUpdate(moduliCurrent, levelOpCounts, factor, offset, noiseBounds);
-        if (candidate.empty()) {
+        if (candidate.empty() || anyModuliNegative(candidate)) {
           continue;
         }
 
         auto [objective, firstMod, __] =
             computeObjective(candidate, levelOpCounts, noiseBounds);
+        
+        if (log2(firstMod) <= 0) {
+          continue;
+        }
 
         if (objective < bestObjective) {
           bestObjective = objective;
@@ -810,6 +834,10 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
 
         computeModuliSizes(smallerDimension, smallerFirstModSize,
                            smallerScalingModSize);
+        if (!smallerScalingModSize || !smallerFirstModSize) {
+          break;
+        }
+
         newRingDimension =
             computeRingDimension(smallerScalingModSize, smallerFirstModSize);
 
