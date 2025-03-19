@@ -87,7 +87,7 @@ for arg in "${expanded_args[@]}"; do
     run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-kpz-avg.mlir" "$PWD/data/${name}_gap-kpz-avg_$TIMESTAMP.json" "$name" "gap-kpz-avg"
 
     print_header "HONGREN APPROACH" "Running Mono model"
-    run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=bgv-noise-mono-pk" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-mono.mlir
+    run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=bgv-noise-mono" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-mono.mlir
     
     print_header "HONGREN APPROACH" "Extracting Mono model parameters"
     run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-mono.mlir" "$PWD/data/${name}_gap-mono_$TIMESTAMP.json" "$name" "gap-mono"
@@ -106,7 +106,10 @@ for arg in "${expanded_args[@]}"; do
     rm "$TEMP_FILE"
     
     print_header "BISECTION ALGORITHM" "Converting to BGV and OpenFHE"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-bisection.mlir" > "$PWD/$name/$name-openfhe-bisection.mlir"
+    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-bisection.mlir" > "$PWD/$name/$name-openfhe-bisection.mlir"
+
+    print_header "BISECTION ALGORITHM" "Validating noise with Mono model"
+    run_command bazel run //tools:heir-opt -- --validate-noise="model=bgv-noise-mono" "$PWD/$name/$name-middle-params-bisection.mlir" --debug --debug-only="ValidateNoise"
 
     print_header "BISECTION ALGORITHM" "Generating OpenFHE header"
     run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-bisection.mlir" > "$name/${name}_bisection.h"
@@ -114,21 +117,28 @@ for arg in "${expanded_args[@]}"; do
     print_header "BISECTION ALGORITHM" "Generating OpenFHE implementation"
     run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$PWD/$name/${name}-openfhe-bisection.mlir" > "$name/${name}_bisection.cpp"
 
+    # CLOSED FORM 
+
     print_header "RUNNING CLOSED-FORM ALGORITHM" "Annotating parameters"
     run_command bazel run //tools:heir-opt -- --annotate-parameters="plaintext-modulus=65537 ring-dimension=0 algorithm=CLOSED" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-middle-params-openfhe.mlir"
     
     print_header "CLOSED-FORM ALGORITHM" "Converting to BGV and OpenFHE"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-openfhe.mlir" > "$PWD/$name/$name-openfhe-openfhe.mlir"
+    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-openfhe.mlir" > "$PWD/$name/$name-openfhe-openfhe.mlir"
 
+    print_header "CLOSED-FORM ALGORITHM" "Validating noise with Mono model"
+    run_command bazel run //tools:heir-opt -- --validate-noise="model=bgv-noise-mono" "$PWD/$name/$name-middle-params-openfhe.mlir" --debug --debug-only="ValidateNoise"
+    
     print_header "CLOSED-FORM ALGORITHM" "Generating OpenFHE header"
     run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-openfhe.mlir" > "$name/${name}_openfhe.h"
     
     print_header "CLOSED-FORM ALGORITHM" "Generating OpenFHE implementation"
     run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$PWD/$name/${name}-openfhe-openfhe.mlir" > "$name/${name}_openfhe.cpp"
     
+    # DIRECT
+
     print_header "RUNNING DIRECT OPENFHE" "Converting to BGV and OpenFHE (no parameter annotation)"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-openfhe-direct.mlir"
-    
+    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-openfhe-direct.mlir"
+
     print_header "DIRECT OPENFHE" "Generating OpenFHE header"
     run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-direct.mlir" > "$name/${name}_direct.h"
     
