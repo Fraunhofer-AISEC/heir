@@ -13,6 +13,7 @@
 #include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
 #include "lib/Dialect/BGV/IR/BGVDialect.h"
 #include "lib/Dialect/BGV/IR/BGVAttributes.h"
+#include "lib/Dialect/BGV/IR/BGVEnums.h"
 #include "lib/Dialect/Mgmt/IR/MgmtOps.h"
 #include "lib/Dialect/Mgmt/IR/MgmtAttributes.h"
 #include "lib/Dialect/Secret/IR/SecretOps.h"
@@ -880,7 +881,7 @@ void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
                   op->getContext(), log2(ringDimension),
                   DenseI64ArrayAttr::get(op->getContext(), ArrayRef<int64_t>(qi)),
                   DenseI64ArrayAttr::get(op->getContext(), ArrayRef<int64_t>(pi)),
-                  plaintextModulus));
+                  plaintextModulus, bgv::BGVEncryptionType::pk, bgv::BGVEncryptionTechnique::standard));
 }
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
