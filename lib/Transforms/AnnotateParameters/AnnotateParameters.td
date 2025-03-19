@@ -9,6 +9,11 @@ def AnnotateParameters : Pass<"annotate-parameters"> {
   This pass runs the parameter analysis and annotates the IR with the results,
   saving it into the function's attribute dictionary as parameter.
   }];
+
+  let dependentDialects = [
+    "mlir::heir::bgv::BGVDialect",
+  ];
+  
   let options = [
     Option<"ringDimension", "ring-dimension", "int", "0", "Specify the ring dimension for the parameters">,
     Option<"plaintextModulus", "plaintext-modulus", "int", "0", "Specify the plaintext modulus for the parameters">,

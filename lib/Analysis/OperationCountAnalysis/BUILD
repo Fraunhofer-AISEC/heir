@@ -14,6 +14,7 @@ cc_library(
         "@heir//lib/Dialect/Secret/IR:Dialect",
         "@heir//lib/Dialect/TensorExt/IR:Dialect",
         "@heir//lib/Dialect/Mgmt/IR:Dialect",
+        "@heir//lib/Dialect/BGV/IR:Dialect",
         "@heir//lib/Analysis/SecretnessAnalysis",
         "@heir//lib/Analysis/LevelAnalysis",
         "@openfhe//:core",

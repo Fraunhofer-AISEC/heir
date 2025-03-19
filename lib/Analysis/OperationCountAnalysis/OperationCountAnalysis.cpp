@@ -1,4 +1,4 @@
-#include "lib/Analysis/OperationCountAnalysis/OperationCountAnalysis.h"
+#include "OperationCountAnalysis.h"
 #include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
 
@@ -9,9 +9,10 @@
 #include <iostream>
 #include <utility>
 
-#include "OperationCountAnalysis.h"
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
 #include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
+#include "lib/Dialect/BGV/IR/BGVDialect.h"
+#include "lib/Dialect/BGV/IR/BGVAttributes.h"
 #include "lib/Dialect/Mgmt/IR/MgmtOps.h"
 #include "lib/Dialect/Mgmt/IR/MgmtAttributes.h"
 #include "lib/Dialect/Secret/IR/SecretOps.h"
@@ -747,6 +748,141 @@ static std::vector<int> computeModuliSizesBalancing(
   return moduli;
 }
 
+using BigInteger = bigintbackend::BigInteger;
+
+static std::vector<int64_t> computeQiModuli(int scalingModSize,
+                                            int firstModSize, 
+                                            int numPrimes,
+                                            int ringDimension,
+                                            int plaintextModulus) {
+  std::vector<int64_t> qi;
+  qi.reserve(numPrimes);
+
+  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
+
+  // Find first modulus
+  lbcrypto::NativeInteger firstMod = 0;
+  firstMod =
+      lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
+  qi.push_back(firstMod.ConvertToInt());
+
+  // Find scaling moduli
+  lbcrypto::NativeInteger q;
+
+  // Start with appropriate prime based on whether sizes are the same
+  if (firstModSize == scalingModSize) {
+    q = firstMod;  // Use the first modulus as starting point
+  } else {
+    // Find a new starting point using the scaling mod size
+    q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
+                                                     modulusOrder);
+  }
+
+  for (int i = 1; i < numPrimes; i++) {
+    q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
+    // Make sure we don't duplicate the first modulus
+    qi.push_back(q.ConvertToInt());
+  }
+
+  return qi;
+}
+
+static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
+                                            int ringDimension,
+                                            int plaintextModulus) {
+  // Following OpenFHE's approach for extension moduli in HYBRID key switching
+  std::vector<int64_t> pi;
+
+  // Calculate auxiliary primes bit size (auxBits)
+  // In OpenFHE, this is typically set to 60 bits for 128-bit security
+  int auxBits = heir::kMaxBitSize;
+
+  // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE)
+  auto numPartQ = ComputeNumLargeDigits(0, qi.size() - 1);
+
+  // Group qi into partitions as done in HYBRID
+  std::vector<BigInteger> moduliPartQ;
+  moduliPartQ.resize(numPartQ);
+
+  // Calculate partitions similar to OpenFHE (ceil(sizeQ/numPartQ) towers per
+  // digit)
+  uint32_t a = ceil(static_cast<double>(qi.size()) / numPartQ);
+
+  // Compute the composite digits PartQ = Q_j
+  for (uint32_t j = 0; j < numPartQ; j++) {
+    moduliPartQ[j] = BigInteger(1);
+    for (uint32_t i = a * j; i < (j + 1) * a; i++) {
+      if (i < qi.size()) moduliPartQ[j] *= qi[i];
+    }
+  }
+
+  // Find number and size of individual special primes using the max bit length
+  uint32_t maxBits = 0;
+  for (uint32_t j = 0; j < numPartQ; j++) {
+    uint32_t bits = moduliPartQ[j].GetLengthForBase(2);
+    if (bits > maxBits) maxBits = bits;
+  }
+
+  // Select number of primes in auxiliary CRT basis
+  uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
+
+  // Compute the prime step for finding primes
+  uint64_t primeStep = ringDimension;  // Same as FindAuxPrimeStep in OpenFHE
+
+  // Choose special primes in auxiliary basis (pi)
+  uint64_t modulusOrder =
+      heir::computeModulusOrder(ringDimension, plaintextModulus);
+
+  // Start with first prime as done in OpenFHE
+  lbcrypto::NativeInteger firstP =
+      lbcrypto::FirstPrime<lbcrypto::NativeInteger>(auxBits, primeStep);
+  lbcrypto::NativeInteger pPrev = firstP;
+
+  // Generate each auxiliary prime
+  for (uint32_t i = 0; i < sizeP; i++) {
+    // The following loop makes sure that moduli in P and Q are different
+    lbcrypto::NativeInteger currentP;
+    bool foundInQ;
+    do {
+      currentP =
+          lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(pPrev, primeStep);
+      foundInQ = false;
+      for (uint32_t j = 0; j < qi.size(); j++) {
+        if (currentP.ConvertToInt() == qi[j]) {
+          foundInQ = true;
+          break;
+        }
+      }
+      pPrev = currentP;
+    } while (foundInQ);
+
+    pi.push_back(currentP.ConvertToInt());
+  }
+
+  return pi;
+}
+
+void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
+                         const uint64_t ringDimension, const int firstModSize,
+                         const int scalingModSize, const int numPrimes) {
+
+  // Compute qi moduli (first modulus and scaling moduli)
+  std::vector<int64_t> qi = computeQiModuli(
+      scalingModSize, firstModSize, numPrimes, ringDimension, plaintextModulus);
+
+  // Compute pi moduli (extension moduli)
+  std::vector<int64_t> pi =
+      computePiModuli(qi, ringDimension, plaintextModulus);
+
+  // Set the scheme parameters attribute
+  op->setAttr(bgv::BGVDialect::kSchemeParamAttrName,
+              bgv::SchemeParamAttr::get(
+                  op->getContext(), log2(ringDimension),
+                  DenseI64ArrayAttr::get(op->getContext(), ArrayRef<int64_t>(qi)),
+                  DenseI64ArrayAttr::get(op->getContext(), ArrayRef<int64_t>(pi)),
+                  plaintextModulus));
+}
+
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
                          int ringDimension, int plaintextModulus,
                          std::string algorithm) {
@@ -869,8 +1005,9 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         scalingModSize, firstModSize, 0, 0);
     funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName,
                     openfheParamAttr);
+                    
+    annotateSchemeParam(top, plaintextModulus, ringDimension, firstModSize, scalingModSize, numPrimes);
   });
 }
-
 }  // namespace heir
 }  // namespace mlir

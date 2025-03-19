@@ -15,6 +15,7 @@ cc_library(
         ":pass_inc_gen",
         "@heir//lib/Analysis/OperationCountAnalysis",
         "@heir//lib/Dialect/Mgmt/IR:Dialect",
+        "@heir//lib/Dialect/BGV/IR:Dialect",
         "@heir//lib/Dialect/Secret/IR:Dialect",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
