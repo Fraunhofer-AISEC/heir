@@ -715,6 +715,13 @@ static void computeModuliSizesClosed(
           sqrt(noiseBounds.boundScale * noiseBounds.boundScale + (maxCounts.getKeySwitchCount() *
                                           noiseBounds.addedNoiseKeySwitching)));
 
+  if (boundOptimal < noiseBounds.boundClean) {
+    boundOptimal =
+    log2(noiseBounds.boundScale +
+         sqrt(noiseBounds.boundClean * noiseBounds.boundClean + (maxCounts.getKeySwitchCount() *
+                                         noiseBounds.addedNoiseKeySwitching)));
+  }
+
  scalingModSize =
      ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
  firstModSize = ceil(1 + boundOptimal);
