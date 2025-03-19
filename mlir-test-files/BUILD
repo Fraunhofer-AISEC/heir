@@ -9,20 +9,10 @@ cc_library(
     ],
 )
 
-
 cc_library(
-    name = "dot8",
-    srcs = ["dot8/dot8.cpp"],
-    hdrs = ["dot8/dot8.h"],
-    deps = [
-        "@openfhe//:pke"
-    ],
-)
-
-cc_library(
-    name = "dot8_common",
-    srcs = ["dot8/dot8_common.cpp"],
-    hdrs = ["dot8/dot8_common.h"],
+    name = "main_dot8_common",
+    srcs = ["dot8/main_dot8_common.cpp"],
+    hdrs = ["dot8/main_dot8_common.h"],
     deps = [
         ":params",
         "@openfhe//:pke",
@@ -33,7 +23,7 @@ cc_binary(
     name = "main_dot8_bisection",
     srcs = ["dot8/main_dot8_bisection.cpp"],
     deps = [
-        ":dot8_common",
+        ":main_dot8_common",
         ":dot8_bisection",
     ],
 )
@@ -42,7 +32,7 @@ cc_binary(
     name = "main_dot8_openfhe",
     srcs = ["dot8/main_dot8_openfhe.cpp"],
     deps = [
-        ":dot8_common",
+        ":main_dot8_common",
         ":dot8_openfhe",
     ],
 )
@@ -51,7 +41,7 @@ cc_binary(
     name = "main_dot8_direct",
     srcs = ["dot8/main_dot8_direct.cpp"],
     deps = [
-        ":dot8_common",
+        ":main_dot8_common",
         ":dot8_direct",
     ],
 )
@@ -79,19 +69,6 @@ cc_library(
     srcs = ["dot8/dot8_direct.cpp"],
     hdrs = ["dot8/dot8_direct.h"],
     deps = [
-        "@openfhe//:pke",
-    ],
-)
-
-# An executable build target that contains your main function and links
-# against the above.
-cc_binary(
-    name = "main_dot8",
-    srcs = ["dot8/main_dot8.cpp"],
-    deps = [
-        ":dot8",
-        ":params",
-        "@openfhe//:core",
         "@openfhe//:pke",
     ],
 )
