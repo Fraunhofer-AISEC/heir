@@ -36,9 +36,13 @@ struct MlirToRLWEPipelineOptions : public SimdVectorizerOptions {
       llvm::cl::init(1024)};
   PassOptions::Option<bool> usePublicKey{
       *this, "use-public-key",
-      llvm::cl::desc("If true, generate a client interface that uses a public "
-                     "key for encryption."),
+      llvm::cl::desc("If true, use public key encryption (default to true)"),
       llvm::cl::init(true)};
+  PassOptions::Option<bool> encryptionTechniqueExtended{
+      *this, "encryption-technique-extended",
+      llvm::cl::desc("If true, use extended encryption technique (default to "
+                     "false)"),
+      llvm::cl::init(false)};
   PassOptions::Option<bool> modulusSwitchBeforeFirstMul{
       *this, "modulus-switch-before-first-mul",
       llvm::cl::desc("Modulus switching right before the first multiplication "
@@ -74,6 +78,11 @@ struct MlirToRLWEPipelineOptions : public SimdVectorizerOptions {
       *this, "bfv-mod-bits",
       llvm::cl::desc("The number of bits for all moduli for B/FV"),
       llvm::cl::init(60)};
+  PassOptions::Option<std::string> plaintextExecutionResultFileName{
+      *this, "plaintext-execution-result-file-name",
+      llvm::cl::desc("File name to import execution result from (c.f. --secret-"
+                     "import-execution-result)"),
+      llvm::cl::init("")};
 };
 
 struct PlaintextBackendOptions
@@ -83,6 +92,11 @@ struct PlaintextBackendOptions
       llvm::cl::desc("Plaintext modulus for BGV/BFV scheme (if not specified, "
                      "execute in the original integer type)"),
       llvm::cl::init(0)};
+  PassOptions::Option<bool> debug{
+      *this, "insert-debug-handler-calls",
+      llvm::cl::desc("Insert function calls to an externally-defined debug "
+                     "function (cf. --secret-add-debug-port)"),
+      llvm::cl::init(false)};
 };
 
 struct BackendOptions : public PassPipelineOptions<BackendOptions> {

@@ -18,8 +18,10 @@
 #include "lib/Dialect/Openfhe/Transforms/CountAddAndKeySwitch.h"
 #include "lib/Dialect/Secret/Conversions/SecretToBGV/SecretToBGV.h"
 #include "lib/Dialect/Secret/Conversions/SecretToCKKS/SecretToCKKS.h"
+#include "lib/Dialect/Secret/Transforms/AddDebugPort.h"
 #include "lib/Dialect/Secret/Transforms/DistributeGeneric.h"
 #include "lib/Dialect/Secret/Transforms/ForgetSecrets.h"
+#include "lib/Dialect/Secret/Transforms/ImportExecutionResult.h"
 #include "lib/Dialect/Secret/Transforms/MergeAdjacentGenerics.h"
 #include "lib/Dialect/TensorExt/Conversions/TensorExtToTensor/TensorExtToTensor.h"
 #include "lib/Dialect/TensorExt/Transforms/CollapseInsertionChains.h"
@@ -134,6 +136,11 @@ void mlirToPlaintextPipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  if (options.debug) {
+    // Insert debug handler calls
+    pm.addPass(secret::createSecretAddDebugPort());
+  }
+
   // Forget secrets to convert secret types to standard types
   pm.addPass(secret::createSecretForgetSecrets());
   pm.addPass(createCanonicalizerPass());
@@ -159,6 +166,19 @@ void mlirToRLWEPipeline(OpPassManager &pm,
                         const MlirToRLWEPipelineOptions &options,
                         const RLWEScheme scheme) {
   mlirToSecretArithmeticPipelineBuilder(pm, options);
+
+  // Only for debugging purpose.
+  // Note that optimization-relinearization below won't preserve the attribute
+  // in relin op.
+  if (!options.plaintextExecutionResultFileName.empty()) {
+    // Import execution result from file
+    secret::SecretImportExecutionResultOptions
+        secretImportExecutionResultOptions;
+    secretImportExecutionResultOptions.fileName =
+        options.plaintextExecutionResultFileName;
+    pm.addPass(secret::createSecretImportExecutionResult(
+        secretImportExecutionResultOptions));
+  }
 
   if (options.insertMgmt) {
     // place mgmt.op and MgmtAttr for BGV
@@ -201,6 +221,9 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       }
       generateParamOptions.plaintextModulus = options.plaintextModulus;
       generateParamOptions.slotNumber = options.ciphertextDegree;
+      generateParamOptions.usePublicKey = options.usePublicKey;
+      generateParamOptions.encryptionTechniqueExtended =
+          options.encryptionTechniqueExtended;
       pm.addPass(createGenerateParamBGV(generateParamOptions));
 
       auto validateNoiseOptions = ValidateNoiseOptions{};
@@ -217,6 +240,9 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       generateParamOptions.modBits = options.bfvModBits;
       generateParamOptions.plaintextModulus = options.plaintextModulus;
       generateParamOptions.slotNumber = options.ciphertextDegree;
+      generateParamOptions.usePublicKey = options.usePublicKey;
+      generateParamOptions.encryptionTechniqueExtended =
+          options.encryptionTechniqueExtended;
       pm.addPass(createGenerateParamBFV(generateParamOptions));
 
       auto validateNoiseOptions = ValidateNoiseOptions{};
@@ -230,6 +256,7 @@ void mlirToRLWEPipeline(OpPassManager &pm,
       generateParamOptions.firstModBits = options.firstModBits;
       generateParamOptions.scalingModBits = options.scalingModBits;
       generateParamOptions.slotNumber = options.ciphertextDegree;
+      generateParamOptions.usePublicKey = options.usePublicKey;
       pm.addPass(createGenerateParamCKKS(generateParamOptions));
       break;
     }
@@ -269,9 +296,7 @@ void mlirToRLWEPipeline(OpPassManager &pm,
   }
 
   // Add client interface (helper functions)
-  auto addClientInterfaceOptions = lwe::AddClientInterfaceOptions{};
-  addClientInterfaceOptions.usePublicKey = options.usePublicKey;
-  pm.addPass(lwe::createAddClientInterface(addClientInterfaceOptions));
+  pm.addPass(lwe::createAddClientInterface());
 
   // TODO (#1145): This should also generate keygen/param gen functions,
   // which can then be lowered to backend specific stuff later.
