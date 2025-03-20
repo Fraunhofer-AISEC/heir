@@ -2,15 +2,12 @@
 #include <mlir/IR/Value.h>
 #include <mlir/Support/LLVM.h>
 
-#include <any>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-#include <iostream>
 #include <utility>
 
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
-#include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
 #include "lib/Dialect/BGV/IR/BGVDialect.h"
 #include "lib/Dialect/BGV/IR/BGVAttributes.h"
 #include "lib/Dialect/BGV/IR/BGVEnums.h"
@@ -23,7 +20,6 @@
 #include "src/pke/include/scheme/scheme-utils.h"            //from @openfhe
 #include "src/core/include/math/hal/nativeintbackend.h"        //from @openfhe
 #include "llvm/include/llvm/ADT/TypeSwitch.h"              // from @llvm-project
-#include "llvm/include/llvm/Support/Debug.h"               // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"      // from @llvm-project
@@ -270,8 +266,8 @@ static std::vector<double> computeChain(
       boundSquare = std::numeric_limits<double>::infinity();
     }
     
-    double A = ciphertextCount * (boundSquare + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
-    bounds[i + 1] = noiseBounds.boundScale + (A / moduli[i]);
+    double a = ciphertextCount * (boundSquare + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+    bounds[i + 1] = noiseBounds.boundScale + (a / moduli[i]);
   }
   
   return bounds;
@@ -320,11 +316,11 @@ static std::vector<double> candidateForward(
   
   auto boundsTemp = computeChain(newModuli, levelOpCounts, noiseBounds);
   
-  double X = boundsTemp[currentIndex + offset];
+  double x = boundsTemp[currentIndex + offset];
   int ciphertextCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getCiphertextCount();
   int keySwitchCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getKeySwitchCount();
   
-  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (target - noiseBounds.boundScale);
+  double newPartnerModuliValue = ciphertextCount * (x * x + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (target - noiseBounds.boundScale);
   
   if (newPartnerModuliValue <= 0) {
     return {};
@@ -366,11 +362,11 @@ static std::vector<double> candidateBackward(
     bound = sqrt(insideSqrt);
   }
   
-  double X = boundsOld[currentIndex - offset];
+  double x = boundsOld[currentIndex - offset];
   int ciphertextCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getCiphertextCount();
   int keySwitchCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getKeySwitchCount();
   
-  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
+  double newPartnerModuliValue = ciphertextCount * (x * x + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
   
   if (newPartnerModuliValue <= 0) {
     return {};
@@ -405,11 +401,11 @@ static std::vector<double> candidateFirstModUpdate(
     bound = sqrt(insideSqrt);
   }
 
-  double X = boundsOld[numberModuli - offset - 1];
+  double x = boundsOld[numberModuli - offset - 1];
   int ciphertextCount = levelOpCounts[offset].getCiphertextCount();
   int keySwitchCount = levelOpCounts[offset].getKeySwitchCount();
   
-  double newPartnerModuliValue = ciphertextCount * (X * X + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
+  double newPartnerModuliValue = ciphertextCount * (x * x + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
   
   if (newPartnerModuliValue <= 0) {
     return {};
@@ -572,12 +568,8 @@ static double findOptimalScalingModSizeBisection(
   auto checkBounds = [&](double scalingMod) {
     std::vector<double> bounds =
         computeBoundChain(scalingMod, numPrimes, levelOpCounts,noiseBounds);
-    for (const auto& b : bounds) {
-      if (std::isinf(b) || std::isnan(b)) {
-        return false;
-      }
-    }
-    return true;
+    return std::all_of(bounds.begin(), bounds.end(), 
+                      [](double b) { return !std::isinf(b) && !std::isnan(b); });
   };
 
   // Increase pLow until all bounds in the chain are valid
@@ -621,16 +613,16 @@ static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
                                         int numPrimes) {
   auto phi = ringDimension;  // Pessimistic
   auto t = plaintextModulus;
-  auto D = 6.0;
+  auto d = 6.0;
 
   auto vKey = 2.0 / 3.0;   
   auto vErr = 3.19 * 3.19; 
 
-  auto boundScale = D * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
+  auto boundScale = d * t * sqrt((phi / 12.0) * (1.0 + (phi * vKey)));
 
-  auto boundClean = D * t * sqrt(phi * (1.0 / 12.0 + 2 * phi * vErr * vKey + vErr));
+  auto boundClean = d * t * sqrt(phi * (1.0 / 12.0 + 2 * phi * vErr * vKey + vErr));
 
-  auto boundKeySwitch = D * t * phi * sqrt(vErr / 12.0);
+  auto boundKeySwitch = d * t * phi * sqrt(vErr / 12.0);
 
   auto f0 = 1;
 
@@ -747,6 +739,7 @@ static std::vector<int> computeModuliSizesBalancing(
   
   std::vector<int> moduli;
 
+  moduli.reserve(rebalanced.size());
   for (const auto& p : rebalanced) {
     moduli.push_back(ceil(log2(p)));
   }
@@ -754,43 +747,6 @@ static std::vector<int> computeModuliSizesBalancing(
 }
 
 using BigInteger = bigintbackend::BigInteger;
-
-static std::vector<int64_t> computeQiModuli(int scalingModSize,
-                                            int firstModSize, 
-                                            int numPrimes,
-                                            int ringDimension,
-                                            int plaintextModulus) {
-  std::vector<int64_t> qi;
-  qi.reserve(numPrimes);
-
-  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
-
-  // Find first modulus
-  lbcrypto::NativeInteger firstMod = 0;
-  firstMod =
-      lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
-  qi.push_back(firstMod.ConvertToInt());
-
-  // Find scaling moduli
-  lbcrypto::NativeInteger q;
-
-  // Start with appropriate prime based on whether sizes are the same
-  if (firstModSize == scalingModSize) {
-    q = firstMod;  // Use the first modulus as starting point
-  } else {
-    // Find a new starting point using the scaling mod size
-    q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
-                                                     modulusOrder);
-  }
-
-  for (int i = 1; i < numPrimes; i++) {
-    q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
-    // Make sure we don't duplicate the first modulus
-    qi.push_back(q.ConvertToInt());
-  }
-
-  return qi;
-}
 
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
                                             int ringDimension,
@@ -831,16 +787,9 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
   // Select number of primes in auxiliary CRT basis
   uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
 
-  // Compute the prime step for finding primes
-  uint64_t primeStep = ringDimension;  // Same as FindAuxPrimeStep in OpenFHE
-
-  // Choose special primes in auxiliary basis (pi)
-  uint64_t modulusOrder =
-      heir::computeModulusOrder(ringDimension, plaintextModulus);
-
   // Start with first prime as done in OpenFHE
   lbcrypto::NativeInteger firstP =
-      lbcrypto::FirstPrime<lbcrypto::NativeInteger>(auxBits, primeStep);
+      lbcrypto::FirstPrime<lbcrypto::NativeInteger>(auxBits, ringDimension);
   lbcrypto::NativeInteger pPrev = firstP;
 
   // Generate each auxiliary prime
@@ -850,10 +799,10 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
     bool foundInQ;
     do {
       currentP =
-          lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(pPrev, primeStep);
+          lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(pPrev, ringDimension);
       foundInQ = false;
-      for (uint32_t j = 0; j < qi.size(); j++) {
-        if (currentP.ConvertToInt() == qi[j]) {
+      for (long j : qi) {
+        if (currentP.ConvertToInt() == j) {
           foundInQ = true;
           break;
         }
