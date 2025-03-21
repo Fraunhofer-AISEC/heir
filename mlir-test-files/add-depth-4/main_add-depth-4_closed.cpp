@@ -2,8 +2,8 @@
 #include <iostream>
 #include <vector>
 
-#include "add-depth-7_openfhe.h"
-#include "main_add-depth-7_common.h"
+#include "add-depth-4_closed.h"
+#include "main_add-depth-4_common.h"
 
 int main(int argc, char* argv[]) {
   // Check for ignoreComputation flag
@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     func__encrypt__arg1,
     func,
     func__decrypt__result0,
-    "openfhe",
+    "closed",
     ignoreComputation
 );
 }
