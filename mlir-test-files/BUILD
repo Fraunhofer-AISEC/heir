@@ -29,11 +29,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_dot8_openfhe",
-    srcs = ["dot8/main_dot8_openfhe.cpp"],
+    name = "main_dot8_closed",
+    srcs = ["dot8/main_dot8_closed.cpp"],
     deps = [
         ":main_dot8_common",
-        ":dot8_openfhe",
+        ":dot8_closed",
     ],
 )
 
@@ -56,9 +56,9 @@ cc_library(
 )
 
 cc_library(
-    name = "dot8_openfhe",
-    srcs = ["dot8/dot8_openfhe.cpp"],
-    hdrs = ["dot8/dot8_openfhe.h"],
+    name = "dot8_closed",
+    srcs = ["dot8/dot8_closed.cpp"],
+    hdrs = ["dot8/dot8_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -102,11 +102,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_psi_openfhe",
-    srcs = ["psi/main_psi_openfhe.cpp"],
+    name = "main_psi_closed",
+    srcs = ["psi/main_psi_closed.cpp"],
     deps = [
         ":psi_common",
-        ":psi_openfhe",
+        ":psi_closed",
     ],
 )
 
@@ -120,9 +120,9 @@ cc_library(
 )
 
 cc_library(
-    name = "psi_openfhe",
-    srcs = ["psi/psi_openfhe.cpp"],
-    hdrs = ["psi/psi_openfhe.h"],
+    name = "psi_closed",
+    srcs = ["psi/psi_closed.cpp"],
+    hdrs = ["psi/psi_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -179,11 +179,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_mult5_openfhe",
-    srcs = ["mult5/main_mult5_openfhe.cpp"],
+    name = "main_mult5_closed",
+    srcs = ["mult5/main_mult5_closed.cpp"],
     deps = [
         ":mult5_common",
-        ":mult5_openfhe",
+        ":mult5_closed",
     ],
 )
 
@@ -197,9 +197,9 @@ cc_library(
 )
 
 cc_library(
-    name = "mult5_openfhe",
-    srcs = ["mult5/mult5_openfhe.cpp"],
-    hdrs = ["mult5/mult5_openfhe.h"],
+    name = "mult5_closed",
+    srcs = ["mult5/mult5_closed.cpp"],
+    hdrs = ["mult5/mult5_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -247,11 +247,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-64-0_openfhe",
-    srcs = ["add-64-0/main_add-64-0_openfhe.cpp"],
+    name = "main_add-64-0_closed",
+    srcs = ["add-64-0/main_add-64-0_closed.cpp"],
     deps = [
         ":main_add-64-0_common",
-        ":add-64-0_openfhe",
+        ":add-64-0_closed",
     ],
 )
 
@@ -274,9 +274,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-64-0_openfhe",
-    srcs = ["add-64-0/add-64-0_openfhe.cpp"],
-    hdrs = ["add-64-0/add-64-0_openfhe.h"],
+    name = "add-64-0_closed",
+    srcs = ["add-64-0/add-64-0_closed.cpp"],
+    hdrs = ["add-64-0/add-64-0_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -311,11 +311,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-64-1_openfhe",
-    srcs = ["add-64-1/main_add-64-1_openfhe.cpp"],
+    name = "main_add-64-1_closed",
+    srcs = ["add-64-1/main_add-64-1_closed.cpp"],
     deps = [
         ":main_add-64-1_common",
-        ":add-64-1_openfhe",
+        ":add-64-1_closed",
     ],
 )
 
@@ -338,9 +338,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-64-1_openfhe",
-    srcs = ["add-64-1/add-64-1_openfhe.cpp"],
-    hdrs = ["add-64-1/add-64-1_openfhe.h"],
+    name = "add-64-1_closed",
+    srcs = ["add-64-1/add-64-1_closed.cpp"],
+    hdrs = ["add-64-1/add-64-1_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -375,11 +375,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-64-2_openfhe",
-    srcs = ["add-64-2/main_add-64-2_openfhe.cpp"],
+    name = "main_add-64-2_closed",
+    srcs = ["add-64-2/main_add-64-2_closed.cpp"],
     deps = [
         ":main_add-64-2_common",
-        ":add-64-2_openfhe",
+        ":add-64-2_closed",
     ],
 )
 
@@ -402,9 +402,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-64-2_openfhe",
-    srcs = ["add-64-2/add-64-2_openfhe.cpp"],
-    hdrs = ["add-64-2/add-64-2_openfhe.h"],
+    name = "add-64-2_closed",
+    srcs = ["add-64-2/add-64-2_closed.cpp"],
+    hdrs = ["add-64-2/add-64-2_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -439,11 +439,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-64-3_openfhe",
-    srcs = ["add-64-3/main_add-64-3_openfhe.cpp"],
+    name = "main_add-64-3_closed",
+    srcs = ["add-64-3/main_add-64-3_closed.cpp"],
     deps = [
         ":main_add-64-3_common",
-        ":add-64-3_openfhe",
+        ":add-64-3_closed",
     ],
 )
 
@@ -466,9 +466,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-64-3_openfhe",
-    srcs = ["add-64-3/add-64-3_openfhe.cpp"],
-    hdrs = ["add-64-3/add-64-3_openfhe.h"],
+    name = "add-64-3_closed",
+    srcs = ["add-64-3/add-64-3_closed.cpp"],
+    hdrs = ["add-64-3/add-64-3_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -503,11 +503,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-64-4_openfhe",
-    srcs = ["add-64-4/main_add-64-4_openfhe.cpp"],
+    name = "main_add-64-4_closed",
+    srcs = ["add-64-4/main_add-64-4_closed.cpp"],
     deps = [
         ":main_add-64-4_common",
-        ":add-64-4_openfhe",
+        ":add-64-4_closed",
     ],
 )
 
@@ -530,9 +530,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-64-4_openfhe",
-    srcs = ["add-64-4/add-64-4_openfhe.cpp"],
-    hdrs = ["add-64-4/add-64-4_openfhe.h"],
+    name = "add-64-4_closed",
+    srcs = ["add-64-4/add-64-4_closed.cpp"],
+    hdrs = ["add-64-4/add-64-4_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -567,11 +567,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-0_openfhe",
-    srcs = ["add-depth-0/main_add-depth-0_openfhe.cpp"],
+    name = "main_add-depth-0_closed",
+    srcs = ["add-depth-0/main_add-depth-0_closed.cpp"],
     deps = [
         ":main_add-depth-0_common",
-        ":add-depth-0_openfhe",
+        ":add-depth-0_closed",
     ],
 )
 
@@ -594,9 +594,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-0_openfhe",
-    srcs = ["add-depth-0/add-depth-0_openfhe.cpp"],
-    hdrs = ["add-depth-0/add-depth-0_openfhe.h"],
+    name = "add-depth-0_closed",
+    srcs = ["add-depth-0/add-depth-0_closed.cpp"],
+    hdrs = ["add-depth-0/add-depth-0_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -631,11 +631,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-1_openfhe",
-    srcs = ["add-depth-1/main_add-depth-1_openfhe.cpp"],
+    name = "main_add-depth-1_closed",
+    srcs = ["add-depth-1/main_add-depth-1_closed.cpp"],
     deps = [
         ":main_add-depth-1_common",
-        ":add-depth-1_openfhe",
+        ":add-depth-1_closed",
     ],
 )
 
@@ -658,9 +658,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-1_openfhe",
-    srcs = ["add-depth-1/add-depth-1_openfhe.cpp"],
-    hdrs = ["add-depth-1/add-depth-1_openfhe.h"],
+    name = "add-depth-1_closed",
+    srcs = ["add-depth-1/add-depth-1_closed.cpp"],
+    hdrs = ["add-depth-1/add-depth-1_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -695,11 +695,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-2_openfhe",
-    srcs = ["add-depth-2/main_add-depth-2_openfhe.cpp"],
+    name = "main_add-depth-2_closed",
+    srcs = ["add-depth-2/main_add-depth-2_closed.cpp"],
     deps = [
         ":main_add-depth-2_common",
-        ":add-depth-2_openfhe",
+        ":add-depth-2_closed",
     ],
 )
 
@@ -722,9 +722,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-2_openfhe",
-    srcs = ["add-depth-2/add-depth-2_openfhe.cpp"],
-    hdrs = ["add-depth-2/add-depth-2_openfhe.h"],
+    name = "add-depth-2_closed",
+    srcs = ["add-depth-2/add-depth-2_closed.cpp"],
+    hdrs = ["add-depth-2/add-depth-2_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -759,11 +759,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-3_openfhe",
-    srcs = ["add-depth-3/main_add-depth-3_openfhe.cpp"],
+    name = "main_add-depth-3_closed",
+    srcs = ["add-depth-3/main_add-depth-3_closed.cpp"],
     deps = [
         ":main_add-depth-3_common",
-        ":add-depth-3_openfhe",
+        ":add-depth-3_closed",
     ],
 )
 
@@ -786,9 +786,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-3_openfhe",
-    srcs = ["add-depth-3/add-depth-3_openfhe.cpp"],
-    hdrs = ["add-depth-3/add-depth-3_openfhe.h"],
+    name = "add-depth-3_closed",
+    srcs = ["add-depth-3/add-depth-3_closed.cpp"],
+    hdrs = ["add-depth-3/add-depth-3_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -823,11 +823,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-4_openfhe",
-    srcs = ["add-depth-4/main_add-depth-4_openfhe.cpp"],
+    name = "main_add-depth-4_closed",
+    srcs = ["add-depth-4/main_add-depth-4_closed.cpp"],
     deps = [
         ":main_add-depth-4_common",
-        ":add-depth-4_openfhe",
+        ":add-depth-4_closed",
     ],
 )
 
@@ -850,9 +850,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-4_openfhe",
-    srcs = ["add-depth-4/add-depth-4_openfhe.cpp"],
-    hdrs = ["add-depth-4/add-depth-4_openfhe.h"],
+    name = "add-depth-4_closed",
+    srcs = ["add-depth-4/add-depth-4_closed.cpp"],
+    hdrs = ["add-depth-4/add-depth-4_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -887,11 +887,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-5_openfhe",
-    srcs = ["add-depth-5/main_add-depth-5_openfhe.cpp"],
+    name = "main_add-depth-5_closed",
+    srcs = ["add-depth-5/main_add-depth-5_closed.cpp"],
     deps = [
         ":main_add-depth-5_common",
-        ":add-depth-5_openfhe",
+        ":add-depth-5_closed",
     ],
 )
 
@@ -914,9 +914,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-5_openfhe",
-    srcs = ["add-depth-5/add-depth-5_openfhe.cpp"],
-    hdrs = ["add-depth-5/add-depth-5_openfhe.h"],
+    name = "add-depth-5_closed",
+    srcs = ["add-depth-5/add-depth-5_closed.cpp"],
+    hdrs = ["add-depth-5/add-depth-5_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -951,11 +951,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-6_openfhe",
-    srcs = ["add-depth-6/main_add-depth-6_openfhe.cpp"],
+    name = "main_add-depth-6_closed",
+    srcs = ["add-depth-6/main_add-depth-6_closed.cpp"],
     deps = [
         ":main_add-depth-6_common",
-        ":add-depth-6_openfhe",
+        ":add-depth-6_closed",
     ],
 )
 
@@ -978,9 +978,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-6_openfhe",
-    srcs = ["add-depth-6/add-depth-6_openfhe.cpp"],
-    hdrs = ["add-depth-6/add-depth-6_openfhe.h"],
+    name = "add-depth-6_closed",
+    srcs = ["add-depth-6/add-depth-6_closed.cpp"],
+    hdrs = ["add-depth-6/add-depth-6_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -1015,11 +1015,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-7_openfhe",
-    srcs = ["add-depth-7/main_add-depth-7_openfhe.cpp"],
+    name = "main_add-depth-7_closed",
+    srcs = ["add-depth-7/main_add-depth-7_closed.cpp"],
     deps = [
         ":main_add-depth-7_common",
-        ":add-depth-7_openfhe",
+        ":add-depth-7_closed",
     ],
 )
 
@@ -1042,9 +1042,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-7_openfhe",
-    srcs = ["add-depth-7/add-depth-7_openfhe.cpp"],
-    hdrs = ["add-depth-7/add-depth-7_openfhe.h"],
+    name = "add-depth-7_closed",
+    srcs = ["add-depth-7/add-depth-7_closed.cpp"],
+    hdrs = ["add-depth-7/add-depth-7_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -1079,11 +1079,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-8_openfhe",
-    srcs = ["add-depth-8/main_add-depth-8_openfhe.cpp"],
+    name = "main_add-depth-8_closed",
+    srcs = ["add-depth-8/main_add-depth-8_closed.cpp"],
     deps = [
         ":main_add-depth-8_common",
-        ":add-depth-8_openfhe",
+        ":add-depth-8_closed",
     ],
 )
 
@@ -1106,9 +1106,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-8_openfhe",
-    srcs = ["add-depth-8/add-depth-8_openfhe.cpp"],
-    hdrs = ["add-depth-8/add-depth-8_openfhe.h"],
+    name = "add-depth-8_closed",
+    srcs = ["add-depth-8/add-depth-8_closed.cpp"],
+    hdrs = ["add-depth-8/add-depth-8_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -1143,11 +1143,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-9_openfhe",
-    srcs = ["add-depth-9/main_add-depth-9_openfhe.cpp"],
+    name = "main_add-depth-9_closed",
+    srcs = ["add-depth-9/main_add-depth-9_closed.cpp"],
     deps = [
         ":main_add-depth-9_common",
-        ":add-depth-9_openfhe",
+        ":add-depth-9_closed",
     ],
 )
 
@@ -1170,9 +1170,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-9_openfhe",
-    srcs = ["add-depth-9/add-depth-9_openfhe.cpp"],
-    hdrs = ["add-depth-9/add-depth-9_openfhe.h"],
+    name = "add-depth-9_closed",
+    srcs = ["add-depth-9/add-depth-9_closed.cpp"],
+    hdrs = ["add-depth-9/add-depth-9_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
@@ -1207,11 +1207,11 @@ cc_binary(
 )
 
 cc_binary(
-    name = "main_add-depth-10_openfhe",
-    srcs = ["add-depth-10/main_add-depth-10_openfhe.cpp"],
+    name = "main_add-depth-10_closed",
+    srcs = ["add-depth-10/main_add-depth-10_closed.cpp"],
     deps = [
         ":main_add-depth-10_common",
-        ":add-depth-10_openfhe",
+        ":add-depth-10_closed",
     ],
 )
 
@@ -1234,9 +1234,9 @@ cc_library(
 )
 
 cc_library(
-    name = "add-depth-10_openfhe",
-    srcs = ["add-depth-10/add-depth-10_openfhe.cpp"],
-    hdrs = ["add-depth-10/add-depth-10_openfhe.h"],
+    name = "add-depth-10_closed",
+    srcs = ["add-depth-10/add-depth-10_closed.cpp"],
+    hdrs = ["add-depth-10/add-depth-10_closed.h"],
     deps = [
         "@openfhe//:pke",
     ],
