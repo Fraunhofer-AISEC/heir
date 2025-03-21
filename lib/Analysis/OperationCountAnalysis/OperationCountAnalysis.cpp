@@ -775,12 +775,18 @@ void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension
   auto unix_timestamp =
       std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch())
           .count();
+  
+  auto toLowerCase = [](std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return str;
+  };
 
   // Generate JSON without using CryptoContext
   std::stringstream ss;
   ss << "{\n";
   ss << R"(  "testname": ")" << testname << "\",\n";
-  ss << R"(  "selectionApproach": ")" << selectionApproach << "\",\n";
+  ss << R"(  "selectionApproach": ")" << toLowerCase(selectionApproach) << "\",\n";
   ss << R"(  "timestamp": )" << unix_timestamp << ",\n";
   ss << "  \"modulusSizes\": [";
   for (size_t i = 0; i < moduli.size(); ++i) {
@@ -795,7 +801,7 @@ void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension
   ss << "  \"plaintextModulus\": " << plaintextModulus << "\n";
   ss << "}";
 
-  std::cerr << "<balancing-result>" << ss.str() << "</balancing-result>" << std::endl;
+  std::cerr << "<params>" << ss.str() << "</params>" << std::endl;
 }
 
 using BigInteger = bigintbackend::BigInteger;
@@ -1068,6 +1074,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         ringDimension = newRingDimension;
       }
    }
+
+   printParamsWithResultTags(moduli, ringDimension, plaintextModulus, "<testname>", algorithm);
 
    annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
    annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus, OperationCount(0, 0));

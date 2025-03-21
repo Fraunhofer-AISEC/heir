@@ -102,7 +102,7 @@ bool saveParamsToJsonFile(const CryptoContext<DCRTPoly>& cc,
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
     std::stringstream timestamp;
     timestamp << std::put_time(std::localtime(&time_t_now), "%Y%m%d_%H%M%S");
-    std::string filename = "/home/ubuntu/heir-aisec/mlir-test-files/data/" + testname + "_" + selectionApproach + "_" + timestamp.str() + "_params.json";
+    std::string filename = "/home/ubuntu/heir-aisec/mlir-test-files/data/" + testname + "_" + selectionApproach + "_execution_" + timestamp.str() + ".json";
     
     // Check if the directory exists, create if it doesn't
     std::filesystem::path dir = "data/";
