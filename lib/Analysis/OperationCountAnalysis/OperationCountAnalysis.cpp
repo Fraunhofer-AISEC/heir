@@ -198,8 +198,16 @@ static std::vector<double> computeBoundChain(
   for (int i = 0; i < numPrimes - 1; ++i) {
     int ciphertextCount = levelOpCounts[numPrimes - i - 1].getCiphertextCount();
     int keySwitchCount = levelOpCounts[numPrimes - i - 1].getKeySwitchCount();
+    
+    // No multiplication for B_clean
+    double square;
+    if (i != 0) {
+      square = bound[i] * bound[i];
+    } else {
+      square = bound[i];
+    }
 
-    double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+    double a = ciphertextCount * (square + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
     bound[i + 1] = noiseBounds.boundScale + (a / scalingMod);
   }
 
