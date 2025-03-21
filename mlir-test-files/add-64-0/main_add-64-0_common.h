@@ -23,7 +23,8 @@ int run(FuncGenerator generateCryptoContext,
             FuncEncryptArg1 encryptArg1,
             FuncCompute compute,
             FuncDecryptResult decryptResult,
-            const std::string selectionApproach) {
+            const std::string selectionApproach,
+            bool ignoreComputation = false) {
   auto cc = generateCryptoContext();
   auto keyPair = cc->KeyGen();
   cc = configureCryptoContext(cc, keyPair.secretKey);
@@ -32,6 +33,10 @@ int run(FuncGenerator generateCryptoContext,
 
   printModulusChain(cc, "add-64-0", selectionApproach);
   saveParamsToJsonFile(cc, "add-64-0", selectionApproach);
+  
+  if (ignoreComputation) {
+    return 0;
+  }
 
   // Initialize 64 tensors with values
   std::vector<std::vector<int16_t>> args;

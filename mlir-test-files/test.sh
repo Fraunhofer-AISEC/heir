@@ -76,77 +76,119 @@ for arg in "${expanded_args[@]}"; do
         echo
     }
 
+    extract_computed_params() {
+        local input_file="$1"
+        local output_file="$2"
+        local test_name="$3"
+        
+        # Clean and extract the JSON content between <params> tags
+        cat "$input_file" | tr -cd '\11\12\15\40-\176' | grep -zo "<params>.*</params>" | \
+            sed 's/<params>//g' | sed 's/<\/params>//g' | \
+            tr -d '\000-\011\013\014\016-\037\177' | \
+            sed "s/<testname>/$test_name/g" > "$output_file"
+            
+        # Forward the original stderr output
+        cat "$input_file" >&2
+    }
+    
+    # Function to annotate parameters with a specific algorithm
+    annotate_parameters() {
+        local algorithm="$1"
+
+        local input_mlir="$PWD/$name/$name-middle.mlir" 
+        local output_mlir="$PWD/$name/$name-middle-params-${algorithm,,}.mlir"
+        
+        print_header "${algorithm^^} ALGORITHM" "Annotating parameters"
+        
+        TEMP_FILE=$(mktemp)
+        run_command bazel run //tools:heir-opt -- --annotate-parameters="plaintext-modulus=65537 ring-dimension=0 algorithm=${algorithm^^}" "$input_mlir" > "$output_mlir" 2> >(tee "$TEMP_FILE" >&2)
+        extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_${algorithm,,}_computed_$TIMESTAMP.json" "$name"
+        cat "$TEMP_FILE" >&2
+        rm "$TEMP_FILE"
+
+        run_command python3 "$PWD/extract_bgv_params.py" $output_mlir "$PWD/data/${name}_${algorithm,,}_annotated_$TIMESTAMP.json" "$name" "${algorithm,,}"
+
+        print_header "${algorithm^^} ALGORITHM" "Validating noise with Mono model"
+        run_command bazel run //tools:heir-opt -- --validate-noise="model=bgv-noise-mono" "$output_mlir" #--debug --debug-only="ValidateNoise"
+    }
+    
+    # Function to convert to BGV and OpenFHE
+    convert_to_bgv_openfhe() {
+        local algorithm="$1"
+        local noParams="$2"
+
+        if [ "$noParams" == "noParams" ]; then
+            local input_mlir="$PWD/$name/$name-middle.mlir"
+        else
+            local input_mlir="$PWD/$name/$name-middle-params-${algorithm,,}.mlir"
+        fi
+        local output_mlir="$PWD/$name/$name-openfhe-${algorithm,,}.mlir"
+
+        print_header "${algorithm^^} ALGORITHM" "Converting to BGV and OpenFHE"
+        run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --scheme-to-openfhe="entry-function=func" "$input_mlir" > "$output_mlir"
+    }
+
+    # Function to generate OpenFHE code for a given implementation
+    generate_openfhe_code() {
+        local algorithm="$1"
+        local input_mlir="$PWD/$name/$name-openfhe-${algorithm,,}.mlir"
+        
+        print_header "${algorithm^^} ALGORITHM" "Generating OpenFHE header"
+        run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$input_mlir" > "$name/${name}_${algorithm,,}.h"
+        
+        print_header "${algorithm^^} ALGORITHM" "Generating OpenFHE implementation"
+        run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$input_mlir" > "$name/${name}_${algorithm,,}.cpp"
+    }
+
+    # Function to run an implementation
+    run_algorithm() {
+        local algorithm="$1"
+        
+        print_header "EXECUTION" "Running ${algorithm^^} implementation"
+        run_command bazel run //mlir-test-files:main_${name}_${algorithm,,} -- ignoreComputation
+    }
+
+    process_algorithm() {
+        local algorithm="$1"
+        local noParams="$2"
+        
+        if [ "$noParams" != "noParams" ]; then
+            annotate_parameters "$algorithm"
+        else 
+            print_header "${algorithm^^} ALGORITHM" "Skipping parameter annotation"
+        fi
+        convert_to_bgv_openfhe "$algorithm" "$noParams"
+        generate_openfhe_code "$algorithm"
+    }
+
+    run_gap_approach() {
+        local model="$1"
+        local model_name="${2:-$model}"  # Use second parameter as name or default to model
+        
+        print_header "GAP APPROACH" "Running ${model_name} model"
+        run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=${model}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir
+        
+        print_header "GAP APPROACH" "Extracting ${model_name} parameters"
+        run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-${model_name}.mlir" "$PWD/data/${name}_gap-${model_name}_annotated_$TIMESTAMP.json" "$name" "gap-${model_name}"
+    }
+    
     print_header "PREPROCESSING" "Converting MLIR to secret arithmetic"
     run_command bazel run //tools:heir-opt -- --secretize --mlir-to-secret-arithmetic --secret-insert-mgmt-bgv "$PWD/$name/$name.mlir" > "$PWD/$name/$name-middle.mlir"
-        
-    # Run Hongren approach
-    print_header "HONGREN APPROACH" "Running KPZ average case model"
-    run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=bgv-noise-by-bound-coeff-average-case-pk" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-kpz-avg.mlir
-    
-    print_header "HONGREN APPROACH" "Extracting KPZ average case parameters"
-    run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-kpz-avg.mlir" "$PWD/data/${name}_gap-kpz-avg_$TIMESTAMP.json" "$name" "gap-kpz-avg"
 
-    print_header "HONGREN APPROACH" "Running Mono model"
-    run_command bazel run //tools:heir-opt -- --generate-param-bgv="model=bgv-noise-mono" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-mono.mlir
+    # Run gap approach with different noise models
+    run_gap_approach "bgv-noise-by-bound-coeff-avg-case" "kpz-avg"
+    run_gap_approach "bgv-noise-mono" "mono"
     
-    print_header "HONGREN APPROACH" "Extracting Mono model parameters"
-    run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-mono.mlir" "$PWD/data/${name}_gap-mono_$TIMESTAMP.json" "$name" "gap-mono"
-
-    print_header "BISECTION ALGORITHM" "Annotating parameters"
-    # First run with BISECTION algorithm
-    # Capture the stderr and extract balancing results
-    TEMP_FILE=$(mktemp)
-    run_command bazel run //tools:heir-opt -- --annotate-parameters="plaintext-modulus=65537 ring-dimension=0 algorithm=BISECTION" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-middle-params-bisection.mlir" 2> "$TEMP_FILE"
-    
-    print_header "BISECTION ALGORITHM" "Extracting balancing results"
-    # Extract balancing results and save to JSON file in data directory with consistent naming
-    # Ensure we clean non-printable characters and properly extract the JSON
-    cat "$TEMP_FILE" | tr -cd '\11\12\15\40-\176' | grep -zo "<balancing-result>.*</balancing-result>" | sed 's/<balancing-result>//g' | sed 's/<\/balancing-result>//g' | tr -d '\000-\011\013\014\016-\037\177' | sed "s/<testname>/$name/g" > "$PWD/data/${name}_balancing_$TIMESTAMP.json"
-    cat "$TEMP_FILE" >&2  # Forward the original stderr output
-    rm "$TEMP_FILE"
-    
-    print_header "BISECTION ALGORITHM" "Converting to BGV and OpenFHE"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-bisection.mlir" > "$PWD/$name/$name-openfhe-bisection.mlir"
-
-    print_header "BISECTION ALGORITHM" "Validating noise with Mono model"
-    run_command bazel run //tools:heir-opt -- --validate-noise="model=bgv-noise-mono" "$PWD/$name/$name-middle-params-bisection.mlir" --debug --debug-only="ValidateNoise"
-
-    print_header "BISECTION ALGORITHM" "Generating OpenFHE header"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-bisection.mlir" > "$name/${name}_bisection.h"
-    
-    print_header "BISECTION ALGORITHM" "Generating OpenFHE implementation"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$PWD/$name/${name}-openfhe-bisection.mlir" > "$name/${name}_bisection.cpp"
-
-    # CLOSED FORM 
-
-    print_header "RUNNING CLOSED-FORM ALGORITHM" "Annotating parameters"
-    run_command bazel run //tools:heir-opt -- --annotate-parameters="plaintext-modulus=65537 ring-dimension=0 algorithm=CLOSED" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-middle-params-openfhe.mlir"
-    
-    print_header "CLOSED-FORM ALGORITHM" "Converting to BGV and OpenFHE"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle-params-openfhe.mlir" > "$PWD/$name/$name-openfhe-openfhe.mlir"
-
-    print_header "CLOSED-FORM ALGORITHM" "Validating noise with Mono model"
-    run_command bazel run //tools:heir-opt -- --validate-noise="model=bgv-noise-mono" "$PWD/$name/$name-middle-params-openfhe.mlir" --debug --debug-only="ValidateNoise"
-    
-    print_header "CLOSED-FORM ALGORITHM" "Generating OpenFHE header"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-openfhe.mlir" > "$name/${name}_openfhe.h"
-    
-    print_header "CLOSED-FORM ALGORITHM" "Generating OpenFHE implementation"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$PWD/$name/${name}-openfhe-openfhe.mlir" > "$name/${name}_openfhe.cpp"
-    
-    # DIRECT
-
-    print_header "RUNNING DIRECT OPENFHE" "Converting to BGV and OpenFHE (no parameter annotation)"
-    run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --debug --debug-only="ValidateNoise" --scheme-to-openfhe="entry-function=func" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-openfhe-direct.mlir"
-
-    print_header "DIRECT OPENFHE" "Generating OpenFHE header"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$PWD/$name/${name}-openfhe-direct.mlir" > "$name/${name}_direct.h"
-    
-    print_header "DIRECT OPENFHE" "Generating OpenFHE implementation"
-    run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$PWD/$name/${name}-openfhe-direct.mlir" > "$name/${name}_direct.cpp"
+    # Run the bisection algorithm pipeline
+    process_algorithm "closed"
+    process_algorithm "bisection"
+    process_algorithm "balancing"
+    process_algorithm "direct" noParams
 
     print_header "POST-PROCESSING" "Fixing include paths in generated files"
-    run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_bisection.h" "$name/${name}_bisection.cpp" "$name/${name}_openfhe.h" "$name/${name}_openfhe.cpp" "$name/${name}_direct.h" "$name/${name}_direct.cpp"
+    for algorithm in "bisection" "closed" "direct"; do
+        run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_${algorithm,,}.h" "$name/${name}_${algorithm,,}.cpp"
+    done
     
     print_header "POST-PROCESSING" "Adding FIXEDAUTO scaling technique to direct variant"
     run_command sed -i 's/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/' "$name/${name}_direct.cpp"
@@ -154,12 +196,8 @@ for arg in "${expanded_args[@]}"; do
     # General command for adding noise eval outputs
     # run_command sed -i 's/^\(\s*\)const auto& \(ct[0-9][0-9]*\) = cc->\(EvalAdd\|EvalRotate\|ModReduce\)\(.*;\)$/\0\n\1std::cout << "\3 operation produced \2" << std::endl;/' /home/ubuntu/heir-aisec/mlir-test-files/${name/${name}.cpp
 
-    print_header "EXECUTION" "Running bisection implementation"
-    run_command bazel run //mlir-test-files:main_${name}_bisection -- ignoreComputation
-    
-    print_header "EXECUTION" "Running closed-form implementation"
-    run_command bazel run //mlir-test-files:main_${name}_openfhe -- ignoreComputation
-    
-    print_header "EXECUTION" "Running direct implementation"
-    run_command bazel run //mlir-test-files:main_${name}_direct -- ignoreComputation
+    # Run all implementations
+    run_algorithm "bisection"
+    run_algorithm "closed"
+    run_algorithm "direct"
 done

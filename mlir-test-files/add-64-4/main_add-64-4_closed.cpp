@@ -2,10 +2,15 @@
 #include <iostream>
 #include <vector>
 
-#include "add-64-3_openfhe.h"
-#include "main_add-64-3_common.h"
+#include "add-64-4_closed.h"
+#include "main_add-64-4_common.h"
 
 int main(int argc, char* argv[]) {
+  // Check for ignoreComputation flag
+  bool ignoreComputation = false;
+  if (argc > 1) {
+    ignoreComputation = std::string(argv[1]) == "ignoreComputation";
+  }
   return run(
       func__generate_crypto_context,
       func__configure_crypto_context,
@@ -13,6 +18,7 @@ int main(int argc, char* argv[]) {
       func__encrypt__arg1,
       func,
       func__decrypt__result0,
-      "openfhe"
+      "closed",
+      ignoreComputation
   );
 }

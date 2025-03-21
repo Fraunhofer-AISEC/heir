@@ -2,8 +2,8 @@
 #include <iostream>
 #include <vector>
 
-#include "add-64-4_openfhe.h"
-#include "main_add-64-4_common.h"
+#include "dot8_closed.h"
+#include "main_dot8_common.h"
 
 int main(int argc, char* argv[]) {
   return run(
@@ -13,6 +13,6 @@ int main(int argc, char* argv[]) {
       func__encrypt__arg1,
       func,
       func__decrypt__result0,
-      "openfhe"
+      "closed"
   );
 }
