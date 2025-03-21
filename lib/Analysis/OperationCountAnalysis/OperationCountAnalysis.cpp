@@ -909,6 +909,11 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto numPrimes = multiplicativeDepth + 1;
 
     auto computeModuliSizes([&](int ringDimension) -> std::vector<int> {
+      if (numPrimes == 1) {
+        auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+        int firstModSize = ceil(1 + log2(levelOpCounts[0].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[0].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)));
+        return {firstModSize};
+      } 
       try {
         int firstModSize = 0;
         int scalingModSize = 0;
