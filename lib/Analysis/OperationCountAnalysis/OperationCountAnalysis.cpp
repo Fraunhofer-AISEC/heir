@@ -169,15 +169,15 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int fir
         q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
                                                          modulusOrder);
       }
-      bool allFound = false;
+      bool allFound = true;
       for (int i = 1; i < numPrimes; i++) {
         q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
         if (q == firstMod) {
           firstModSize += 1;
+          allFound = false;
           break;
         }
-        allFound = true;
-        }
+      }
       if (allFound || numPrimes == 1) {
         return {firstModSize, scalingModSize};
       }
