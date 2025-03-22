@@ -189,29 +189,33 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int fir
 }
 
 static std::vector<double> computeBoundChain(
-    double scalingMod, int numPrimes, const std::vector<OperationCount> &levelOpCounts,
-    NoiseBounds noiseBounds) {
+    const std::vector<double> &moduli,
+    const std::vector<OperationCount> &levelOpCounts, NoiseBounds noiseBounds) {
+  int ciphertextCount = levelOpCounts[moduli.size()].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[moduli.size()].getKeySwitchCount();
 
-  std::vector<double> bound(numPrimes);
-  bound[0] = noiseBounds.boundClean;
+  std::vector<double> bound(moduli.size());
+  bound[0] = ciphertextCount * (noiseBounds.boundClean + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
   
-  for (int i = 0; i < numPrimes - 1; ++i) {
-    int ciphertextCount = levelOpCounts[numPrimes - i - 1].getCiphertextCount();
-    int keySwitchCount = levelOpCounts[numPrimes - i - 1].getKeySwitchCount();
+  for (int i = 0; i < moduli.size() - 1; ++i) {
+    int ciphertextCount = levelOpCounts[moduli.size() - 1 - i].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[moduli.size() - 1 - i].getKeySwitchCount();
     
     // No multiplication for B_clean
-    double square;
-    if (i != 0) {
-      square = bound[i] * bound[i];
-    } else {
-      square = bound[i];
-    }
-
-    double a = ciphertextCount * (square + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
-    bound[i + 1] = noiseBounds.boundScale + (a / scalingMod);
+    double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+    bound[i + 1] = noiseBounds.boundScale + (a / moduli[i]);
   }
 
   return bound;
+}
+
+static std::vector<double> computeBoundChainFixed(
+    double scalingMod, int numPrimes, const std::vector<OperationCount> &levelOpCounts,
+    NoiseBounds noiseBounds) {
+
+  std::vector<double> moduli(numPrimes - 1, scalingMod);
+      
+  return computeBoundChain(moduli, levelOpCounts, noiseBounds);
 }
 
 static double computeObjectiveFunction(
@@ -220,9 +224,9 @@ static double computeObjectiveFunction(
     NoiseBounds noiseBounds) {
 
   std::vector<double> bound =
-      computeBoundChain(scalingMod, numPrimes, levelOpCounts, noiseBounds);
+      computeBoundChainFixed(scalingMod, numPrimes, levelOpCounts, noiseBounds);
 
-  double firstMod = 2 * bound[numPrimes - 1];
+  double firstMod = 2 * bound.back();
 
   return scalingMod + firstMod;
 }
@@ -232,7 +236,7 @@ static double computeFirstModSizeFromChain(
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
     NoiseBounds noiseBounds) {
   std::vector<double> bound =
-      computeBoundChain(p, numPrimes, levelOpCounts,noiseBounds);
+      computeBoundChainFixed(p, numPrimes, levelOpCounts,noiseBounds);
   auto firstModSize = ceil(log2(2 * bound[numPrimes - 1]));
   if (std::isnan(firstModSize) || std::isinf(firstModSize)){
     return 0;
@@ -254,39 +258,12 @@ static double derivativeObjective(
   return (highObjective - lowObjective) / (2 * h);
 }
 
-static std::vector<double> computeChain(
-    const std::vector<double>& moduli, 
-    const std::vector<OperationCount>& levelOpCounts,
-    NoiseBounds noiseBounds) {
-
-  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
-  std::vector<double> bounds(numberModuli);
-  bounds[0] = noiseBounds.boundClean;
-  
-  for (int i = 0; i < numberModuli - 1; ++i) {
-    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
-    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
-    
-    double boundSquare;
-    try {
-      boundSquare = bounds[i] * bounds[i];
-    } catch (...) {
-      boundSquare = std::numeric_limits<double>::infinity();
-    }
-    
-    double a = ciphertextCount * (boundSquare + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
-    bounds[i + 1] = noiseBounds.boundScale + (a / moduli[i]);
-  }
-  
-  return bounds;
-}
-
 // Calculate objective function: max(p_list) + q where q = 2 * B[N]
 static std::tuple<double, double, std::vector<double>> computeObjective(
     const std::vector<double>& moduli,
     const std::vector<OperationCount>& levelOpCounts,
     NoiseBounds noiseBounds) {
-  auto bounds = computeChain(moduli, levelOpCounts, noiseBounds);
+  auto bounds = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   double firstMod = 2 * bounds.back();
   
   double sumModuli = 0;
@@ -315,14 +292,14 @@ static std::vector<double> candidateForward(
   
   newModuli[currentIndex] = newModuliValue;
   
-  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+  auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   double target = boundsOld[currentIndex + offset + 1];
   
   if (target - noiseBounds.boundScale <= 0) {
     return {};
   }
   
-  auto boundsTemp = computeChain(newModuli, levelOpCounts, noiseBounds);
+  auto boundsTemp = computeBoundChain(newModuli, levelOpCounts, noiseBounds);
   
   double x = boundsTemp[currentIndex + offset];
   int ciphertextCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getCiphertextCount();
@@ -355,7 +332,7 @@ static std::vector<double> candidateBackward(
   
   newModuli[currentIndex] = newModuliValue;
   
-  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+  auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
 
   auto bound = boundsOld[currentIndex + 1];
 
@@ -391,7 +368,7 @@ static std::vector<double> candidateFirstModUpdate(
     NoiseBounds noiseBounds) {
     
   int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
-  auto boundsOld = computeChain(moduli, levelOpCounts, noiseBounds);
+  auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   
   double currentFirstMod = 2 * boundsOld.back();
   double newFirstMod = factor * currentFirstMod;
@@ -575,7 +552,7 @@ static double findOptimalScalingModSizeBisection(
     NoiseBounds noiseBounds, double pLow = 2, double pHigh = pow(2.0, 60)) {
   auto checkBounds = [&](double scalingMod) {
     std::vector<double> bounds =
-        computeBoundChain(scalingMod, numPrimes, levelOpCounts,noiseBounds);
+        computeBoundChainFixed(scalingMod, numPrimes, levelOpCounts, noiseBounds);
     return std::all_of(bounds.begin(), bounds.end(), 
                       [](double b) { return !std::isinf(b) && !std::isnan(b); });
   };
