@@ -236,8 +236,8 @@ static double computeFirstModSizeFromChain(
     const std::vector<OperationCount> &levelOpCounts, int numPrimes,
     NoiseBounds noiseBounds) {
   std::vector<double> bound =
-      computeBoundChainFixed(p, numPrimes, levelOpCounts,noiseBounds);
-  auto firstModSize = ceil(log2(2 * bound[numPrimes - 1]));
+      computeBoundChainFixed(p, numPrimes, levelOpCounts, noiseBounds);
+  auto firstModSize = ceil(log2(2 * bound.back()));
   if (std::isnan(firstModSize) || std::isinf(firstModSize)){
     return 0;
   }
@@ -566,7 +566,7 @@ static double findOptimalScalingModSizeBisection(
   }
   
   // Bisection
-  while (log2(pHigh) - log2(pLow) > 1) {
+  while (log2(pHigh- pLow) > 1) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
                             levelOpCounts, numPrimes, noiseBounds) < 0) {
