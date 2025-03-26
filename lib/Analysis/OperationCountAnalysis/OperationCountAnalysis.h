@@ -14,10 +14,23 @@ namespace heir {
 
 class OperationCount {
  public:
-  OperationCount() : initialized(false), ciphertextCount(0), keySwitchCount(0) {}
+  OperationCount()
+      : initialized(false),
+        ciphertextCount(0),
+        keySwitchCount(0),
+        highestLevel(false) {}
   explicit OperationCount(int ciphertextCount, int keySwitchCount)
-      : initialized(true), ciphertextCount(ciphertextCount), keySwitchCount(keySwitchCount) {}
-  
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        highestLevel(false) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount,
+                          bool highestLevel)
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        highestLevel(highestLevel) {}
+
   void countOperation(Operation *op);
 
   int getCiphertextCount() const {
@@ -32,28 +45,31 @@ class OperationCount {
 
   OperationCount incrementKeySwitch() const {
     assert(isInitialized() && "OperationCount not initialized");
-    return OperationCount(ciphertextCount, keySwitchCount + 1);
+    return OperationCount(ciphertextCount, keySwitchCount + 1, highestLevel);
   }
 
   bool isInitialized() const { return initialized; }
 
+  bool isHighestLevel() const { return highestLevel; }
+
   bool operator==(const OperationCount &rhs) const {
     return initialized == rhs.initialized && ciphertextCount == rhs.ciphertextCount &&
-           keySwitchCount == rhs.keySwitchCount;
+           keySwitchCount == rhs.keySwitchCount && highestLevel == rhs.highestLevel;
   }
 
   OperationCount operator+(const OperationCount &rhs) const {
     assert(isInitialized() && rhs.isInitialized() &&
            "OperationCount not initialized");
     return OperationCount(ciphertextCount + rhs.ciphertextCount,
-                          keySwitchCount + rhs.keySwitchCount);
+                          std::max(keySwitchCount, rhs.keySwitchCount), highestLevel && rhs.highestLevel );
   }
 
   static OperationCount max(const OperationCount &lhs, const OperationCount &rhs) {
     assert(lhs.isInitialized() && rhs.isInitialized() &&
            "OperationCount not initialized");
     return OperationCount(std::max(lhs.ciphertextCount, rhs.ciphertextCount),
-                          std::max(lhs.keySwitchCount, rhs.keySwitchCount));
+                          std::max(lhs.keySwitchCount, rhs.keySwitchCount), 
+                          lhs.highestLevel && rhs.highestLevel);
   }
 
   static OperationCount join(const OperationCount &lhs,
@@ -89,6 +105,8 @@ class OperationCount {
   // "Number of ciphertexts with base noise" that flow into the respective value
   int ciphertextCount;
   int keySwitchCount;
+  // Indicates, whether the OperationCount started from a fresh ciphertext
+  bool highestLevel;
 };
 
 class OperationCountLattice : public dataflow::Lattice<OperationCount> {

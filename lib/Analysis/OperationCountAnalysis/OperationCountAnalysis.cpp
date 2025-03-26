@@ -54,7 +54,7 @@ LogicalResult OperationCountAnalysis::visitOperation(
       .Case<secret::GenericOp>([&](auto genericOp){
         Block *body = genericOp.getBody();
         for (auto arg: body->getArguments()) {
-          propagate(arg, OperationCount(1, 0));
+          propagate(arg, OperationCount(1, 0, true));
         }
       })
       .Case<arith::AddIOp, arith::SubIOp>([&](auto addOp) {
@@ -64,7 +64,7 @@ LogicalResult OperationCountAnalysis::visitOperation(
           return;
         }
 
-        OperationCount sumCount(0, 0);
+        OperationCount sumCount(0, 0, true);
         SmallVector<OpOperand *> secretOperands;
         getSecretOperands(op, secretOperands);
         for (auto *operand : secretOperands) {
@@ -191,15 +191,15 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int fir
 static std::vector<double> computeBoundChain(
     const std::vector<double> &moduli,
     const std::vector<OperationCount> &levelOpCounts, NoiseBounds noiseBounds) {
-  int ciphertextCount = levelOpCounts[moduli.size()].getCiphertextCount();
-  int keySwitchCount = levelOpCounts[moduli.size()].getKeySwitchCount();
+  int ciphertextCount = levelOpCounts[moduli.size() + 1].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[moduli.size() + 1].getKeySwitchCount();
 
-  std::vector<double> bound(moduli.size());
+  std::vector<double> bound(moduli.size() + 1);
   bound[0] = ciphertextCount * (noiseBounds.boundClean + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
   
-  for (int i = 0; i < moduli.size() - 1; ++i) {
-    int ciphertextCount = levelOpCounts[moduli.size() - 1 - i].getCiphertextCount();
-    int keySwitchCount = levelOpCounts[moduli.size() - 1 - i].getKeySwitchCount();
+  for (int i = 0; i < moduli.size(); ++i) {
+    int ciphertextCount = levelOpCounts[moduli.size() - i].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[moduli.size() - i].getKeySwitchCount();
     
     // No multiplication for B_clean
     double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
@@ -284,13 +284,11 @@ static std::vector<double> candidateForward(
   int numberModuli = moduli.size();
   
   std::vector<double> newModuli = moduli;
-  double newModuliValue = factor * moduli[currentIndex];
+  newModuli[currentIndex] = factor * moduli[currentIndex];
   
-  if (newModuliValue <= 0) {
+  if (newModuli[currentIndex] <= 0) {
     return {};
   }
-  
-  newModuli[currentIndex] = newModuliValue;
   
   auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   double target = boundsOld[currentIndex + offset + 1];
@@ -302,8 +300,8 @@ static std::vector<double> candidateForward(
   auto boundsTemp = computeBoundChain(newModuli, levelOpCounts, noiseBounds);
   
   double x = boundsTemp[currentIndex + offset];
-  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getCiphertextCount();
-  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex + offset) - 1].getKeySwitchCount();
+  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex + offset)].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex + offset)].getKeySwitchCount();
   
   double newPartnerModuliValue = ciphertextCount * (x * x + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (target - noiseBounds.boundScale);
   
@@ -324,21 +322,19 @@ static std::vector<double> candidateBackward(
   int numberModuli = moduli.size();
 
   std::vector<double> newModuli = moduli;
-  double newModuliValue = factor * moduli[currentIndex];
+  newModuli[currentIndex] = factor * moduli[currentIndex];
   
-  if (newModuliValue <= 0) {
+  if (newModuli[currentIndex] <= 0) {
     return {};
   }
-  
-  newModuli[currentIndex] = newModuliValue;
   
   auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
 
   auto bound = boundsOld[currentIndex + 1];
 
   for (int i = currentIndex; i > currentIndex - offset; i--) {
-    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
-    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
+    int ciphertextCount = levelOpCounts[numberModuli - i].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[numberModuli - i].getKeySwitchCount();
    
     double numerator = newModuli[i] * (bound - noiseBounds.boundScale);
     double denominator = ciphertextCount;
@@ -348,8 +344,8 @@ static std::vector<double> candidateBackward(
   }
   
   double x = boundsOld[currentIndex - offset];
-  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getCiphertextCount();
-  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex - offset) - 1].getKeySwitchCount();
+  int ciphertextCount = levelOpCounts[numberModuli - (currentIndex - offset)].getCiphertextCount();
+  int keySwitchCount = levelOpCounts[numberModuli - (currentIndex - offset)].getKeySwitchCount();
   
   double newPartnerModuliValue = ciphertextCount * (x * x + keySwitchCount * noiseBounds.addedNoiseKeySwitching) / (bound - noiseBounds.boundScale);
   
@@ -375,9 +371,9 @@ static std::vector<double> candidateFirstModUpdate(
 
   auto bound = newFirstMod / 2;
 
-  for (int i = numberModuli - 2; i >= numberModuli - offset; i--) {
-    int ciphertextCount = levelOpCounts[numberModuli - i - 1].getCiphertextCount();
-    int keySwitchCount = levelOpCounts[numberModuli - i - 1].getKeySwitchCount();
+  for (int i = numberModuli - 2; i > numberModuli - offset - 1; i--) {
+    int ciphertextCount = levelOpCounts[numberModuli - i].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[numberModuli - i].getKeySwitchCount();
    
     double numerator = moduli[i] * (bound - noiseBounds.boundScale);
     double denominator = ciphertextCount;
@@ -406,24 +402,19 @@ static bool anyModuliNegative(const std::vector<double>& moduli) {
   return std::any_of(moduli.begin(), moduli.end(), [](double val) { return val <= 0; });
 }
 
-
 static std::vector<double> rebalanceSingleModulus(
     const std::vector<double>& moduli,
     const std::vector<OperationCount>& levelOpCounts,
     int currentModuliIndex, double factor,
    NoiseBounds noiseBounds) {
     
-  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
   std::vector<std::tuple<std::vector<double>, double>> candidates;
   
   // Forward updates
-  for (int d = 1; d < numberModuli - 1 - currentModuliIndex; ++d) {
-    auto cand = candidateForward(moduli, levelOpCounts, currentModuliIndex, factor, d, 
+  for (int offset = 1; offset < moduli.size() - currentModuliIndex; ++offset) {
+    auto cand = candidateForward(moduli, levelOpCounts, currentModuliIndex, factor, offset, 
                                 noiseBounds);
-    if (!cand.empty()) {
-      if (anyModuliNegative(cand)) {
-        continue;
-      }
+    if (!cand.empty() && !anyModuliNegative(cand)) {
       auto [objective, firstMod, __] = computeObjective(cand, levelOpCounts, 
                                               noiseBounds);
       if (log2(firstMod) <= 0) {
@@ -434,12 +425,9 @@ static std::vector<double> rebalanceSingleModulus(
   }
 
   // Backward updates
-    for (int d = 1; d <= currentModuliIndex; ++d) {
-      auto cand = candidateBackward(moduli, levelOpCounts, currentModuliIndex, factor, d, noiseBounds);
-      if (!cand.empty()) {
-        if (anyModuliNegative(cand)) {
-          continue;
-        }
+    for (int offset = 1; offset <= currentModuliIndex; ++offset) {
+      auto cand = candidateBackward(moduli, levelOpCounts, currentModuliIndex, factor, offset, noiseBounds);
+      if (!cand.empty() && !anyModuliNegative(cand)) {
         auto [objective, firstMod, __] = computeObjective(cand, levelOpCounts, 
                                                 noiseBounds);
         if (log2(firstMod) <= 0) {
@@ -468,7 +456,7 @@ static std::vector<double> rebalancingModuli(
     NoiseBounds noiseBounds,
     int maxIter = 100, double tolerance = 0.01, double eps = 1e-6) {
   
-  int numberModuli = levelOpCounts.size();
+  int numberModuli = levelOpCounts.size() - 1;
   std::vector<double> moduliCurrent(numberModuli - 1,pInit);
   
   std::vector<double> candidateFactors = {0.5, 0.75, 0.9, 1.1, 1.25, 1.5, 2.0};
@@ -487,7 +475,7 @@ static std::vector<double> rebalancingModuli(
       for (double factor : candidateFactors) {
         auto candidate = rebalanceSingleModulus(moduliCurrent, levelOpCounts, i, factor, 
                                      noiseBounds);
-        if (candidate.empty()) {
+        if (candidate.empty() || anyModuliNegative(candidate)) {
           continue;
         }
 
@@ -635,7 +623,8 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
                                                     int maxLevel) {
   std::vector<OperationCount> levelOpCounts;
 
-  levelOpCounts.resize(maxLevel + 1, OperationCount(0, 0));
+  levelOpCounts.resize(maxLevel + 2, OperationCount(0, 0));
+  levelOpCounts[maxLevel + 1] = OperationCount(0, 0, true);
 
   // Second pass to populate the vector
   op->getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
@@ -656,9 +645,16 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
     // Get the level for the operation's result
     int level = getLevelFromMgmtAttr(op->getResult(0));
 
-    // Update the max operation count for the level
-    levelOpCounts[level] = OperationCount::max(levelOpCounts[level], count);
+    if (count.isHighestLevel()) {
+      levelOpCounts[maxLevel + 1] = OperationCount::max(levelOpCounts[maxLevel + 1], count);
+    } else {
+      levelOpCounts[level] = OperationCount::max(levelOpCounts[level], count);
+    }
   });
+
+  if (levelOpCounts[maxLevel + 1].getCiphertextCount() == 0) {
+    levelOpCounts[maxLevel + 1] = OperationCount(1, 0);
+  }
 
   return levelOpCounts;
 }
@@ -896,9 +892,9 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto computeModuliSizes([&](int ringDimension) -> std::vector<int> {
       if (numPrimes == 1) {
         auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
-        int firstModSize = ceil(1 + log2(levelOpCounts[0].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[0].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)));
+        int firstModSize = ceil(1 + log2(levelOpCounts[1].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[1].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)));
         return {firstModSize};
-      } 
+      }
       try {
         int firstModSize = 0;
         int scalingModSize = 0;
