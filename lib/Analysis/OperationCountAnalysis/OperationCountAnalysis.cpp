@@ -228,7 +228,7 @@ static double computeObjectiveFunction(
 
   double firstMod = 2 * bound.back();
 
-  return scalingMod + firstMod;
+  return (numPrimes - 1) * log2(scalingMod) + log2(firstMod);
 }
 
 static double computeFirstModSizeFromChain(
@@ -268,10 +268,10 @@ static std::tuple<double, double, std::vector<double>> computeObjective(
   
   double sumModuli = 0;
   for (auto mod : moduli) {
-    sumModuli += mod;
+    sumModuli += log2(mod);
   }
   
-  return {sumModuli + firstMod, firstMod, bounds};
+  return {sumModuli + log2(firstMod), firstMod, bounds};
 }
 
 // Forward candidate update
@@ -554,7 +554,7 @@ static double findOptimalScalingModSizeBisection(
   }
   
   // Bisection
-  while (log2(pHigh- pLow) > 1) {
+  while (ceil(log2(pHigh)) != ceil(log2(pLow))) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
                             levelOpCounts, numPrimes, noiseBounds) < 0) {
@@ -802,9 +802,9 @@ static std::vector<int64_t> computeQiModuliFromSizes(
     int plaintextModulus) {
   std::vector<int64_t> qi;
   qi.reserve(moduliSizes.size());
-
-  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
-
+  
+  // Use order for non GHS BGV Variant (for BGV GHS, use computeModulusOrder(ringDimension, plaintextModulus))
+  uint64_t modulusOrder = 2 * ringDimension;
   // Process each modulus size in sequence
   lbcrypto::NativeInteger currentPrime = 0;
   for (int moduliSize : moduliSizes) {
