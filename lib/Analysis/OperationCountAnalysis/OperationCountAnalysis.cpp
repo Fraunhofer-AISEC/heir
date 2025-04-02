@@ -689,21 +689,27 @@ static void computeModuliSizesClosed(
    maxCounts = OperationCount::max(maxCounts, count);
  }
 
- auto boundOptimal =
-     log2(noiseBounds.boundScale +
-          sqrt(noiseBounds.boundScale * noiseBounds.boundScale + (maxCounts.getKeySwitchCount() *
-                                          noiseBounds.addedNoiseKeySwitching)));
+ auto boundOptimal = log2(noiseBounds.boundScale +
+                          sqrt(noiseBounds.boundScale * noiseBounds.boundScale +
+                               (maxCounts.getKeySwitchCount() *
+                                noiseBounds.addedNoiseKeySwitching)));
 
-  if (boundOptimal < noiseBounds.boundClean) {
-    boundOptimal =
-    log2(noiseBounds.boundScale +
-         sqrt(noiseBounds.boundClean * noiseBounds.boundClean + (maxCounts.getKeySwitchCount() *
-                                         noiseBounds.addedNoiseKeySwitching)));
-  }
+ auto b0 = maxCounts.getCiphertextCount() *
+           (noiseBounds.boundClean +
+            maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching);
 
- scalingModSize =
-     ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
- firstModSize = ceil(1 + boundOptimal);
+ if (boundOptimal >= log2(b0)) {
+   scalingModSize =
+       ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
+   firstModSize = ceil(1 + boundOptimal);
+ } else {
+   scalingModSize =
+       log2(maxCounts.getCiphertextCount() *
+       (b0 * b0 +
+        maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)) - log2(
+       (b0 - noiseBounds.boundScale));
+   firstModSize = ceil(1 + log2(b0));
+ }
 }
 
 static std::vector<int> computeModuliSizesBalancing(
