@@ -134,12 +134,12 @@ static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus
   return pow2ptm * plaintextModulus;
 }
 
-static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int firstModSize,
+static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int minFirstModSize,
                                         int numPrimes, int ringDimension,
-                                        int plaintextModulus) {
-  if (firstModSize > kMaxBitSize || scalingModSize > kMaxBitSize) {
+                                        int plaintextModulus, std::function<int(int)> &recomputeFirstModSize) {
+  if (minFirstModSize > kMaxBitSize || minScalingModSize > kMaxBitSize) {
     throw std::runtime_error("Could not find valid primes! FirstModSize or scalingModSize exeed maximum bit size!");
-  }                           
+  }
 
   uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
 
@@ -148,22 +148,25 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int fir
   // Find valid firstModulusSize and respective firstModulus prime
   while (true) {
     try {
-      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize, modulusOrder);
+      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minFirstModSize, modulusOrder);
       break;
     } catch (lbcrypto::OpenFHEException &e) {
-      firstModSize += 1;
-      if (firstModSize > kMaxBitSize) {
+      minFirstModSize += 1;
+      if (minFirstModSize > kMaxBitSize) {
         throw std::runtime_error("Could not find valid primes for firstMod!");
       }
     }
   }
 
+  auto firstModSize = minFirstModSize;
+  auto scalingModSize = minScalingModSize;
+
   while (scalingModSize <= kMaxBitSize) {
     try {
       lbcrypto::NativeInteger q;
+      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
+        modulusOrder);
       if (firstModSize == scalingModSize){
-        firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
-                                                            modulusOrder);
         q = firstMod;
       } else {
         q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
@@ -182,7 +185,13 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int scalingModSize, int fir
         return {firstModSize, scalingModSize};
       }
     } catch (lbcrypto::OpenFHEException &e) {
-      scalingModSize += 1;
+      if (firstModSize <= scalingModSize) {
+        firstModSize +=1;
+      } else {
+        firstModSize = recomputeFirstModSize(scalingModSize);
+        scalingModSize += 1;
+      }
+      // TODO Check that in the case if we 
     }
   }
   throw std::runtime_error("Could not find valid primes for scalingMod!");
@@ -567,7 +576,7 @@ static double findOptimalScalingModSizeBisection(
   while (ceil(log2(pHigh)) != ceil(log2(pLow))) {
     double pMid = (pLow + pHigh) / 2.0;
     if (derivativeObjective(pMid, ringDimension, plaintextModulus,
-                            levelOpCounts, numPrimes, noiseBounds) < 0) {
+                            levelOpCounts, numPrimes, noiseBounds) <= 0) {
       // lower then the minimizer.
       pLow = pMid;
     } else {
@@ -917,18 +926,28 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         if (algorithm == "BISECTION") {
           computeModuliSizesBisection(firstModSize, scalingModSize, ringDimension,
                                       plaintextModulus, levelOpCounts, numPrimes);
+          std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
+            double scalingMod = pow(2.0, currentScalingModSize);
+            auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+            int firstModSize = computeFirstModSizeFromChain(
+                scalingMod, ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
+            return firstModSize;
+          };
           auto modSizes =
               findValidPrimes(scalingModSize, firstModSize, numPrimes,
-                              ringDimension, plaintextModulus);
+                              ringDimension, plaintextModulus, recomputeFirstModSize);
           return createModuliSizeChain(modSizes.first, modSizes.second,
                                        numPrimes);
         }
         if (algorithm == "CLOSED") {
           computeModuliSizesClosed(firstModSize, scalingModSize, ringDimension,
                                   plaintextModulus, levelOpCounts, numPrimes);
+          std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
+              return firstModSize;
+          };
           auto modSizes =
               findValidPrimes(scalingModSize, firstModSize, numPrimes,
-                              ringDimension, plaintextModulus);
+                              ringDimension, plaintextModulus, recomputeFirstModSize);
           return createModuliSizeChain(modSizes.first, modSizes.second,
                                        numPrimes);
         }
