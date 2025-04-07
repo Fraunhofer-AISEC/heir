@@ -228,6 +228,10 @@ static double computeObjectiveFunction(
 
   double firstMod = 2 * bound.back();
 
+  if (log2(firstMod) > kMaxBitSize){
+    return std::numeric_limits<double>::max();
+  }
+
   return (numPrimes - 1) * log2(scalingMod) + log2(firstMod);
 }
 
@@ -265,9 +269,15 @@ static std::tuple<double, double, std::vector<double>> computeObjective(
     NoiseBounds noiseBounds) {
   auto bounds = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   double firstMod = 2 * bounds.back();
+  if (log2(firstMod) > kMaxBitSize){
+    return {std::numeric_limits<double>::max(), firstMod, bounds};
+  }
   
   double sumModuli = 0;
   for (auto mod : moduli) {
+    if (log2(mod) > kMaxBitSize){
+      return {std::numeric_limits<double>::max(), firstMod, bounds};
+    }
     sumModuli += log2(mod);
   }
   
