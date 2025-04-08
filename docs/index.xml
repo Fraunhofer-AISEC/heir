@@ -1,4 +1,165 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>HEIR – Documentation</title><link>https://heir.dev/docs/</link><description>Recent content in Documentation on HEIR</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://heir.dev/docs/index.xml" rel="self" type="application/rss+xml"/><item><title>Docs: Data-oblivious Transformations</title><link>https://heir.dev/docs/design/do_transformation/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/design/do_transformation/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>HEIR – Documentation</title><link>https://heir.dev/docs/</link><description>Recent content in Documentation on HEIR</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://heir.dev/docs/index.xml" rel="self" type="application/rss+xml"/><item><title>Docs: Ciphertext Management</title><link>https://heir.dev/docs/design/management/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/design/management/</guid><description>
+&lt;p>To lower from user specified computation to FHE scheme operations, a compiler
+must insert &lt;em>ciphertext management&lt;/em> operations to satisfy various requirements
+of the FHE scheme, like modulus switching, relinearization, and bootstrapping.
+In HEIR, such operations are modeled in a scheme-agnostic way in the &lt;code>mgmt&lt;/code>
+dialect.&lt;/p>
+&lt;p>Taking the arithmetic pipeline as example: a program specified in high-level
+MLIR dialects like &lt;code>arith&lt;/code> and &lt;code>linalg&lt;/code> is first transformed to an IR with only
+&lt;code>arith.addi/addf&lt;/code>, &lt;code>arith.muli/mulf&lt;/code>, and &lt;code>tensor_ext.rotate&lt;/code> operations. We
+call this form the &lt;em>secret arithmetic&lt;/em> IR.&lt;/p>
+&lt;p>Then management passes insert &lt;code>mgmt&lt;/code> ops to support future lowerings to scheme
+dialects like &lt;code>bgv&lt;/code> and &lt;code>ckks&lt;/code>. As different schemes have different management
+requirement, they should be inserted in different styles.&lt;/p>
+&lt;p>We discuss each scheme below to show the design in HEIR. For RLWE schemes, we
+all assume RNS instantiation.&lt;/p>
+&lt;h2 id="bgv">BGV&lt;/h2>
+&lt;p>BGV is a leveled scheme where each level has a modulus $q_i$. The level is
+numbered from $0$ to $L$ where $L$ is the input level and $0$ is the output
+level. The core feature of BGV is that when the magnititude of the noise becomes
+large (often caused by multiplication), a modulus switching operation from level
+$i$ to level $i-1$ can be inserted to reduce the noise to a &amp;ldquo;constant&amp;rdquo; level. In
+this way, BGV can support a circuit of multiplicative depth $L$.&lt;/p>
+&lt;h3 id="bgv-relinearization">BGV: Relinearization&lt;/h3>
+&lt;p>HEIR initially inserts relinearization ops immediately after each multiplication
+to keep ciphertext dimension &amp;ldquo;linear&amp;rdquo;. A later relinearization optimization pass
+relaxes this requirement, and uses an integer linear program to decide when to
+relinearize. See &lt;a href="https://heir.dev/docs/design/relinearization_ilp/">Optimizing Relinearization&lt;/a>
+for more details.&lt;/p>
+&lt;h3 id="bgv-modulus-switching">BGV: Modulus switching&lt;/h3>
+&lt;p>There are several techniques to insert modulus switching ops.&lt;/p>
+&lt;p>For the example circuit &lt;code>input -&amp;gt; mult -&amp;gt; mult -&amp;gt; output&lt;/code>, the insertion result
+could be one of&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>After multiplication: &lt;code>input -&amp;gt; (mult -&amp;gt; ms) -&amp;gt; (mult -&amp;gt; ms) -&amp;gt; output&lt;/code>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Before multiplication: &lt;code>input -&amp;gt; (mult) -&amp;gt; (ms -&amp;gt; mult) -&amp;gt; (ms -&amp;gt; output)&lt;/code>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Before multiplication (including the first multiplication):
+&lt;code>input -&amp;gt; (ms -&amp;gt; mult) -&amp;gt; (ms -&amp;gt; mult) -&amp;gt; (ms -&amp;gt; output)&lt;/code>&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;p>The first strategy is from the BGV paper, the second and third strategies are
+from OpenFHE, which correspond to the &lt;code>FLEXIBLEAUTO&lt;/code> mode and &lt;code>FLEXIBLEAUTOEXT&lt;/code>
+mode, respectively.&lt;/p>
+&lt;p>The first strategy is conceptually simpler, yet other policies have the
+advantage of smaller noise growth. In latter policies, by delaying the modulus
+switch until just before multiplication, the noise from other operations between
+multiplications (like rotation/relinearization) also benefit from the noise
+reduction of a modulus switch.&lt;/p>
+&lt;p>Note that, as multiplication has two operands, the actual circuit for the latter
+two policies is &lt;code>mult(ms(ct0), ms(ct1))&lt;/code>, whereas in the first policy the
+circuit is &lt;code>ms(mult(ct0, ct1))&lt;/code>.&lt;/p>
+&lt;p>The third policy has one more switching op than the others, so it will need one
+more modulus.&lt;/p>
+&lt;p>There are also other insertion strategy like inserting it dynamically based on
+current noise (see HElib) or lazy modulus switching. Those are not implemented.&lt;/p>
+&lt;h3 id="bgv-scale-management">BGV: Scale management&lt;/h3>
+&lt;p>For the original BGV scheme, it is required to have $qi \equiv 1 \pmod{t}$
+where $t$ is the plaintext modulus. However in practice such requirement will
+make the choice of $q_i$ too constrained. In the GHS variant, this condition is
+removed, with the price of scale management needed.&lt;/p>
+&lt;p>Modulus switching from level $i$ to level $i-1$ is essentially dividing (with
+rounding) the ciphertext by $q_i$, hence dividing the noise and payload message
+inside by $q_i$. The message $m$ can often be written as $[m]_t$, the coset
+representative of &lt;code>m&lt;/code> $\mathbb{Z}/t\mathbb{Z}$. Then by dividing of $q_i$
+produces a result message $[m \cdot q_i^{-1}]_t$.&lt;/p>
+&lt;p>Note that when $qi \equiv 1 \pmod{t}$, the result message is the same as the
+original message. However, in the GHS variant this does not always hold, so we
+call the introduced factor of $[q^{-1}]_t$ the &lt;em>scale&lt;/em> of the message. HEIR
+needs to record and manage it during compilation. When decrypting the scale must
+be removed to obtain the right message.&lt;/p>
+&lt;p>Note that, for messages $m_0$ and $m_1$ of different scale $a$ and $b$, we
+cannot add them directly because $[a \cdot m_0 + b \cdot m_1]_t$ does not
+always equal $[m_0 + m_1]_t$. Instead we need to adjust the scale of one
+message to match the other, so $[b \cdot m_0 + b \cdot m_1]_t = [b \cdot
+(m_0 + m_1)]_t$. Such adjustment could be done by multiplying $m_0$ with a
+constant $[b \cdot a^{-1}]_t$. This adjustment is not for free, and
+increases the ciphertext noise.&lt;/p>
+&lt;p>As one may expect, different modulus switching insertion strategies affect
+message scale differently. For $m_0$ with scale $a$ and $m_1$ with scale $b$,
+the result scale would be&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>After multiplication: $[ab / qi]_t$.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Before multiplication: $[a / qi \cdot b / qi]_t = [ab / (qi^2)]_t$.&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;p>This is messy enough. To ease the burden, we can impose additional requirement:
+mandate a constant scale $\Delta_i$ for all ciphertext at level $i$. This is
+called the &lt;em>level-specific scaling factor&lt;/em>. With this in mind, addition within
+one level can happen without caring about the scale.&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>After multiplication: $\Delta_{i-1} = [\Delta_i^2 / qi]_t$&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Before multiplication: $\Delta_{i-1} = [\Delta_i^2 / (qi^2)]_t$&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="bgv-cross-level-operation">BGV: Cross Level Operation&lt;/h3>
+&lt;p>With the level-specific scaling factor, one may wonder how to perform addition
+and multiplication of ciphertexts on different levels. This can be done by
+adjusting the level and scale of the ciphertext at the higher level.&lt;/p>
+&lt;p>The level can be easily adjusted by dropping the extra limbs, and scale can be
+adjusted by multiplying a constant, but because multiplying a constant will
+incur additional noise, the procedure becomes the following:&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>Assume the level and scale of two ciphertexts are $l_1$ and $l_2$, $s_1$ and
+$s_2$ respectively. WLOG assume $l_1 &amp;gt; l_2$.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Drop $l_1 - l_2 - 1$ limbs for the first ciphertext to make it at level $l_2
++ 1$, if those extra limbs exist.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Adjust scale from $s_1$ to $s_2 \cdot q_{l_2 + 1}$ by multiplying $[s_2
+\cdot q_{l_2 + 1} / s1]_t$ for the first ciphertext.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Modulus switch from $l_2 + 1$ to $l_2$, producing scale $s_2$ for the first
+ciphertext and its noise is controlled.&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="bgv-implementation-in-heir">BGV: Implementation in HEIR&lt;/h3>
+&lt;p>In HEIR the different modulus switching policy is controlled by the pass option
+for &lt;code>--secret-insert-mgmt-bgv&lt;/code>. The pass defaults to the &amp;ldquo;Before Multiplication&amp;rdquo;
+policy. If user wants other policy, the &lt;code>after-mul&lt;/code> or
+&lt;code>before-mul-include-first-mul&lt;/code> option may be used. The &lt;code>mlir-to-bgv&lt;/code> pipeline
+option &lt;code>modulus-switch-before-first-mul&lt;/code> corresponds to the latter option.&lt;/p>
+&lt;p>The &lt;code>secret-insert-mgmt&lt;/code> pass is also responsible for managing cross-level
+operations. However, as the scheme parameters are not generated at this point,
+the concrete scale could not be instantiated so some placeholder operations are
+inserted.&lt;/p>
+&lt;p>After the modulus switching policy is applied, the &lt;code>generate-param-bgv&lt;/code> pass
+generates scheme parameters. Optionally, user could skip this pass by manually
+providing scheme parameter as an attribute at module level.&lt;/p>
+&lt;p>Then &lt;code>populate-scale-bgv&lt;/code> comes into play by using the scheme parameters to
+instantiate concrete scale, and turn those placeholder operations into concrete
+multiplication operation.&lt;/p>
+&lt;h2 id="ckks">CKKS&lt;/h2>
+&lt;p>CKKS is a leveled scheme where each level has a modulus $q_i$. The level is
+numbered from $0$ to $L$ where $L$ is the input level and $0$ is the output
+level. CKKS ciphertext contains a scaled message $\Delta m$ where $\Delta$
+takes some value like $2^40$ or $2^80$. After multiplication of two messages,
+the scaling factor $\Delta&amp;rsquo;$ will become larger, hence some kind of management
+policy is needed in case it blows up. Contrary to BGV where modulus switching is
+used for noise management, in CKKS modulus switching from level $i$ to level
+$i-1$ can divide the scaling factor $\Delta$ by the modulus $q_i$.&lt;/p>
+&lt;p>The management of CKKS is similar to BGV above in the sense that their strategy
+are the similar and uses similar code base. However, BGV scale management is
+internal and users are not required to concern about it, while CKKS scale
+management is visible to user as it affects the precision. One notable
+difference is that, for &amp;ldquo;Before multiplication (including the first
+multiplication)&amp;rdquo; modulus switching policy, the user input should be encoded at
+$\Delta^2$ or higher, as otherwise the first modulus switching (or rescaling in
+CKKS term) will rescale $\Delta$ to $1$, rendering full precision loss.&lt;/p></description></item><item><title>Docs: Data-oblivious Transformations</title><link>https://heir.dev/docs/design/do_transformation/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/design/do_transformation/</guid><description>
 &lt;p>A data-oblivious program is one that decouples data input from program
 execution. Such programs exhibit control-flow and memory access patterns that
 are independent of their input(s). This programming model, when applied to
@@ -385,9 +546,9 @@ are omitted for brevity.&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%8&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="differences-for-cggi-style-pipeline">Differences for CGGI-style pipeline&lt;/h2>
-&lt;p>The &lt;code>tosa-to-boolean-tfhe&lt;/code> and related pipelines add a few additional steps. The
-main goal here is to apply a hardware circuit optimizer to blocks of standard
-MLIR code (inside &lt;code>secret.generic&lt;/code> ops) which converts the computation to an
+&lt;p>The &lt;code>mlir-to-cggi&lt;/code> and related pipelines add a few additional steps. The main
+goal here is to apply a hardware circuit optimizer to blocks of standard MLIR
+code (inside &lt;code>secret.generic&lt;/code> ops) which converts the computation to an
 optimized boolean circuit with a desired set of gates. Only then is
 &lt;code>-secret-distribute-generic&lt;/code> applied to split the ops up and lower them to the
 &lt;code>cggi&lt;/code> dialect. In particular, because passing an IR through the circuit
@@ -415,9 +576,9 @@ lowering.&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>separator
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%6&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">tensor&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1x16x&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>After running &lt;code>--tosa-to-boolean-tfhe&lt;/code> and dumping the IR after the linalg ops
-are lowered to loops, we can see the &lt;code>secret.separator&lt;/code> ops enclose the lowered
-ops, with the exception of some pure ops that are speculatively executed.&lt;/p>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>After running &lt;code>--mlir-to-cggi&lt;/code> and dumping the IR after the linalg ops are
+lowered to loops, we can see the &lt;code>secret.separator&lt;/code> ops enclose the lowered ops,
+with the exception of some pure ops that are speculatively executed.&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@main&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">memref&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1x1x&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i8&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> strided&lt;span style="color:#000;font-weight:bold">&amp;lt;[&lt;/span>&lt;span style="color:#a40000">?&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#a40000">?&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span> offset&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#a40000">?&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">})&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#204a87;font-weight:bold">memref&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1x16x&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%c&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">-128&lt;/span>&lt;span style="color:#f57900">_i32 =&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">constant&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">-128&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i32&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> &lt;span style="color:#204a87;font-weight:bold">memref&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>get_global &lt;span style="color:#000">@__constant_16xi32&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">memref&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">16x&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
@@ -926,9 +1087,17 @@ MLIR like in that file. The program is below:&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>Next, we use the &lt;code>heir-translate&lt;/code> tool to run code generation for the OpenFHE
 &lt;code>pke&lt;/code> API.&lt;/p>
-&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>bazel run //tools:heir-translate -- --emit-openfhe-pke-header &lt;span style="color:#000">$PWD&lt;/span>/output.mlir &amp;gt; heir_output.h
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>bazel run //tools:heir-translate -- --emit-openfhe-pke &lt;span style="color:#000">$PWD&lt;/span>/output.mlir &amp;gt; heir_output.cpp
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>The results:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>bazel run //tools:heir-translate -- --emit-openfhe-pke-header --openfhe-include-type&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>source-relative &lt;span style="color:#000">$PWD&lt;/span>/output.mlir &amp;gt; heir_output.h
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>bazel run //tools:heir-translate -- --emit-openfhe-pke --openfhe-include-type&lt;span style="color:#ce5c00;font-weight:bold">=&lt;/span>source-relative &lt;span style="color:#000">$PWD&lt;/span>/output.mlir &amp;gt; heir_output.cpp
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>The &lt;code>openfhe-include-type&lt;/code> indicates which include path for OpenFHE is used. It
+has three possible values: &lt;code>install-relative&lt;/code>, &lt;code>source-relative&lt;/code> and &lt;code>embedded&lt;/code>.
+In this example we use &lt;code>source-relative&lt;/code> as we are compiling against an
+(unoptimized) OpenFHE managed by bazel in HEIR source. To compile against an
+installed (and possibly optimized) OpenFHE, you could use &lt;code>install-relative&lt;/code> and
+compile it on your own. Or you could just put the generated file in OpenFHE
+source directory &lt;code>src/pke/examples&lt;/code> and let OpenFHE find and compile it for you
+with the &lt;code>embedded&lt;/code> option.&lt;/p>
+&lt;p>The results:&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-cpp" data-lang="cpp">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic">// heir_output.h
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic">&lt;/span>&lt;span style="color:#8f5902;font-style:italic">#include&lt;/span> &lt;span style="color:#8f5902;font-style:italic">&amp;#34;src/pke/include/openfhe.h&amp;#34; // from @openfhe&lt;/span>&lt;span style="color:#8f5902;font-style:italic">
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic">&lt;/span>
@@ -1847,10 +2016,11 @@ location of the ABC binary and that &lt;code>HEIR_YOSYS_SCRIPTS_DIR&lt;/code> co
 location of the Yosys&amp;rsquo; techlib files that are needed to execute the path.&lt;/p>
 &lt;p>This pass can be disabled by defining &lt;code>HEIR_NO_YOSYS&lt;/code>; this will avoid Yosys
 library and ABC binary compilation, and avoid registration of this pass.&lt;/p>
-&lt;h3 id="--tosa-to-boolean-tfhe">&lt;code>--tosa-to-boolean-tfhe&lt;/code>&lt;/h3>
-&lt;p>This is an experimental pipeline for end-to-end private inference.&lt;/p>
+&lt;h3 id="--mlir-to-cggi">&lt;code>--mlir-to-cggi&lt;/code>&lt;/h3>
+&lt;p>This is an experimental pipeline for lowering standard MLIR (including TOSA) to
+CGGI.&lt;/p>
 &lt;p>Converts a TOSA MLIR model to tfhe_rust dialect defined by HEIR. It converts a
-tosa model to optimized boolean circuit using Yosys ABC optimizations. The
+TOSA model to optimized boolean circuit using Yosys ABC optimizations. The
 resultant optimized boolean circuit in comb dialect is then converted to cggi
 and then to tfhe_rust exit dialect. This pipeline can be used with
 heir-translate &amp;ndash;emit-tfhe-rust to generate code for
@@ -2515,7 +2685,16 @@ return %102 : i8
 &lt;/code>&lt;/pre>&lt;h4 id="options-10">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-min-loop-size : Use this to control the minimum loop size to apply this pass
 -min-body-size : Use this to control the minimum loop body size to apply this pass
-&lt;/code>&lt;/pre>&lt;h3 id="-forward-insert-to-extract">&lt;code>-forward-insert-to-extract&lt;/code>&lt;/h3>
+&lt;/code>&lt;/pre>&lt;h3 id="-fold-convert-layout-into-assign-layout">&lt;code>-fold-convert-layout-into-assign-layout&lt;/code>&lt;/h3>
+&lt;p>&lt;em>Merges tensor_ext.convert_layout ops into preceding tensor_ext.assign_layout ops&lt;/em>&lt;/p>
+&lt;p>A &lt;code>tensor_ext.assign_layout&lt;/code> op corresponds to an encoding of a cleartext
+into a plaintext or ciphertext. If this is immediately followed by a
+&lt;code>tensor_ext.convert_layout&lt;/code> op, then one can just change the initial encoding
+to correspond to the result of the conversion.&lt;/p>
+&lt;p>If the result of an &lt;code>assign_layout&lt;/code> has multiple subsequent &lt;code>convert_layout&lt;/code>
+ops, then they are folded into multiple &lt;code>assign_layout&lt;/code> ops applied to the
+same cleartext.&lt;/p>
+&lt;h3 id="-forward-insert-to-extract">&lt;code>-forward-insert-to-extract&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Forward inserts to extracts within a single block&lt;/em>&lt;/p>
 &lt;p>This pass is similar to forward-store-to-load pass where store ops
 are forwarded load ops; here instead tensor.insert ops are forwarded
@@ -2987,17 +3166,7 @@ arguments, and the debug port is called after each homomorphic operation:&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-17">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-entry-function : Default entry function name of entry function.
-&lt;/code>&lt;/pre>&lt;h3 id="-lwe-set-default-parameters">&lt;code>-lwe-set-default-parameters&lt;/code>&lt;/h3>
-&lt;p>&lt;em>Set default parameters for LWE ops&lt;/em>&lt;/p>
-&lt;p>This pass adds default parameters to all &lt;code>lwe&lt;/code> types as the &lt;code>lwe_params&lt;/code>
-attribute, and for &lt;code>lwe&lt;/code> ops as the &lt;code>params&lt;/code> attribute, overriding any
-existing attributes set with those names.&lt;/p>
-&lt;p>This pass is primarily for testing purposes, and as a parameter provider
-before a proper parameter selection mechanism is added. This pass should not
-be used in production.&lt;/p>
-&lt;p>The specific parameters are hard-coded in
-&lt;code>lib/Dialect/LWE/Transforms/SetDefaultParameters.cpp&lt;/code>.&lt;/p>
-&lt;h3 id="-lwe-to-lattigo">&lt;code>-lwe-to-lattigo&lt;/code>&lt;/h3>
+&lt;/code>&lt;/pre>&lt;h3 id="-lwe-to-lattigo">&lt;code>-lwe-to-lattigo&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Lower &lt;code>lwe&lt;/code> to &lt;code>lattigo&lt;/code> dialect.&lt;/em>&lt;/p>
 &lt;p>This pass lowers the &lt;code>lwe&lt;/code> dialect to &lt;code>Lattigo&lt;/code> dialect.&lt;/p>
 &lt;h3 id="-lwe-to-openfhe">&lt;code>-lwe-to-openfhe&lt;/code>&lt;/h3>
@@ -3048,15 +3217,27 @@ Mac operation and removes the mul operation.&lt;/p>
 &lt;h3 id="-openfhe-configure-crypto-context">&lt;code>-openfhe-configure-crypto-context&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Configure the crypto context in OpenFHE&lt;/em>&lt;/p>
 &lt;p>This pass generates helper functions to generate and configure the OpenFHE crypto context for the given function. Generating the crypto context sets the appropriate encryption parameters, while the configuration generates the necessary evaluation keys (relinearization and rotation keys).&lt;/p>
+&lt;p>For the options, reader can refer to the OpenFHE documentation at
+&lt;a href="https://github.com/openfheorg/openfhe-development/blob/main/src/pke/examples/README.md#description-of-the-cryptocontext-parameters-and-their-restrictions">https://github.com/openfheorg/openfhe-development/blob/main/src/pke/examples/README.md#description-of-the-cryptocontext-parameters-and-their-restrictions&lt;/a>&lt;/p>
 &lt;p>For example, for an MLIR function &lt;code>@my_func&lt;/code>, the generated helpers have the following signatures&lt;/p>
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@my_func__generate_crypto_context&lt;/span>&lt;span style="color:#000;font-weight:bold">()&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@my_func__configure_crypto_context&lt;/span>&lt;span style="color:#000;font-weight:bold">(!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>private_key&lt;span style="color:#000;font-weight:bold">)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>openfhe&lt;span style="color:#000;font-weight:bold">.&lt;/span>crypto_context
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-18">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-entry-function : Default entry function name of entry function.
+-mul-depth : Manually specify the mul depth
+-ring-dim : Manually specify the ring dimension (insecure is implied)
+-batch-size : Manually specify the batch size
+-first-mod-size : Manually specify the first mod size
+-scaling-mod-size : Manually specify the scaling mod size
+-digit-size : Manually specify the digit size for relinearization
+-num-large-digits : Manually specify the number of large digits for HYBRID relinearization
+-max-relin-sk-deg : Manually specify the max number of relin sk deg
+-insecure : Whether to use insecure parameter (defaults to false)
+-key-switching-technique-bv : Whether to use BV key switching technique (defaults to false)
+-scaling-technique-fixed-manual : Whether to use fixed manual scaling technique (defaults to false)
 -level-budget-encode : Level budget for CKKS bootstrap encode (s2c) phase
 -level-budget-decode : Level budget for CKKS bootstrap decode (c2s) phase
--insecure : Whether to use insecure parameter for faster evaluation(should only be used in test) (defaults to false)
 &lt;/code>&lt;/pre>&lt;h3 id="-openfhe-count-add-and-key-switch">&lt;code>-openfhe-count-add-and-key-switch&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Count the number of add and key-switch operations in OpenFHE&lt;/em>&lt;/p>
 &lt;p>This pass counts the number of add and key-switch operations in the given function.&lt;/p>
@@ -3162,7 +3343,78 @@ attribute.&lt;/p>
 &lt;p>&lt;em>Lower &lt;code>polynomial&lt;/code> to standard MLIR dialects.&lt;/em>&lt;/p>
 &lt;p>This pass lowers the &lt;code>polynomial&lt;/code> dialect to standard MLIR plus mod_arith,
 including possibly ops from affine, tensor, linalg, and arith.&lt;/p>
-&lt;h3 id="-remove-unused-memref">&lt;code>-remove-unused-memref&lt;/code>&lt;/h3>
+&lt;h3 id="-populate-scale-bgv">&lt;code>-populate-scale-bgv&lt;/code>&lt;/h3>
+&lt;p>&lt;em>Populate the scale for BGV (GHS variant) ciphertext&lt;/em>&lt;/p>
+&lt;p>In the original BGV scheme, it is required that each modulus in
+the modulus chain is a prime number q such that $q \equiv 1 \pmod{t}$,
+the plaintext modulus. This is to ensure that the after each modulus
+switching, the plaintext message is preserved. However, this limits
+the possible choices of the moduli chain.&lt;/p>
+&lt;p>In the GHS variant of BGV, such requirement is removed by introducing
+scaling factor to the ciphertext, with the cost of scale management.
+This pass is responsible for such management.&lt;/p>
+&lt;p>This pass relies on concrete SchemeParamAttr annotated on the module
+to determine the scale for each ciphertext. Such annotation can be
+generated by the &lt;code>generate-param-bgv&lt;/code> pass.&lt;/p>
+&lt;p>Example:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>module attributes &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">bgv.schemeParam =&lt;/span> &lt;span style="color:#000">#bgv.scheme_param&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">logN =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">13&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">Q =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">67239937&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">8796093202433&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">P =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">8796093349889&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">plaintextModulus =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">65537&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;,&lt;/span> scheme&lt;span style="color:#000;font-weight:bold">.&lt;/span>bgv&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@mul&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>generic ins&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;)&lt;/span> &lt;span style="color:#f57900">attrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">__argattrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">[{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">__resattrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">[{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">42541&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">]}&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f57900">^body&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%input0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">):&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>muli &lt;span style="color:#000">%input0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%input0&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">dimension =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">3&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%2&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>relinearize &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%3&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>modreduce &lt;span style="color:#000">%2&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">42541&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>yield &lt;span style="color:#000">%3&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h3 id="-populate-scale-ckks">&lt;code>-populate-scale-ckks&lt;/code>&lt;/h3>
+&lt;p>&lt;em>Populate the scale for CKKS ciphertext&lt;/em>&lt;/p>
+&lt;p>In CKKS, each ciphertext is associated with a scaling factor $\Delta$,
+and such scaling factor will change after homomorphic operations
+such as multiplication and modulus reducing.&lt;/p>
+&lt;p>However, certain operations such as addition require the input ciphertexts
+to have the same scale. This pass is then responsible for managing the scale
+of the ciphertexts.&lt;/p>
+&lt;p>This pass relies on concrete SchemeParamAttr annotated on the module
+to determine the scale for each ciphertext. Such annotation can be
+generated by the &lt;code>generate-param-ckks&lt;/code> pass.&lt;/p>
+&lt;p>The scaling factor is expressed in logarithm form.&lt;/p>
+&lt;p>Example:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>module attributes &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">ckks.schemeParam =&lt;/span> &lt;span style="color:#000">#ckks.scheme_param&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">logN =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">13&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">Q =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">36028797019389953&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">35184372121601&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">P =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">36028797019488257&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">logDefaultScale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">45&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;,&lt;/span> scheme&lt;span style="color:#000;font-weight:bold">.&lt;/span>ckks&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@mul&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;)&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>generic ins&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;)&lt;/span> &lt;span style="color:#f57900">attrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">__argattrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">[{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">45&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">],&lt;/span> &lt;span style="color:#f57900">__resattrs =&lt;/span> &lt;span style="color:#000;font-weight:bold">[{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">45&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">]}&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f57900">^body&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%input0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">):&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>mulf &lt;span style="color:#000">%input0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%input0&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">dimension =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">3&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">90&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%2&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>relinearize &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">90&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%3&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>modreduce &lt;span style="color:#000">%2&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">mgmt.mgmt =&lt;/span> &lt;span style="color:#000">#mgmt.mgmt&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#f57900">level =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#f57900">scale =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">45&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>yield &lt;span style="color:#000">%3&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">f32&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-20">Options&lt;/h4>
+&lt;pre tabindex="0">&lt;code>-before-mul-include-first-mul : Modulus switching before each multiplication, including the first multiplication (default to false)
+&lt;/code>&lt;/pre>&lt;h3 id="-propagate-annotation">&lt;code>-propagate-annotation&lt;/code>&lt;/h3>
+&lt;p>&lt;em>Propagate annotation from operation to subsequent operations&lt;/em>&lt;/p>
+&lt;p>This pass propagates the attribute from one operation to subsequent operations
+if these operations does not have the attribute already.&lt;/p>
+&lt;p>Example: with &lt;code>--propagate-annotation=attr-name=test.attr&lt;/code>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@foo&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">test.attr =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">})&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>muli &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%arg0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>relinearize &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>the above IR becomes&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span>&lt;span style="color:#000;font-weight:bold">.&lt;/span>&lt;span style="color:#204a87;font-weight:bold">func&lt;/span> &lt;span style="color:#000">@foo&lt;/span>&lt;span style="color:#000;font-weight:bold">(&lt;/span>&lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">test.attr =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">})&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>muli &lt;span style="color:#000">%arg0&lt;/span>&lt;span style="color:#000;font-weight:bold">,&lt;/span> &lt;span style="color:#000">%arg0&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">test.attr =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> mgmt&lt;span style="color:#000;font-weight:bold">.&lt;/span>relinearize &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">test.attr =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">test.attr =&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i64&lt;/span>&lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-21">Options&lt;/h4>
+&lt;pre tabindex="0">&lt;code>-attr-name : The attribute name to propagate with.
+&lt;/code>&lt;/pre>&lt;h3 id="-remove-unused-memref">&lt;code>-remove-unused-memref&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Cleanup any unused memrefs&lt;/em>&lt;/p>
 &lt;p>Scan the IR for unused memrefs and remove them.&lt;/p>
 &lt;p>This pass looks for locally allocated memrefs that are never used and
@@ -3238,7 +3490,7 @@ program that operates on a secret type annotates the input to a region as
 list of op names (e.g., &lt;code>distribute-thorugh=&amp;quot;affine.for,scf.if&amp;quot;&lt;/code>), which
 limits the distribution to only pass through those ops. If unset, all ops
 are distributed through when possible.&lt;/p>
-&lt;h4 id="options-20">Options&lt;/h4>
+&lt;h4 id="options-22">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-distribute-through : comma-separated list of ops that should be distributed through
 &lt;/code>&lt;/pre>&lt;h3 id="-secret-extract-generic-body">&lt;code>-secret-extract-generic-body&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Extract the bodies of all generic ops into functions&lt;/em>&lt;/p>
@@ -3280,7 +3532,7 @@ back to the IR by using &lt;code>--secret-import-execution-result=file-name=trac
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000">%1&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> arith&lt;span style="color:#000;font-weight:bold">.&lt;/span>muli &lt;span style="color:#000;font-weight:bold">...&lt;/span> &lt;span style="color:#000;font-weight:bold">{&lt;/span>&lt;span style="color:#f57900">secret.execution_result =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">2.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">3.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">4.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">5.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">6.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">7.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">8.0&lt;/span> &lt;span style="color:#0000cf;font-weight:bold">9.0&lt;/span>&lt;span style="color:#000;font-weight:bold">]}&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-21">Options&lt;/h4>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-23">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-file-name : file name of the execution result
 &lt;/code>&lt;/pre>&lt;h3 id="-secret-insert-mgmt-bfv">&lt;code>-secret-insert-mgmt-bfv&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Place BFV ciphertext management operations&lt;/em>&lt;/p>
@@ -3355,8 +3607,9 @@ RNS Type.&lt;/p>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#000;font-weight:bold">}&lt;/span> &lt;span style="color:#000;font-weight:bold">-&amp;gt;&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#204a87;font-weight:bold">return&lt;/span> &lt;span style="color:#000">%0&lt;/span> &lt;span style="color:#000;font-weight:bold">:&lt;/span> &lt;span style="color:#000;font-weight:bold">!&lt;/span>secret&lt;span style="color:#000;font-weight:bold">.&lt;/span>secret&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>&lt;span style="color:#204a87;font-weight:bold">i16&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">}&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-22">Options&lt;/h4>
-&lt;pre tabindex="0">&lt;code>-include-first-mul : Modulus switching right before the first multiplication (default to false)
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-24">Options&lt;/h4>
+&lt;pre tabindex="0">&lt;code>-after-mul : Modulus switching after each multiplication (default to false)
+-before-mul-include-first-mul : Modulus switching before each multiplication, including the first multiplication (default to false)
 &lt;/code>&lt;/pre>&lt;h3 id="-secret-insert-mgmt-ckks">&lt;code>-secret-insert-mgmt-ckks&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Place CKKS ciphertext management operations&lt;/em>&lt;/p>
 &lt;p>Check the description of secret-insert-mgmt-bgv. This pass
@@ -3370,8 +3623,9 @@ where when all levels are consumed then a bootstrap is inserted.&lt;/p>
 handled by further lowering.
 TODO(#1207): handle it here so parameter selection can depend on it.
 TODO(#1207): with this info we can encrypt at max level (with bootstrap consumed level).&lt;/p>
-&lt;h4 id="options-23">Options&lt;/h4>
-&lt;pre tabindex="0">&lt;code>-include-first-mul : Modulus switching right before the first multiplication (default to false)
+&lt;h4 id="options-25">Options&lt;/h4>
+&lt;pre tabindex="0">&lt;code>-after-mul : Modulus switching after each multiplication (default to false)
+-before-mul-include-first-mul : Modulus switching before each multiplication, including the first multiplication (default to false)
 -slot-number : Default number of slots use for ciphertext space.
 -bootstrap-waterline : Waterline for insert bootstrap op
 &lt;/code>&lt;/pre>&lt;h3 id="-secret-merge-adjacent-generics">&lt;code>-secret-merge-adjacent-generics&lt;/code>&lt;/h3>
@@ -3390,7 +3644,7 @@ non-secret values used are removed from the &lt;code>secret.generic&lt;/code>&am
 arguments.&lt;/p>
 &lt;p>The pass requires that all types are tensors of a uniform shape matching the
 dimension of the ciphertext space specified my &lt;code>poly-mod-degree&lt;/code>.&lt;/p>
-&lt;h4 id="options-24">Options&lt;/h4>
+&lt;h4 id="options-26">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-poly-mod-degree : Default degree of the cyclotomic polynomial modulus to use for ciphertext space.
 &lt;/code>&lt;/pre>&lt;h3 id="-secret-to-cggi">&lt;code>-secret-to-cggi&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Lower &lt;code>secret&lt;/code> to &lt;code>cggi&lt;/code> dialect.&lt;/em>&lt;/p>
@@ -3406,14 +3660,14 @@ non-secret values used are removed from the &lt;code>secret.generic&lt;/code>&am
 arguments.&lt;/p>
 &lt;p>The pass requires that all types are tensors of a uniform shape matching the
 dimension of the ciphertext space specified my &lt;code>poly-mod-degree&lt;/code>.&lt;/p>
-&lt;h4 id="options-25">Options&lt;/h4>
+&lt;h4 id="options-27">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-poly-mod-degree : Default degree of the cyclotomic polynomial modulus to use for ciphertext space.
 &lt;/code>&lt;/pre>&lt;h3 id="-secretize">&lt;code>-secretize&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Adds secret argument attributes to entry function&lt;/em>&lt;/p>
 &lt;p>Helper pass that adds a secret.secret attribute argument to each function argument.
 By default, the pass applies to all functions in the module.
 This may be overridden with the option -function=func_name to apply to a single function only.&lt;/p>
-&lt;h4 id="options-26">Options&lt;/h4>
+&lt;h4 id="options-28">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-function : function to add secret annotations to
 &lt;/code>&lt;/pre>&lt;h3 id="-select-rewrite">&lt;code>-select-rewrite&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Rewrites arith.select to a CMUX style expression&lt;/em>&lt;/p>
@@ -3424,7 +3678,7 @@ In the latter case, it will broadcast/splat the scalar condition value to the re
 &lt;p>&lt;em>A vectorizer for straight line programs.&lt;/em>&lt;/p>
 &lt;p>This pass ignores control flow and only vectorizes straight-line programs
 within a given region.&lt;/p>
-&lt;h4 id="options-27">Options&lt;/h4>
+&lt;h4 id="options-29">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-dialect : Use this to restrict the dialect whose ops should be vectorized.
 &lt;/code>&lt;/pre>&lt;h3 id="-tensor-ext-to-tensor">&lt;code>-tensor-ext-to-tensor&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Lower &lt;code>tensor_ext&lt;/code> to &lt;code>tensor&lt;/code> dialect.&lt;/em>&lt;/p>
@@ -3433,6 +3687,10 @@ within a given region.&lt;/p>
 secret arithmetic IR containing &lt;code>tensor_ext&lt;/code> dialect is lowered
 to the IR containing &lt;code>tensor&lt;/code> dialect, which could be further
 lowered to the LLVM dialect.&lt;/p>
+&lt;h3 id="-tensor-linalg-to-affine-loops">&lt;code>-tensor-linalg-to-affine-loops&lt;/code>&lt;/h3>
+&lt;p>&lt;em>A port of convert-linalg-to-affine-loops for loops with tensor semantics&lt;/em>&lt;/p>
+&lt;p>This pass primarily exists to support the conversion of &lt;code>linalg.generic&lt;/code>
+operations that implement &lt;code>tensor_ext.assign_layout&lt;/code> ops.&lt;/p>
 &lt;h3 id="-tosa-to-secret-arith">&lt;code>-tosa-to-secret-arith&lt;/code>&lt;/h3>
 &lt;p>&lt;em>Lower &lt;code>tosa.sigmoid&lt;/code> to secret arith dialects.&lt;/em>&lt;/p>
 &lt;p>This pass lowers the &lt;code>tosa.sigmoid&lt;/code> dialect to the polynomial approximation
@@ -3473,7 +3731,7 @@ this is done by the &lt;code>generate-param-&amp;lt;scheme&amp;gt;&lt;/code> pas
 &lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#8f5902;font-style:italic"># with commandline --debug-only=ValidateNoise&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Noise Bound: 29.27 Budget: 149.73 Total: 179.00 &lt;span style="color:#204a87;font-weight:bold">for&lt;/span> value: &amp;lt;block argument&amp;gt; of &lt;span style="color:#204a87">type&lt;/span> &lt;span style="color:#4e9a06">&amp;#39;tensor&amp;lt;8xi16&amp;gt;&amp;#39;&lt;/span> at index: &lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Noise Bound: 29.27 Budget: 149.73 Total: 179.00 &lt;span style="color:#204a87;font-weight:bold">for&lt;/span> value: &amp;lt;block argument&amp;gt; of &lt;span style="color:#204a87">type&lt;/span> &lt;span style="color:#4e9a06">&amp;#39;tensor&amp;lt;8xi16&amp;gt;&amp;#39;&lt;/span> at index: &lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-28">Options&lt;/h4>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h4 id="options-30">Options&lt;/h4>
 &lt;pre tabindex="0">&lt;code>-model : Noise model to validate against.
 -annotate-noise-bound : Annotate the noise bound to the IR.
 &lt;/code>&lt;/pre>&lt;h3 id="-wrap-generic">&lt;code>-wrap-generic&lt;/code>&lt;/h3>
@@ -3521,23 +3779,32 @@ arguments in the function body.&lt;/li>
 &lt;/ul>
 &lt;h4 id="statistics">Statistics&lt;/h4>
 &lt;pre tabindex="0">&lt;code>total circuit size : The total circuit size for all optimized circuits, after optimization is done.
-&lt;/code>&lt;/pre></description></item><item><title>Blog: HEIR meeting 2024-11-26</title><link>https://heir.dev/blog/2024/11/26/heir-meeting-2024-11-26/</link><pubDate>Tue, 26 Nov 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/11/26/heir-meeting-2024-11-26/</guid><description>
+&lt;/code>&lt;/pre></description></item><item><title>Blog: HEIR meeting 2025-03-20</title><link>https://heir.dev/blog/2025/03/20/heir-meeting-2025-03-20/</link><pubDate>Thu, 20 Mar 2025 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2025/03/20/heir-meeting-2025-03-20/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/10WTpdVaLz4mgmTwlJ3lVMGD4qmiNEl2Uvt3R3h0XFmc/edit?hl=en&amp;amp;forcehl=1&amp;amp;tab=t.0#heading=h.w3lar3vbuip1">notes&lt;/a>,
-&lt;a href="https://drive.google.com/file/d/13yvX_ap09tTqwJsdABDf3WDl79GF3bJx/view?usp=sharing">video recording&lt;/a>,
-and
-&lt;a href="https://docs.google.com/document/d/1s5iXtOSpIDJX3JOEB5gQqUPm5lo1gLpRUM10pBfAdoo/edit?usp=sharing">a transcription of the recording&lt;/a>
-from the HEIR meeting on 2024-11-26.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-06-13</title><link>https://heir.dev/blog/2024/06/13/heir-meeting-2024-06-13/</link><pubDate>Thu, 13 Jun 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/06/13/heir-meeting-2024-06-13/</guid><description>
+&lt;a href="https://docs.google.com/document/d/1TMXQBVumA4YmOTH5QgKR27_Sb-60PI7bKyltJ-D3jbE/edit?usp=sharing">notes&lt;/a>
+and &lt;a href="https://youtu.be/ULRFEmhwzZE">video recording&lt;/a> from the HEIR meeting on
+2025-03-20.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-07-25</title><link>https://heir.dev/blog/2024/07/25/heir-meeting-2024-07-25/</link><pubDate>Thu, 25 Jul 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/07/25/heir-meeting-2024-07-25/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1rkPxOdbJY5J6qhsciZ0rfdj5_9PG_Ng-6USBUvLrEeU/edit?usp=sharing">notes&lt;/a>
+&lt;a href="https://docs.google.com/document/d/1tIrxc4V5OlAeqx_Z1rl_kuMmkd-HUAKEv90q3i-5QSU/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/19oQOYlvfeHoSwWqOC4hXZTBuaPIf1zQl/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2024-06-13.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-05-02</title><link>https://heir.dev/blog/2024/05/02/heir-meeting-2024-05-02/</link><pubDate>Thu, 02 May 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/05/02/heir-meeting-2024-05-02/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1_1CbRJeNr5NqcwEMXnfkxOqy9u5wJPyq/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-07-25.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-07-18 (mod_arith dialect)</title><link>https://heir.dev/blog/2024/07/18/heir-meeting-2024-07-18-mod_arith-dialect/</link><pubDate>Thu, 18 Jul 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/07/18/heir-meeting-2024-07-18-mod_arith-dialect/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1uEDeIN0iTUmmtlacZg0c2j7VbAHO3A9e0_8mnunUv10/edit?usp=sharing">notes&lt;/a>
+&lt;a href="https://docs.google.com/document/d/1o2-I03DJtNJQDupSHn8LtOXLmxsd3WO1fjvqLbT-SIc/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/1u1q74rUKdXFi08tAKFRKjI-bojuorQK8/view?usp=drivesdk">video recording&lt;/a>
-from the HEIR meeting on 2024-05-02.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-12-12</title><link>https://heir.dev/blog/2023/12/12/heir-meeting-2023-12-12/</link><pubDate>Tue, 12 Dec 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/12/12/heir-meeting-2023-12-12/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1bCMuuKnBVf6HP7R2SiZgo1C1vsG6FzF2/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-07-18. This special discussion was focused on the
+modular arithmetic dialect.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-04-04</title><link>https://heir.dev/blog/2024/04/04/heir-meeting-2024-04-04/</link><pubDate>Thu, 04 Apr 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/04/04/heir-meeting-2024-04-04/</guid><description>
+&lt;p>Here are the
+&lt;a href="https://docs.google.com/document/d/121_0mzqYIWYMc7rcW2Et5qS-ux4ut3b-kno1dI9sQq8/edit?usp=sharing">notes&lt;/a>
+and
+&lt;a href="https://drive.google.com/file/d/1_Ksjx8s8nD4cLsuZp5_KitYI2mPN72Je/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-04-04.&lt;/p></description></item><item><title>Blog: HEIR meeting 2024-01-25</title><link>https://heir.dev/blog/2024/01/25/heir-meeting-2024-01-25/</link><pubDate>Thu, 25 Jan 2024 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2024/01/25/heir-meeting-2024-01-25/</guid><description>
+&lt;p>Here are the
+&lt;a href="https://docs.google.com/document/d/1yrkAVR_348vT3SD7apb9QDoFIgz0bjHn-SzT2GOacfs/edit?usp=sharing">notes&lt;/a>
+and
+&lt;a href="https://drive.google.com/file/d/11JTfRy_3LvHjJQe0nJuqe8WGa8F9oHu1/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2024-01-25.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-12-12</title><link>https://heir.dev/blog/2023/12/12/heir-meeting-2023-12-12/</link><pubDate>Tue, 12 Dec 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/12/12/heir-meeting-2023-12-12/</guid><description>
 &lt;p>Here are the
 &lt;a href="https://docs.google.com/document/d/1ekGrOBLoB_F3qjC43r6NzJbWpgT9RILTJyVu5Ax3PCQ/edit?usp=sharing">notes&lt;/a>
 and
@@ -3545,20 +3812,17 @@ and
 from the HEIR meeting on 2023-12-12.&lt;/p>
 &lt;p>This is the last meeting for 2023. Please respond to
 &lt;a href="https://app.rallly.co/invite/fHNdzrbisHVA">this poll&lt;/a> for 2024 scheduling
-preferences.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-10-24</title><link>https://heir.dev/blog/2023/10/25/heir-meeting-2023-10-24/</link><pubDate>Wed, 25 Oct 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/10/25/heir-meeting-2023-10-24/</guid><description>
+preferences.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-11-28</title><link>https://heir.dev/blog/2023/11/28/heir-meeting-2023-11-28/</link><pubDate>Tue, 28 Nov 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/11/28/heir-meeting-2023-11-28/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1MYjjkytck0fxySbrh49hxBJgNM78NXSD0ZwzAgEPOUw/edit?usp=sharing">notes&lt;/a>
+&lt;a href="https://docs.google.com/document/d/1-kkkG__qlAtsp50YXxHC7Dq__Qvgb4BcLZCopzJOzE4/edit?usp=sharing">notes&lt;/a>
 and
-&lt;a href="https://drive.google.com/file/d/1zrSCQJXta40KbBiCjcIWOP3gd1tuc3MU/view?usp=sharing">video recording&lt;/a>
-from the HEIR meeting on 2023-10-24.&lt;/p>
-&lt;p>Also of note: our talk at FHE.org was last Thursday
-(&lt;a href="https://www.youtube.com/watch?v=kqDFdKUTNA4">recording&lt;/a>), and the similar talk
-at the LLVM developers meeting talk was the previous Wednesday, though the video
-has not yet been posted for that.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-08-29</title><link>https://heir.dev/blog/2023/09/05/heir-meeting-2023-08-29/</link><pubDate>Tue, 05 Sep 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/09/05/heir-meeting-2023-08-29/</guid><description>
+&lt;a href="https://drive.google.com/file/d/1ykxaqlfVExqGC6saiSnfM2A7_TpWqKiE/view">video recording&lt;/a>
+from the HEIR meeting on 2023-11-28.&lt;/p></description></item><item><title>Blog: HEIR meeting 2023-09-12</title><link>https://heir.dev/blog/2023/09/13/heir-meeting-2023-09-12/</link><pubDate>Wed, 13 Sep 2023 00:00:00 +0000</pubDate><guid>https://heir.dev/blog/2023/09/13/heir-meeting-2023-09-12/</guid><description>
 &lt;p>Here are the
-&lt;a href="https://docs.google.com/document/d/1Lax8Inby5Mg8BZLkcV_5hUiWH-roL22rtszfc0PBGmE/edit?usp=sharing">notes&lt;/a>
-from the HEIR meeting on 2023-08-29. There was an issue with the recording, so
-there is no video recording this week.&lt;/p></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
+&lt;a href="https://docs.google.com/document/d/1gOH1V6ORQwJDDo6I4jrDgCqqNFTsfcQbfpdUR6tv_60/edit?usp=sharing">notes&lt;/a>
+and
+&lt;a href="https://drive.google.com/file/d/1zFtpBcCCq5d6UD8Nm8r3rfg3sgy-guz7/view?usp=sharing">video recording&lt;/a>
+from the HEIR meeting on 2023-09-12.&lt;/p></description></item><item><title>Docs: BGV</title><link>https://heir.dev/docs/dialects/bgv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/bgv/</guid><description>
 &lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
 &lt;h1 id="bgv-dialect">&amp;lsquo;bgv&amp;rsquo; Dialect&lt;/h1>
 &lt;p>The BGV dialect defines the types and operations of the BGV and B/FV cryptosystem.&lt;/p>
@@ -3676,7 +3940,7 @@ BGVEncryptionTechnique # encryptionTechnique
 &lt;p>&lt;em>Addition operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `bgv.add_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Commutative&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-1">Operands:&lt;/h4>
@@ -3689,12 +3953,12 @@ BGVEncryptionTechnique # encryptionTechnique
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -3891,7 +4155,7 @@ that tensor type.&lt;/p>
 &lt;p>&lt;em>Multiplication operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `bgv.mul_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Commutative&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-6">Operands:&lt;/h4>
@@ -3904,12 +4168,12 @@ that tensor type.&lt;/p>
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -4155,7 +4419,7 @@ this case, the plaintext slots can be viewed as a &lt;code>2 x N/2&lt;/code> mat
 &lt;p>&lt;em>Subtraction operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `bgv.sub_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-12">Operands:&lt;/h4>
@@ -4168,12 +4432,12 @@ this case, the plaintext slots can be viewed as a &lt;code>2 x N/2&lt;/code> mat
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -5719,7 +5983,7 @@ CKKSEncryptionType # encryptionType
 &lt;p>&lt;em>Addition operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `ckks.add_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Commutative&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-1">Operands:&lt;/h4>
@@ -5732,12 +5996,12 @@ CKKSEncryptionType # encryptionType
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -5931,7 +6195,7 @@ that tensor type.&lt;/p>
 &lt;p>&lt;em>Multiplication operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `ckks.mul_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Commutative&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-6">Operands:&lt;/h4>
@@ -5944,12 +6208,12 @@ that tensor type.&lt;/p>
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -6183,7 +6447,7 @@ listing the powers of &lt;code>s&lt;/code> at each position of the array. For ex
 &lt;p>&lt;em>Subtraction operation between ciphertext-plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `ckks.sub_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>, &lt;code>IsCiphertextPlaintextOp&lt;/code>, &lt;code>SameOperandsAndResultPlaintextTypes&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-12">Operands:&lt;/h4>
@@ -6196,12 +6460,12 @@ listing the powers of &lt;code>s&lt;/code> at each position of the array. For ex
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertextInput&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintextInput&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -8003,6 +8267,179 @@ significant bit to least-significant bit.&lt;/p>
 &lt;tr>
 &lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
 &lt;td>ciphertext-like&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table></description></item><item><title>Docs: JaxiteWord</title><link>https://heir.dev/docs/dialects/jaxiteword/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/jaxiteword/</guid><description>
+&lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
+&lt;h1 id="jaxiteword-dialect">&amp;lsquo;jaxiteword&amp;rsquo; Dialect&lt;/h1>
+&lt;p>The &lt;code>jaxiteword&lt;/code> dialect is an exit dialect for generating py code against the jaxiteword library API,
+using the jaxiteword parameters and encoding scheme.&lt;/p>
+&lt;p>See &lt;a href="https://github.com/google/jaxite/jaxite_word">https://github.com/google/jaxite/jaxite_word&lt;/a>&lt;/p>
+&lt;h2 id="jaxiteword-types">JaxiteWord types&lt;/h2>
+&lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
+&lt;h3 id="ccparamstype">CCParamsType&lt;/h3>
+&lt;p>&lt;em>The CCParams required to create CryptoContext.&lt;/em>&lt;/p>
+&lt;p>Syntax: &lt;code>!jaxiteword.cc_params&lt;/code>&lt;/p>
+&lt;h3 id="ciphertexttype">CiphertextType&lt;/h3>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>!jaxiteword.ciphertext&amp;lt;
+int, # polys
+int, # towers
+int # degrees
+&amp;gt;
+&lt;/code>&lt;/pre>&lt;p>A ciphertext - a three dimensional array.&lt;/p>
+&lt;h4 id="parameters">Parameters:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Parameter&lt;/th>
+&lt;th style="text-align:center">C++ type&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">polys&lt;/td>
+&lt;td style="text-align:center">&lt;code>int&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">towers&lt;/td>
+&lt;td style="text-align:center">&lt;code>int&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">degrees&lt;/td>
+&lt;td style="text-align:center">&lt;code>int&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="cryptocontexttype">CryptoContextType&lt;/h3>
+&lt;p>&lt;em>The CryptoContext required to perform homomorphic operations in JaxiteWord.&lt;/em>&lt;/p>
+&lt;p>Syntax: &lt;code>!jaxiteword.crypto_context&lt;/code>&lt;/p>
+&lt;h3 id="evalkeytype">EvalKeyType&lt;/h3>
+&lt;p>&lt;em>The evaluation key required to keyswitch/relinearize/rotate/automorphism operation in JaxiteWord.&lt;/em>&lt;/p>
+&lt;p>Syntax: &lt;code>!jaxiteword.eval_key&lt;/code>&lt;/p>
+&lt;h3 id="moduluslisttype">ModulusListType&lt;/h3>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>!jaxiteword.modulus_list&amp;lt;
+::llvm::ArrayRef&amp;lt;::mlir::IntegerAttr&amp;gt; # modulus_list
+&amp;gt;
+&lt;/code>&lt;/pre>&lt;p>A list of modulus values.&lt;/p>
+&lt;h4 id="parameters-1">Parameters:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Parameter&lt;/th>
+&lt;th style="text-align:center">C++ type&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">modulus_list&lt;/td>
+&lt;td style="text-align:center">&lt;code>::llvm::ArrayRef&amp;lt;::mlir::IntegerAttr&amp;gt;&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="privatekeytype">PrivateKeyType&lt;/h3>
+&lt;p>&lt;em>The private key required to decrypt a ciphertext in JaxiteWord.&lt;/em>&lt;/p>
+&lt;p>Syntax: &lt;code>!jaxiteword.private_key&lt;/code>&lt;/p>
+&lt;h3 id="publickeytype">PublicKeyType&lt;/h3>
+&lt;p>&lt;em>The public key required to encrypt plaintext in JaxiteWord.&lt;/em>&lt;/p>
+&lt;p>Syntax: &lt;code>!jaxiteword.public_key&lt;/code>&lt;/p>
+&lt;h2 id="jaxiteword-ops">JaxiteWord ops&lt;/h2>
+&lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
+&lt;h3 id="jaxitewordadd-heirjaxitewordaddop">&lt;code>jaxiteword.add&lt;/code> (heir::jaxiteword::AddOp)&lt;/h3>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `jaxiteword.add` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;p>The operation computed by this function is homomorphic addition.&lt;/p>
+&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Commutative&lt;/code>&lt;/p>
+&lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
+&lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="operands">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>value_a&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>value_b&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>modulus_list&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>result&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="jaxitewordmake_ciphertext-heirjaxitewordmakeciphertextop">&lt;code>jaxiteword.make_ciphertext&lt;/code> (heir::jaxiteword::MakeCiphertextOp)&lt;/h3>
+&lt;p>&lt;em>Create a JaxiteWord ciphertext.&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `jaxiteword.make_ciphertext` $polys `,` $towers `,` $degrees attr-dict `:` type($ciphertext)
+&lt;/code>&lt;/pre>&lt;p>Creates a JaxiteWord ciphertext with the given dimensions.&lt;/p>
+&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>&lt;/p>
+&lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
+&lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="operands-1">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>polys&lt;/code>&lt;/td>
+&lt;td>32-bit signless integer&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>towers&lt;/code>&lt;/td>
+&lt;td>32-bit signless integer&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>degrees&lt;/code>&lt;/td>
+&lt;td>32-bit signless integer&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-1">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>ciphertext&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table></description></item><item><title>Docs: Lattigo</title><link>https://heir.dev/docs/dialects/lattigo/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://heir.dev/docs/dialects/lattigo/</guid><description>
@@ -9933,12 +10370,106 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
+&lt;h3 id="lattigorlwedrop_level_new-heirlattigorlwedroplevelnewop">&lt;code>lattigo.rlwe.drop_level_new&lt;/code> (heir::lattigo::RLWEDropLevelNewOp)&lt;/h3>
+&lt;p>&lt;em>Drop level of a ciphertext&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.drop_level_new` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;h4 id="attributes-9">Attributes:&lt;/h4>
+&lt;table>
+&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>levelToDrop&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;h4 id="operands-37">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>evaluator&lt;/code>&lt;/td>
+&lt;td>or&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-39">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="lattigorlwedrop_level-heirlattigorlwedroplevelop">&lt;code>lattigo.rlwe.drop_level&lt;/code> (heir::lattigo::RLWEDropLevelOp)&lt;/h3>
+&lt;p>&lt;em>Drop level of a ciphertext&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.drop_level` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;p>This operation drops the level of a ciphertext&lt;/p>
+&lt;p>The result will be written to the &lt;code>inplace&lt;/code> operand. The &lt;code>output&lt;/code>result is
+a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the MLIR SSA form.&lt;/p>
+&lt;p>Interfaces: &lt;code>InplaceOpInterface&lt;/code>&lt;/p>
+&lt;h4 id="attributes-10">Attributes:&lt;/h4>
+&lt;table>
+&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>levelToDrop&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;h4 id="operands-38">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>evaluator&lt;/code>&lt;/td>
+&lt;td>or&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>inplace&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-40">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
 &lt;h3 id="lattigorlweencrypt-heirlattigorlweencryptop">&lt;code>lattigo.rlwe.encrypt&lt;/code> (heir::lattigo::RLWEEncryptOp)&lt;/h3>
 &lt;p>&lt;em>Encrypts a plaintext using RLWE&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.encrypt` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation encrypts a plaintext using RLWE&lt;/p>
-&lt;h4 id="operands-37">Operands:&lt;/h4>
+&lt;h4 id="operands-39">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -9957,7 +10488,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-39">Results:&lt;/h4>
+&lt;h4 id="results-41">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -9978,89 +10509,11 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.gen_galois_key` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE Galois key&lt;/p>
 &lt;p>galoisElement: Enabling the automorphism X -&amp;gt; X^{galoisElement}.&lt;/p>
-&lt;h4 id="attributes-9">Attributes:&lt;/h4>
+&lt;h4 id="attributes-11">Attributes:&lt;/h4>
 &lt;table>
 &lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>galoisElement&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>An Attribute containing a integer value&lt;/td>&lt;/tr>
 &lt;/table>
-&lt;h4 id="operands-38">Operands:&lt;/h4>
-&lt;table>
-&lt;thead>
-&lt;tr>
-&lt;th style="text-align:center">Operand&lt;/th>
-&lt;th>Description&lt;/th>
-&lt;/tr>
-&lt;/thead>
-&lt;tbody>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>keyGenerator&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>secretKey&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;/tbody>
-&lt;/table>
-&lt;h4 id="results-40">Results:&lt;/h4>
-&lt;table>
-&lt;thead>
-&lt;tr>
-&lt;th style="text-align:center">Result&lt;/th>
-&lt;th>Description&lt;/th>
-&lt;/tr>
-&lt;/thead>
-&lt;tbody>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>galoisKey&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;/tbody>
-&lt;/table>
-&lt;h3 id="lattigorlwegen_key_pair-heirlattigorlwegenkeypairop">&lt;code>lattigo.rlwe.gen_key_pair&lt;/code> (heir::lattigo::RLWEGenKeyPairOp)&lt;/h3>
-&lt;p>&lt;em>Generates a new RLWE key pair&lt;/em>&lt;/p>
-&lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.gen_key_pair` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE key pair&lt;/p>
-&lt;h4 id="operands-39">Operands:&lt;/h4>
-&lt;table>
-&lt;thead>
-&lt;tr>
-&lt;th style="text-align:center">Operand&lt;/th>
-&lt;th>Description&lt;/th>
-&lt;/tr>
-&lt;/thead>
-&lt;tbody>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>keyGenerator&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;/tbody>
-&lt;/table>
-&lt;h4 id="results-41">Results:&lt;/h4>
-&lt;table>
-&lt;thead>
-&lt;tr>
-&lt;th style="text-align:center">Result&lt;/th>
-&lt;th>Description&lt;/th>
-&lt;/tr>
-&lt;/thead>
-&lt;tbody>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>secretKey&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;tr>
-&lt;td style="text-align:center">&lt;code>publicKey&lt;/code>&lt;/td>
-&lt;td>&lt;/td>
-&lt;/tr>
-&lt;/tbody>
-&lt;/table>
-&lt;h3 id="lattigorlwegen_relinearization_key-heirlattigorlwegenrelinearizationkeyop">&lt;code>lattigo.rlwe.gen_relinearization_key&lt;/code> (heir::lattigo::RLWEGenRelinearizationKeyOp)&lt;/h3>
-&lt;p>&lt;em>Generates a new RLWE relinearization key&lt;/em>&lt;/p>
-&lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.gen_relinearization_key` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE relinearization key&lt;/p>
 &lt;h4 id="operands-40">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
@@ -10090,20 +10543,16 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>relinearizationKey&lt;/code>&lt;/td>
+&lt;td style="text-align:center">&lt;code>galoisKey&lt;/code>&lt;/td>
 &lt;td>&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h3 id="lattigorlwelevel_reduce_new-heirlattigorlwelevelreducenewop">&lt;code>lattigo.rlwe.level_reduce_new&lt;/code> (heir::lattigo::RLWELevelReduceNewOp)&lt;/h3>
-&lt;p>&lt;em>Drop level of a ciphertext&lt;/em>&lt;/p>
+&lt;h3 id="lattigorlwegen_key_pair-heirlattigorlwegenkeypairop">&lt;code>lattigo.rlwe.gen_key_pair&lt;/code> (heir::lattigo::RLWEGenKeyPairOp)&lt;/h3>
+&lt;p>&lt;em>Generates a new RLWE key pair&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.level_reduce_new` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;h4 id="attributes-10">Attributes:&lt;/h4>
-&lt;table>
-&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
-&lt;tr>&lt;td>&lt;code>levelToDrop&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
-&lt;/table>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.gen_key_pair` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE key pair&lt;/p>
 &lt;h4 id="operands-41">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
@@ -10114,7 +10563,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td style="text-align:center">&lt;code>keyGenerator&lt;/code>&lt;/td>
 &lt;td>&lt;/td>
 &lt;/tr>
 &lt;/tbody>
@@ -10129,24 +10578,20 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td style="text-align:center">&lt;code>secretKey&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>publicKey&lt;/code>&lt;/td>
 &lt;td>&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h3 id="lattigorlwelevel_reduce-heirlattigorlwelevelreduceop">&lt;code>lattigo.rlwe.level_reduce&lt;/code> (heir::lattigo::RLWELevelReduceOp)&lt;/h3>
-&lt;p>&lt;em>Drop level of a ciphertext&lt;/em>&lt;/p>
+&lt;h3 id="lattigorlwegen_relinearization_key-heirlattigorlwegenrelinearizationkeyop">&lt;code>lattigo.rlwe.gen_relinearization_key&lt;/code> (heir::lattigo::RLWEGenRelinearizationKeyOp)&lt;/h3>
+&lt;p>&lt;em>Generates a new RLWE relinearization key&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.level_reduce` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>This operation drops the level of a ciphertext&lt;/p>
-&lt;p>The result will be written to the &lt;code>inplace&lt;/code> operand. The &lt;code>output&lt;/code>result is
-a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the MLIR SSA form.&lt;/p>
-&lt;p>Interfaces: &lt;code>InplaceOpInterface&lt;/code>&lt;/p>
-&lt;h4 id="attributes-11">Attributes:&lt;/h4>
-&lt;table>
-&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
-&lt;tr>&lt;td>&lt;code>levelToDrop&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
-&lt;/table>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.gen_relinearization_key` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE relinearization key&lt;/p>
 &lt;h4 id="operands-42">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
@@ -10157,6 +10602,90 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
+&lt;td style="text-align:center">&lt;code>keyGenerator&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>secretKey&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-44">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>relinearizationKey&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="lattigorlwenegate_new-heirlattigorlwenegatenewop">&lt;code>lattigo.rlwe.negate_new&lt;/code> (heir::lattigo::RLWENegateNewOp)&lt;/h3>
+&lt;p>&lt;em>Negate a ciphertext&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.negate_new` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;h4 id="operands-43">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>evaluator&lt;/code>&lt;/td>
+&lt;td>or&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-45">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="lattigorlwenegate-heirlattigorlwenegateop">&lt;code>lattigo.rlwe.negate&lt;/code> (heir::lattigo::RLWENegateOp)&lt;/h3>
+&lt;p>&lt;em>Negate of a ciphertext&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.negate` operands attr-dict `:` functional-type(operands, results)
+&lt;/code>&lt;/pre>&lt;p>This operation negates a ciphertext&lt;/p>
+&lt;p>The result will be written to the &lt;code>inplace&lt;/code> operand. The &lt;code>output&lt;/code> result is
+a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the MLIR SSA form.&lt;/p>
+&lt;p>Interfaces: &lt;code>InplaceOpInterface&lt;/code>&lt;/p>
+&lt;h4 id="operands-44">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>evaluator&lt;/code>&lt;/td>
+&lt;td>or&lt;/td>
+&lt;/tr>
+&lt;tr>
 &lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
 &lt;td>&lt;/td>
 &lt;/tr>
@@ -10166,7 +10695,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-44">Results:&lt;/h4>
+&lt;h4 id="results-46">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10186,7 +10715,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.new_decryptor` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation creates a new RLWE decryptor&lt;/p>
-&lt;h4 id="operands-43">Operands:&lt;/h4>
+&lt;h4 id="operands-45">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10205,7 +10734,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-45">Results:&lt;/h4>
+&lt;h4 id="results-47">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10225,7 +10754,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.new_encryptor` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation creates a new RLWE encryptor&lt;/p>
-&lt;h4 id="operands-44">Operands:&lt;/h4>
+&lt;h4 id="operands-46">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10244,7 +10773,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-46">Results:&lt;/h4>
+&lt;h4 id="results-48">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10264,7 +10793,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.new_evaluation_key_set` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE evaluation key set&lt;/p>
-&lt;h4 id="operands-45">Operands:&lt;/h4>
+&lt;h4 id="operands-47">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10279,7 +10808,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-47">Results:&lt;/h4>
+&lt;h4 id="results-49">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10299,7 +10828,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `lattigo.rlwe.new_key_generator` operands attr-dict `:` functional-type(operands, results)
 &lt;/code>&lt;/pre>&lt;p>This operation generates a new RLWE key generator&lt;/p>
-&lt;h4 id="operands-46">Operands:&lt;/h4>
+&lt;h4 id="operands-48">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -10314,7 +10843,7 @@ a transitive reference to the &lt;code>inplace&lt;/code> operand for sake of the
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h4 id="results-48">Results:&lt;/h4>
+&lt;h4 id="results-50">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -11805,7 +12334,8 @@ passes may refine them with scheme-specific information.&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>#mgmt.mgmt&amp;lt;
 int, # level
-int # dimension
+int, # dimension
+int64_t # scale
 &amp;gt;
 &lt;/code>&lt;/pre>&lt;p>This attribute is used to store all mgmt parameters.&lt;/p>
 &lt;p>The attribute is a struct with the following fields:&lt;/p>
@@ -11841,6 +12371,11 @@ going through the secret-to-&lt;scheme> pass.&lt;/p>
 &lt;tr>
 &lt;td style="text-align:center">dimension&lt;/td>
 &lt;td style="text-align:center">&lt;code>int&lt;/code>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">scale&lt;/td>
+&lt;td style="text-align:center">&lt;code>int64_t&lt;/code>&lt;/td>
 &lt;td>&lt;/td>
 &lt;/tr>
 &lt;/tbody>
@@ -11889,22 +12424,29 @@ going through the secret-to-bgv bgv-to-openfhe pass.&lt;/p>
 &lt;/table>
 &lt;h2 id="mgmt-ops">Mgmt ops&lt;/h2>
 &lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
-&lt;h3 id="mgmtbootstrap-heirmgmtbootstrapop">&lt;code>mgmt.bootstrap&lt;/code> (heir::mgmt::BootstrapOp)&lt;/h3>
-&lt;p>&lt;em>Bootstrap the input ciphertext to refresh its noise budget&lt;/em>&lt;/p>
+&lt;h3 id="mgmtadjust_scale-heirmgmtadjustscaleop">&lt;code>mgmt.adjust_scale&lt;/code> (heir::mgmt::AdjustScaleOp)&lt;/h3>
+&lt;p>&lt;em>Adjust the scale of the input ciphertext (for BGV and CKKS)&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.bootstrap` operands attr-dict `:` type($output)
-&lt;/code>&lt;/pre>&lt;p>This is a scheme-agnostic operation that implies bootstrapping
-of the input ciphertext to refresh its noise budget.&lt;/p>
-&lt;p>Bootstrapping is a technique used in homomorphic encryption to
-reduce the noise in a ciphertext, allowing further operations
-to be performed on it without decryption.&lt;/p>
-&lt;p>When further lowered, it could be lowered to bgv.bootstrap
-or ckks.bootstrap depending on the scheme.&lt;/p>
-&lt;p>For the current backend, only ckks.bootstrap is supported.
-Further backend may include bgv.bootstrap.&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.adjust_scale` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This is scheme-agonistic operation that adjust the scale of the input
+ciphertext. This is an opaque operation, and the concrete value of the
+scale is determined by other methods.&lt;/p>
+&lt;p>To distinguish different opaque adjust_scale operations, the &lt;code>id&lt;/code> attribute
+is used.&lt;/p>
+&lt;p>At the time of &lt;code>secret-insert-mgmt-&amp;lt;scheme&amp;gt;&lt;/code>, the concrete scale
+is not known as the scheme parameter is not generated.
+Further passes like &lt;code>populate-scale-&amp;lt;scheme&amp;gt;&lt;/code> is responsible for materializing
+the concrete scale when the scheme parameter is known.&lt;/p>
+&lt;p>When further lowered, it could be lowered to &lt;code>bgv.mul_plain&lt;/code>
+or &lt;code>ckks.mul_plain&lt;/code> depending on the scheme.&lt;/p>
 &lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="attributes">Attributes:&lt;/h4>
+&lt;table>
+&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>id&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;/table>
 &lt;h4 id="operands">Operands:&lt;/h4>
 &lt;table>
 &lt;thead>
@@ -11935,15 +12477,19 @@ Further backend may include bgv.bootstrap.&lt;/p>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h3 id="mgmtmodreduce-heirmgmtmodreduceop">&lt;code>mgmt.modreduce&lt;/code> (heir::mgmt::ModReduceOp)&lt;/h3>
-&lt;p>&lt;em>Modulus switch the input ciphertext down by one limb (RNS assumed)&lt;/em>&lt;/p>
+&lt;h3 id="mgmtbootstrap-heirmgmtbootstrapop">&lt;code>mgmt.bootstrap&lt;/code> (heir::mgmt::BootstrapOp)&lt;/h3>
+&lt;p>&lt;em>Bootstrap the input ciphertext to refresh its noise budget&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.modreduce` operands attr-dict `:` type($output)
-&lt;/code>&lt;/pre>&lt;p>This is scheme-agonistic operation that implies modulus switching/rescaling
-by one limb.&lt;/p>
-&lt;p>Input ciphertext is assumed to be in RNS form when further lowered.&lt;/p>
-&lt;p>When further lowered, it could be lowered to bgv.modulus_switch
-or ckks.rescale depending on the scheme.&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.bootstrap` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This is a scheme-agnostic operation that implies bootstrapping
+of the input ciphertext to refresh its noise budget.&lt;/p>
+&lt;p>Bootstrapping is a technique used in homomorphic encryption to
+reduce the noise in a ciphertext, allowing further operations
+to be performed on it without decryption.&lt;/p>
+&lt;p>When further lowered, it could be lowered to bgv.bootstrap
+or ckks.bootstrap depending on the scheme.&lt;/p>
+&lt;p>For the current backend, only ckks.bootstrap is supported.
+Further backend may include bgv.bootstrap.&lt;/p>
 &lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
@@ -11977,21 +12523,21 @@ or ckks.rescale depending on the scheme.&lt;/p>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
-&lt;h3 id="mgmtrelinearize-heirmgmtrelinearizeop">&lt;code>mgmt.relinearize&lt;/code> (heir::mgmt::RelinearizeOp)&lt;/h3>
-&lt;p>&lt;em>Relinearize the input ciphertext to be &lt;em>linear&lt;/em>&lt;/em>&lt;/p>
+&lt;h3 id="mgmtinit-heirmgmtinitop">&lt;code>mgmt.init&lt;/code> (heir::mgmt::InitOp)&lt;/h3>
+&lt;p>&lt;em>Init the plaintext with mgmt attributes&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
-&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.relinearize` operands attr-dict `:` type($output)
-&lt;/code>&lt;/pre>&lt;p>This is scheme-agonistic operation that implies relinearization
-of the input ciphertext to be &lt;em>linear&lt;/em> (i.e. returns to dimension 2).&lt;/p>
-&lt;p>This is used solely by multiplication. For rotation, currently HEIR
-assumes relinearization is done internally and does not have a separate
-scheme-specific operation for it.&lt;/p>
-&lt;p>This accepts a ciphertext with dimension &amp;gt; 2 and returns a ciphertext
-with dimension 2. Note that the semantic includes the relinearization
-of higher dimension input like input with dimension 4 or higher,
-which when materialized should require multiple relinearization keys.&lt;/p>
-&lt;p>When further lowered, it could be lowered to bgv.relinearize
-or ckks.relinearize depending on the scheme.&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.init` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This is a scheme-agnostic operation that initializes the plaintext
+with &lt;code>mgmt&lt;/code> attributes.&lt;/p>
+&lt;p>Plaintext has multiple sources, e.g. function argument, arith.constant,
+tensor.empty, etc. However, they may have multiple uses in HE circuit
+and the level/scale information for them may be different, so we could
+not annotate them with &lt;code>mgmt&lt;/code> attributes directly, as they could not have
+more than one annotation.&lt;/p>
+&lt;p>Also, &lt;code>mgmt&lt;/code> attributes annotated on them may get lost as other optimization
+like CSE or constant folding may canonicalize them away.&lt;/p>
+&lt;p>To address the problem, for each &lt;em>use&lt;/em> of the plaintext, we insert an &lt;code>mgmt.init&lt;/code>
+operation to initialize the plaintext with &lt;code>mgmt&lt;/code> attributes.&lt;/p>
 &lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
@@ -12011,6 +12557,144 @@ or ckks.relinearize depending on the scheme.&lt;/p>
 &lt;/tbody>
 &lt;/table>
 &lt;h4 id="results-2">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="mgmtlevel_reduce-heirmgmtlevelreduceop">&lt;code>mgmt.level_reduce&lt;/code> (heir::mgmt::LevelReduceOp)&lt;/h3>
+&lt;p>&lt;em>Reduce the level of input ciphertext by dropping the last k RNS limbs&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.level_reduce` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This scheme-agonistic operation reduces the ciphertext level
+by k, as specified by the &lt;code>levelToDrop&lt;/code> attribute.&lt;/p>
+&lt;p>If &lt;code>levelToDrop&lt;/code> is not specified, it defaults to 1.&lt;/p>
+&lt;p>Input ciphertext is assumed to be in RNS form when further lowered.&lt;/p>
+&lt;p>Later passes may lower this op to &lt;code>bgv.level_reduce&lt;/code>
+or &lt;code>ckks.level_reduce&lt;/code> depending on the scheme.&lt;/p>
+&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
+&lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
+&lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="attributes-1">Attributes:&lt;/h4>
+&lt;table>
+&lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>levelToDrop&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;/table>
+&lt;h4 id="operands-3">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-3">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="mgmtmodreduce-heirmgmtmodreduceop">&lt;code>mgmt.modreduce&lt;/code> (heir::mgmt::ModReduceOp)&lt;/h3>
+&lt;p>&lt;em>Modulus switch the input ciphertext down by one limb (RNS assumed)&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.modreduce` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This is scheme-agonistic operation that implies modulus switching/rescaling
+by one limb.&lt;/p>
+&lt;p>Input ciphertext is assumed to be in RNS form when further lowered.&lt;/p>
+&lt;p>When further lowered, it could be lowered to bgv.modulus_switch
+or ckks.rescale depending on the scheme.&lt;/p>
+&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
+&lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
+&lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="operands-4">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-4">Results:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Result&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3 id="mgmtrelinearize-heirmgmtrelinearizeop">&lt;code>mgmt.relinearize&lt;/code> (heir::mgmt::RelinearizeOp)&lt;/h3>
+&lt;p>&lt;em>Relinearize the input ciphertext to be &lt;em>linear&lt;/em>&lt;/em>&lt;/p>
+&lt;p>Syntax:&lt;/p>
+&lt;pre tabindex="0">&lt;code>operation ::= `mgmt.relinearize` operands attr-dict `:` type($output)
+&lt;/code>&lt;/pre>&lt;p>This is scheme-agonistic operation that implies relinearization
+of the input ciphertext to be &lt;em>linear&lt;/em> (i.e. returns to dimension 2).&lt;/p>
+&lt;p>This is used solely by multiplication. For rotation, currently HEIR
+assumes relinearization is done internally and does not have a separate
+scheme-specific operation for it.&lt;/p>
+&lt;p>This accepts a ciphertext with dimension &amp;gt; 2 and returns a ciphertext
+with dimension 2. Note that the semantic includes the relinearization
+of higher dimension input like input with dimension 4 or higher,
+which when materialized should require multiple relinearization keys.&lt;/p>
+&lt;p>When further lowered, it could be lowered to bgv.relinearize
+or ckks.relinearize depending on the scheme.&lt;/p>
+&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>Elementwise&lt;/code>, &lt;code>SameOperandsAndResultType&lt;/code>, &lt;code>Scalarizable&lt;/code>, &lt;code>Tensorizable&lt;/code>, &lt;code>Vectorizable&lt;/code>&lt;/p>
+&lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
+&lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
+&lt;h4 id="operands-5">Operands:&lt;/h4>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Operand&lt;/th>
+&lt;th>Description&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">&lt;code>input&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h4 id="results-5">Results:&lt;/h4>
 &lt;table>
 &lt;thead>
 &lt;tr>
@@ -12641,7 +13325,7 @@ representatives and guarantees the output being canonical representative.&lt;/p>
 &lt;p>&lt;em>OpenFHE add operation of a ciphertext and a plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `openfhe.add_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-2">Operands:&lt;/h4>
@@ -12658,12 +13342,12 @@ representatives and guarantees the output being canonical representative.&lt;/p>
 &lt;td>The CryptoContext required to perform homomorphic operations in OpenFHE.&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertext&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintext&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -12947,18 +13631,29 @@ including the bootstrapping depth.&lt;/p>
 &lt;p>&lt;code>plainMod&lt;/code> is the modulus of the plaintext space. If we
 are using CKKS, this is 0.&lt;/p>
 &lt;p>&lt;code>insecure&lt;/code> is a flag that determines whether the parameters
-are generated securely or not. This is mainly used for
-testing purposes.&lt;/p>
+are generated securely or not. In Openfhe, this means setting
+HEStd_NotSet for security level.&lt;/p>
+&lt;p>For other flags, see the OpenFHE documentation in
+&lt;a href="https://github.com/openfheorg/openfhe-development/blob/main/src/pke/examples/README.md#description-of-the-cryptocontext-parameters-and-their-restrictions">https://github.com/openfheorg/openfhe-development/blob/main/src/pke/examples/README.md#description-of-the-cryptocontext-parameters-and-their-restrictions&lt;/a>&lt;/p>
 &lt;p>Interfaces: &lt;code>InferTypeOpInterface&lt;/code>&lt;/p>
 &lt;h4 id="attributes-1">Attributes:&lt;/h4>
 &lt;table>
 &lt;tr>&lt;th>Attribute&lt;/th>&lt;th>MLIR Type&lt;/th>&lt;th>Description&lt;/th>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>mulDepth&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>plainMod&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
-&lt;tr>&lt;td>&lt;code>insecure&lt;/code>&lt;/td>&lt;td>::mlir::BoolAttr&lt;/td>&lt;td>bool attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>ringDim&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>batchSize&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>firstModSize&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>scalingModSize&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>evalAddCount&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>keySwitchCount&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>digitSize&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>numLargeDigits&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>maxRelinSkDeg&lt;/code>&lt;/td>&lt;td>::mlir::IntegerAttr&lt;/td>&lt;td>64-bit signless integer attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>insecure&lt;/code>&lt;/td>&lt;td>::mlir::BoolAttr&lt;/td>&lt;td>bool attribute&lt;/td>&lt;/tr>
 &lt;tr>&lt;td>&lt;code>encryptionTechniqueExtended&lt;/code>&lt;/td>&lt;td>::mlir::BoolAttr&lt;/td>&lt;td>bool attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>keySwitchingTechniqueBV&lt;/code>&lt;/td>&lt;td>::mlir::BoolAttr&lt;/td>&lt;td>bool attribute&lt;/td>&lt;/tr>
+&lt;tr>&lt;td>&lt;code>scalingTechniqueFixedManual&lt;/code>&lt;/td>&lt;td>::mlir::BoolAttr&lt;/td>&lt;td>bool attribute&lt;/td>&lt;/tr>
 &lt;/table>
 &lt;h4 id="results-7">Results:&lt;/h4>
 &lt;table>
@@ -13661,7 +14356,7 @@ testing purposes.&lt;/p>
 &lt;p>&lt;em>OpenFHE sub operation of a ciphertext and a plaintext.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `openfhe.sub_plain` operands attr-dict `:` functional-type(operands, results)
-&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AlwaysSpeculatableImplTrait&lt;/code>&lt;/p>
+&lt;/code>&lt;/pre>&lt;p>Traits: &lt;code>AllCiphertextTypesMatch&lt;/code>, &lt;code>AlwaysSpeculatableImplTrait&lt;/code>, &lt;code>InferTypeOpAdaptor&lt;/code>&lt;/p>
 &lt;p>Interfaces: &lt;code>ConditionallySpeculatable&lt;/code>, &lt;code>InferTypeOpInterface&lt;/code>, &lt;code>NoMemoryEffect (MemoryEffectOpInterface)&lt;/code>&lt;/p>
 &lt;p>Effects: &lt;code>MemoryEffects::Effect{}&lt;/code>&lt;/p>
 &lt;h4 id="operands-27">Operands:&lt;/h4>
@@ -13678,12 +14373,12 @@ testing purposes.&lt;/p>
 &lt;td>The CryptoContext required to perform homomorphic operations in OpenFHE.&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>ciphertext&lt;/code>&lt;/td>
-&lt;td>A ciphertext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>lhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>plaintext&lt;/code>&lt;/td>
-&lt;td>A plaintext type&lt;/td>
+&lt;td style="text-align:center">&lt;code>rhs&lt;/code>&lt;/td>
+&lt;td>A ciphertext type or A plaintext type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -15249,11 +15944,12 @@ unlikely to be upstreamed to MLIR due to their specificity to FHE.&lt;/p>
 ::mlir::DenseI64ArrayAttr, # padding
 TypedAttr # paddingValue
 &amp;gt;
-&lt;/code>&lt;/pre>&lt;p>This attribute is used to describe how a data-semantic tensor is padded
+&lt;/code>&lt;/pre>&lt;p>This attribute is used to describe how a data-semantic value is padded
 and replicated to align its size before applying a ciphertext layout
 (see &lt;code>tensor_ext.layout&lt;/code>).&lt;/p>
-&lt;p>It describes transformations to be applied to an input tensor.&lt;/p>
-&lt;p>The &lt;code>in&lt;/code> attribute describes the shape of the original tensor.
+&lt;p>It describes transformations to be applied to an input tensor or scalar.&lt;/p>
+&lt;p>The &lt;code>in&lt;/code> attribute describes the shape of the original value. An empty list
+for &lt;code>in&lt;/code> indicates a scalar value that must be materialized as a tensor.
 The following transformations are applied to the input tensor.&lt;/p>
 &lt;ol>
 &lt;li>New unit dimensions are inserted to match the number of dimensions
@@ -15303,6 +15999,15 @@ dimension is inserted as the first axis, then zeros are padded along the
 second axis to make a &lt;code>tensor&amp;lt;1x16xi32&amp;gt;&lt;/code>. Finally, it is replicated twice
 along the columns and 32 times along the rows to fill the 32x32 output
 tensor.&lt;/p>
+&lt;p>Example:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="background-color:#f8f8f8;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-mlir" data-lang="mlir">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000">#repl&lt;/span> &lt;span style="color:#000;font-weight:bold">=&lt;/span> &lt;span style="color:#000">#tensor_ext.alignment&lt;/span>&lt;span style="color:#000;font-weight:bold">&amp;lt;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f57900">in =&lt;/span> &lt;span style="color:#000;font-weight:bold">[],&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f57900">insertedDims =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">0&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f57900">out =&lt;/span> &lt;span style="color:#000;font-weight:bold">[&lt;/span>&lt;span style="color:#0000cf;font-weight:bold">1&lt;/span>&lt;span style="color:#000;font-weight:bold">],&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#000;font-weight:bold">&amp;gt;&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>This indicates that the original input is a scalar such as &lt;code>i32&lt;/code>, and it is
+elevated to a &lt;code>tensor&amp;lt;1xi32&amp;gt;&lt;/code> before being replicated to fill the
+ciphertext shape.&lt;/p>
 &lt;h4 id="parameters">Parameters:&lt;/h4>
 &lt;table>
 &lt;thead>
@@ -15489,10 +16194,10 @@ data &lt;code>[1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0]&lt;/code>.&lt;/p>
 &lt;h2 id="tensorext-ops">TensorExt ops&lt;/h2>
 &lt;!-- Autogenerated by mlir-tblgen; don't manually edit -->
 &lt;h3 id="tensor_extassign_layout-heirtensor_extassignlayoutop">&lt;code>tensor_ext.assign_layout&lt;/code> (heir::tensor_ext::AssignLayoutOp)&lt;/h3>
-&lt;p>&lt;em>Assign a layout to a plaintext tensor.&lt;/em>&lt;/p>
+&lt;p>&lt;em>Assign a layout to a plaintext tensor or scalar.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `tensor_ext.assign_layout` operands attr-dict `:` type($output)
-&lt;/code>&lt;/pre>&lt;p>This op allows the ingestion of a plaintext tensor into the layout system.
+&lt;/code>&lt;/pre>&lt;p>This op allows the ingestion of a plaintext value into the layout system.
 For example, ops like &lt;code>linalg.reduce&lt;/code>, require a tensor input to represent
 initial values. These will generally be created by an &lt;code>arith.constant&lt;/code> or
 &lt;code>tensor.empty&lt;/code> op, which does not have secret results. Lowerings will
@@ -15517,8 +16222,8 @@ lowered as ciphertext-plaintext ops.&lt;/p>
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>tensor&lt;/code>&lt;/td>
-&lt;td>ranked tensor of any type values&lt;/td>
+&lt;td style="text-align:center">&lt;code>value&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -15533,7 +16238,7 @@ lowered as ciphertext-plaintext ops.&lt;/p>
 &lt;tbody>
 &lt;tr>
 &lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
-&lt;td>ranked tensor of any type values&lt;/td>
+&lt;td>any type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -15541,7 +16246,7 @@ lowered as ciphertext-plaintext ops.&lt;/p>
 &lt;p>&lt;em>Convert from one layout to another.&lt;/em>&lt;/p>
 &lt;p>Syntax:&lt;/p>
 &lt;pre tabindex="0">&lt;code>operation ::= `tensor_ext.convert_layout` operands attr-dict `:` type($output)
-&lt;/code>&lt;/pre>&lt;p>This op represents the conversion of a tensor from one packed layout to
+&lt;/code>&lt;/pre>&lt;p>This op represents the conversion of a value from one packed layout to
 another. This is implemented via a &amp;ldquo;shift network&amp;rdquo; of ciphertext rotations,
 plaintext masks (ciphertext-plaintext multiplications), and additions.&lt;/p>
 &lt;p>This op is inserted by layout selection passes.&lt;/p>
@@ -15564,8 +16269,8 @@ plaintext masks (ciphertext-plaintext multiplications), and additions.&lt;/p>
 &lt;/thead>
 &lt;tbody>
 &lt;tr>
-&lt;td style="text-align:center">&lt;code>tensor&lt;/code>&lt;/td>
-&lt;td>ranked tensor of any type values&lt;/td>
+&lt;td style="text-align:center">&lt;code>value&lt;/code>&lt;/td>
+&lt;td>any type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
@@ -15580,7 +16285,7 @@ plaintext masks (ciphertext-plaintext multiplications), and additions.&lt;/p>
 &lt;tbody>
 &lt;tr>
 &lt;td style="text-align:center">&lt;code>output&lt;/code>&lt;/td>
-&lt;td>ranked tensor of any type values&lt;/td>
+&lt;td>any type&lt;/td>
 &lt;/tr>
 &lt;/tbody>
 &lt;/table>
