@@ -9,9 +9,28 @@ add-depth-*/add-depth-*_*.h
 add-depth-*/add-depth-*-*.mlir
 add-depth-[0-9][0-9]*/add-depth-[0-9][0-9]*_*
 
+add-eq-*/add-eq-*_*.cpp
+add-eq-*/add-eq-*_*.h
+add-eq-*/add-eq-*-*.mlir
+
+add-end/add-end_*.cpp
+add-end/add-end_*.h
+add-end/add-end-*.mlir
+
+rotate-*/rotate-*_*.cpp
+rotate-*/rotate-*_*.h
+rotate-*/rotate-*-*.mlir
+
+form-*/form-*_*.cpp
+form-*/form-*_*.h
+form-*/form-*-*.mlir
+
+
 dot8/dot8-*.mlir
 dot8/dot8_*.cpp
 dot8/dot8_*.h
+
+parallel_results
 
 /create
 /undone
