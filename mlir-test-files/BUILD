@@ -1250,3 +1250,1411 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+cc_library(
+    name = "main_add-depth-11_common",
+    srcs = ["add-depth-11/main_add-depth-11_common.cpp"],
+    hdrs = ["add-depth-11/main_add-depth-11_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-11_bisection",
+    srcs = ["add-depth-11/main_add-depth-11_bisection.cpp"],
+    deps = [
+        ":main_add-depth-11_common",
+        ":add-depth-11_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-11_closed",
+    srcs = ["add-depth-11/main_add-depth-11_closed.cpp"],
+    deps = [
+        ":main_add-depth-11_common",
+        ":add-depth-11_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-11_direct",
+    srcs = ["add-depth-11/main_add-depth-11_direct.cpp"],
+    deps = [
+        ":main_add-depth-11_common",
+        ":add-depth-11_direct",
+    ],
+)
+
+cc_library(
+    name = "add-depth-11_bisection",
+    srcs = ["add-depth-11/add-depth-11_bisection.cpp"],
+    hdrs = ["add-depth-11/add-depth-11_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-depth-11_closed",
+    srcs = ["add-depth-11/add-depth-11_closed.cpp"],
+    hdrs = ["add-depth-11/add-depth-11_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-depth-11_direct",
+    srcs = ["add-depth-11/add-depth-11_direct.cpp"],
+    hdrs = ["add-depth-11/add-depth-11_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-depth-12_common",
+    srcs = ["add-depth-12/main_add-depth-12_common.cpp"],
+    hdrs = ["add-depth-12/main_add-depth-12_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-12_bisection",
+    srcs = ["add-depth-12/main_add-depth-12_bisection.cpp"],
+    deps = [
+        ":main_add-depth-12_common",
+        ":add-depth-12_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-12_closed",
+    srcs = ["add-depth-12/main_add-depth-12_closed.cpp"],
+    deps = [
+        ":main_add-depth-12_common",
+        ":add-depth-12_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-depth-12_direct",
+    srcs = ["add-depth-12/main_add-depth-12_direct.cpp"],
+    deps = [
+        ":main_add-depth-12_common",
+        ":add-depth-12_direct",
+    ],
+)
+
+cc_library(
+    name = "add-depth-12_bisection",
+    srcs = ["add-depth-12/add-depth-12_bisection.cpp"],
+    hdrs = ["add-depth-12/add-depth-12_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-depth-12_closed",
+    srcs = ["add-depth-12/add-depth-12_closed.cpp"],
+    hdrs = ["add-depth-12/add-depth-12_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-depth-12_direct",
+    srcs = ["add-depth-12/add-depth-12_direct.cpp"],
+    hdrs = ["add-depth-12/add-depth-12_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-1_common",
+    srcs = ["rotate-1/main_rotate-1_common.cpp"],
+    hdrs = ["rotate-1/main_rotate-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-1_bisection",
+    srcs = ["rotate-1/main_rotate-1_bisection.cpp"],
+    deps = [
+        ":main_rotate-1_common",
+        ":rotate-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-1_closed",
+    srcs = ["rotate-1/main_rotate-1_closed.cpp"],
+    deps = [
+        ":main_rotate-1_common",
+        ":rotate-1_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-1_direct",
+    srcs = ["rotate-1/main_rotate-1_direct.cpp"],
+    deps = [
+        ":main_rotate-1_common",
+        ":rotate-1_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-1_bisection",
+    srcs = ["rotate-1/rotate-1_bisection.cpp"],
+    hdrs = ["rotate-1/rotate-1_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-1_closed",
+    srcs = ["rotate-1/rotate-1_closed.cpp"],
+    hdrs = ["rotate-1/rotate-1_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-1_direct",
+    srcs = ["rotate-1/rotate-1_direct.cpp"],
+    hdrs = ["rotate-1/rotate-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-2_common",
+    srcs = ["rotate-2/main_rotate-2_common.cpp"],
+    hdrs = ["rotate-2/main_rotate-2_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-2_bisection",
+    srcs = ["rotate-2/main_rotate-2_bisection.cpp"],
+    deps = [
+        ":main_rotate-2_common",
+        ":rotate-2_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-2_closed",
+    srcs = ["rotate-2/main_rotate-2_closed.cpp"],
+    deps = [
+        ":main_rotate-2_common",
+        ":rotate-2_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-2_direct",
+    srcs = ["rotate-2/main_rotate-2_direct.cpp"],
+    deps = [
+        ":main_rotate-2_common",
+        ":rotate-2_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-2_bisection",
+    srcs = ["rotate-2/rotate-2_bisection.cpp"],
+    hdrs = ["rotate-2/rotate-2_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-2_closed",
+    srcs = ["rotate-2/rotate-2_closed.cpp"],
+    hdrs = ["rotate-2/rotate-2_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-2_direct",
+    srcs = ["rotate-2/rotate-2_direct.cpp"],
+    hdrs = ["rotate-2/rotate-2_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-3_common",
+    srcs = ["rotate-3/main_rotate-3_common.cpp"],
+    hdrs = ["rotate-3/main_rotate-3_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-3_bisection",
+    srcs = ["rotate-3/main_rotate-3_bisection.cpp"],
+    deps = [
+        ":main_rotate-3_common",
+        ":rotate-3_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-3_closed",
+    srcs = ["rotate-3/main_rotate-3_closed.cpp"],
+    deps = [
+        ":main_rotate-3_common",
+        ":rotate-3_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-3_direct",
+    srcs = ["rotate-3/main_rotate-3_direct.cpp"],
+    deps = [
+        ":main_rotate-3_common",
+        ":rotate-3_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-3_bisection",
+    srcs = ["rotate-3/rotate-3_bisection.cpp"],
+    hdrs = ["rotate-3/rotate-3_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-3_closed",
+    srcs = ["rotate-3/rotate-3_closed.cpp"],
+    hdrs = ["rotate-3/rotate-3_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-3_direct",
+    srcs = ["rotate-3/rotate-3_direct.cpp"],
+    hdrs = ["rotate-3/rotate-3_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-4_common",
+    srcs = ["rotate-4/main_rotate-4_common.cpp"],
+    hdrs = ["rotate-4/main_rotate-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-4_bisection",
+    srcs = ["rotate-4/main_rotate-4_bisection.cpp"],
+    deps = [
+        ":main_rotate-4_common",
+        ":rotate-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-4_closed",
+    srcs = ["rotate-4/main_rotate-4_closed.cpp"],
+    deps = [
+        ":main_rotate-4_common",
+        ":rotate-4_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-4_direct",
+    srcs = ["rotate-4/main_rotate-4_direct.cpp"],
+    deps = [
+        ":main_rotate-4_common",
+        ":rotate-4_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-4_bisection",
+    srcs = ["rotate-4/rotate-4_bisection.cpp"],
+    hdrs = ["rotate-4/rotate-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-4_closed",
+    srcs = ["rotate-4/rotate-4_closed.cpp"],
+    hdrs = ["rotate-4/rotate-4_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-4_direct",
+    srcs = ["rotate-4/rotate-4_direct.cpp"],
+    hdrs = ["rotate-4/rotate-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-0_common",
+    srcs = ["rotate-0/main_rotate-0_common.cpp"],
+    hdrs = ["rotate-0/main_rotate-0_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-0_bisection",
+    srcs = ["rotate-0/main_rotate-0_bisection.cpp"],
+    deps = [
+        ":main_rotate-0_common",
+        ":rotate-0_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-0_closed",
+    srcs = ["rotate-0/main_rotate-0_closed.cpp"],
+    deps = [
+        ":main_rotate-0_common",
+        ":rotate-0_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-0_direct",
+    srcs = ["rotate-0/main_rotate-0_direct.cpp"],
+    deps = [
+        ":main_rotate-0_common",
+        ":rotate-0_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-0_bisection",
+    srcs = ["rotate-0/rotate-0_bisection.cpp"],
+    hdrs = ["rotate-0/rotate-0_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-0_closed",
+    srcs = ["rotate-0/rotate-0_closed.cpp"],
+    hdrs = ["rotate-0/rotate-0_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-0_direct",
+    srcs = ["rotate-0/rotate-0_direct.cpp"],
+    hdrs = ["rotate-0/rotate-0_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-hill_common",
+    srcs = ["form-hill/main_form-hill_common.cpp"],
+    hdrs = ["form-hill/main_form-hill_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-hill_bisection",
+    srcs = ["form-hill/main_form-hill_bisection.cpp"],
+    deps = [
+        ":main_form-hill_common",
+        ":form-hill_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-hill_closed",
+    srcs = ["form-hill/main_form-hill_closed.cpp"],
+    deps = [
+        ":main_form-hill_common",
+        ":form-hill_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-hill_direct",
+    srcs = ["form-hill/main_form-hill_direct.cpp"],
+    deps = [
+        ":main_form-hill_common",
+        ":form-hill_direct",
+    ],
+)
+
+cc_library(
+    name = "form-hill_bisection",
+    srcs = ["form-hill/form-hill_bisection.cpp"],
+    hdrs = ["form-hill/form-hill_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-hill_closed",
+    srcs = ["form-hill/form-hill_closed.cpp"],
+    hdrs = ["form-hill/form-hill_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-hill_direct",
+    srcs = ["form-hill/form-hill_direct.cpp"],
+    hdrs = ["form-hill/form-hill_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-high-low_common",
+    srcs = ["form-high-low/main_form-high-low_common.cpp"],
+    hdrs = ["form-high-low/main_form-high-low_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-high-low_bisection",
+    srcs = ["form-high-low/main_form-high-low_bisection.cpp"],
+    deps = [
+        ":main_form-high-low_common",
+        ":form-high-low_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-high-low_closed",
+    srcs = ["form-high-low/main_form-high-low_closed.cpp"],
+    deps = [
+        ":main_form-high-low_common",
+        ":form-high-low_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-high-low_direct",
+    srcs = ["form-high-low/main_form-high-low_direct.cpp"],
+    deps = [
+        ":main_form-high-low_common",
+        ":form-high-low_direct",
+    ],
+)
+
+cc_library(
+    name = "form-high-low_bisection",
+    srcs = ["form-high-low/form-high-low_bisection.cpp"],
+    hdrs = ["form-high-low/form-high-low_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-high-low_closed",
+    srcs = ["form-high-low/form-high-low_closed.cpp"],
+    hdrs = ["form-high-low/form-high-low_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-high-low_direct",
+    srcs = ["form-high-low/form-high-low_direct.cpp"],
+    hdrs = ["form-high-low/form-high-low_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-low-high_common",
+    srcs = ["form-low-high/main_form-low-high_common.cpp"],
+    hdrs = ["form-low-high/main_form-low-high_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-low-high_bisection",
+    srcs = ["form-low-high/main_form-low-high_bisection.cpp"],
+    deps = [
+        ":main_form-low-high_common",
+        ":form-low-high_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-low-high_closed",
+    srcs = ["form-low-high/main_form-low-high_closed.cpp"],
+    deps = [
+        ":main_form-low-high_common",
+        ":form-low-high_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-low-high_direct",
+    srcs = ["form-low-high/main_form-low-high_direct.cpp"],
+    deps = [
+        ":main_form-low-high_common",
+        ":form-low-high_direct",
+    ],
+)
+
+cc_library(
+    name = "form-low-high_bisection",
+    srcs = ["form-low-high/form-low-high_bisection.cpp"],
+    hdrs = ["form-low-high/form-low-high_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-low-high_closed",
+    srcs = ["form-low-high/form-low-high_closed.cpp"],
+    hdrs = ["form-low-high/form-low-high_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-low-high_direct",
+    srcs = ["form-low-high/form-low-high_direct.cpp"],
+    hdrs = ["form-low-high/form-low-high_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-decreasing_common",
+    srcs = ["form-decreasing/main_form-decreasing_common.cpp"],
+    hdrs = ["form-decreasing/main_form-decreasing_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-decreasing_bisection",
+    srcs = ["form-decreasing/main_form-decreasing_bisection.cpp"],
+    deps = [
+        ":main_form-decreasing_common",
+        ":form-decreasing_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-decreasing_closed",
+    srcs = ["form-decreasing/main_form-decreasing_closed.cpp"],
+    deps = [
+        ":main_form-decreasing_common",
+        ":form-decreasing_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-decreasing_direct",
+    srcs = ["form-decreasing/main_form-decreasing_direct.cpp"],
+    deps = [
+        ":main_form-decreasing_common",
+        ":form-decreasing_direct",
+    ],
+)
+
+cc_library(
+    name = "form-decreasing_bisection",
+    srcs = ["form-decreasing/form-decreasing_bisection.cpp"],
+    hdrs = ["form-decreasing/form-decreasing_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-decreasing_closed",
+    srcs = ["form-decreasing/form-decreasing_closed.cpp"],
+    hdrs = ["form-decreasing/form-decreasing_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-decreasing_direct",
+    srcs = ["form-decreasing/form-decreasing_direct.cpp"],
+    hdrs = ["form-decreasing/form-decreasing_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-increasing_common",
+    srcs = ["form-increasing/main_form-increasing_common.cpp"],
+    hdrs = ["form-increasing/main_form-increasing_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-increasing_bisection",
+    srcs = ["form-increasing/main_form-increasing_bisection.cpp"],
+    deps = [
+        ":main_form-increasing_common",
+        ":form-increasing_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-increasing_closed",
+    srcs = ["form-increasing/main_form-increasing_closed.cpp"],
+    deps = [
+        ":main_form-increasing_common",
+        ":form-increasing_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-increasing_direct",
+    srcs = ["form-increasing/main_form-increasing_direct.cpp"],
+    deps = [
+        ":main_form-increasing_common",
+        ":form-increasing_direct",
+    ],
+)
+
+cc_library(
+    name = "form-increasing_bisection",
+    srcs = ["form-increasing/form-increasing_bisection.cpp"],
+    hdrs = ["form-increasing/form-increasing_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-increasing_closed",
+    srcs = ["form-increasing/form-increasing_closed.cpp"],
+    hdrs = ["form-increasing/form-increasing_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-increasing_direct",
+    srcs = ["form-increasing/form-increasing_direct.cpp"],
+    hdrs = ["form-increasing/form-increasing_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-valley_common",
+    srcs = ["form-valley/main_form-valley_common.cpp"],
+    hdrs = ["form-valley/main_form-valley_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-valley_bisection",
+    srcs = ["form-valley/main_form-valley_bisection.cpp"],
+    deps = [
+        ":main_form-valley_common",
+        ":form-valley_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-valley_closed",
+    srcs = ["form-valley/main_form-valley_closed.cpp"],
+    deps = [
+        ":main_form-valley_common",
+        ":form-valley_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-valley_direct",
+    srcs = ["form-valley/main_form-valley_direct.cpp"],
+    deps = [
+        ":main_form-valley_common",
+        ":form-valley_direct",
+    ],
+)
+
+cc_library(
+    name = "form-valley_bisection",
+    srcs = ["form-valley/form-valley_bisection.cpp"],
+    hdrs = ["form-valley/form-valley_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-valley_closed",
+    srcs = ["form-valley/form-valley_closed.cpp"],
+    hdrs = ["form-valley/form-valley_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-valley_direct",
+    srcs = ["form-valley/form-valley_direct.cpp"],
+    hdrs = ["form-valley/form-valley_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_form-equal_common",
+    srcs = ["form-equal/main_form-equal_common.cpp"],
+    hdrs = ["form-equal/main_form-equal_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_form-equal_bisection",
+    srcs = ["form-equal/main_form-equal_bisection.cpp"],
+    deps = [
+        ":main_form-equal_common",
+        ":form-equal_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_form-equal_closed",
+    srcs = ["form-equal/main_form-equal_closed.cpp"],
+    deps = [
+        ":main_form-equal_common",
+        ":form-equal_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_form-equal_direct",
+    srcs = ["form-equal/main_form-equal_direct.cpp"],
+    deps = [
+        ":main_form-equal_common",
+        ":form-equal_direct",
+    ],
+)
+
+cc_library(
+    name = "form-equal_bisection",
+    srcs = ["form-equal/form-equal_bisection.cpp"],
+    hdrs = ["form-equal/form-equal_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-equal_closed",
+    srcs = ["form-equal/form-equal_closed.cpp"],
+    hdrs = ["form-equal/form-equal_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "form-equal_direct",
+    srcs = ["form-equal/form-equal_direct.cpp"],
+    hdrs = ["form-equal/form-equal_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-3_common",
+    srcs = ["add-eq-3/main_add-eq-3_common.cpp"],
+    hdrs = ["add-eq-3/main_add-eq-3_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-3_bisection",
+    srcs = ["add-eq-3/main_add-eq-3_bisection.cpp"],
+    deps = [
+        ":main_add-eq-3_common",
+        ":add-eq-3_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-3_closed",
+    srcs = ["add-eq-3/main_add-eq-3_closed.cpp"],
+    deps = [
+        ":main_add-eq-3_common",
+        ":add-eq-3_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-3_direct",
+    srcs = ["add-eq-3/main_add-eq-3_direct.cpp"],
+    deps = [
+        ":main_add-eq-3_common",
+        ":add-eq-3_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-3_bisection",
+    srcs = ["add-eq-3/add-eq-3_bisection.cpp"],
+    hdrs = ["add-eq-3/add-eq-3_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-3_closed",
+    srcs = ["add-eq-3/add-eq-3_closed.cpp"],
+    hdrs = ["add-eq-3/add-eq-3_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-3_direct",
+    srcs = ["add-eq-3/add-eq-3_direct.cpp"],
+    hdrs = ["add-eq-3/add-eq-3_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-2_common",
+    srcs = ["add-eq-2/main_add-eq-2_common.cpp"],
+    hdrs = ["add-eq-2/main_add-eq-2_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-2_bisection",
+    srcs = ["add-eq-2/main_add-eq-2_bisection.cpp"],
+    deps = [
+        ":main_add-eq-2_common",
+        ":add-eq-2_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-2_closed",
+    srcs = ["add-eq-2/main_add-eq-2_closed.cpp"],
+    deps = [
+        ":main_add-eq-2_common",
+        ":add-eq-2_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-2_direct",
+    srcs = ["add-eq-2/main_add-eq-2_direct.cpp"],
+    deps = [
+        ":main_add-eq-2_common",
+        ":add-eq-2_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-2_bisection",
+    srcs = ["add-eq-2/add-eq-2_bisection.cpp"],
+    hdrs = ["add-eq-2/add-eq-2_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-2_closed",
+    srcs = ["add-eq-2/add-eq-2_closed.cpp"],
+    hdrs = ["add-eq-2/add-eq-2_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-2_direct",
+    srcs = ["add-eq-2/add-eq-2_direct.cpp"],
+    hdrs = ["add-eq-2/add-eq-2_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-1_common",
+    srcs = ["add-eq-1/main_add-eq-1_common.cpp"],
+    hdrs = ["add-eq-1/main_add-eq-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-1_bisection",
+    srcs = ["add-eq-1/main_add-eq-1_bisection.cpp"],
+    deps = [
+        ":main_add-eq-1_common",
+        ":add-eq-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-1_closed",
+    srcs = ["add-eq-1/main_add-eq-1_closed.cpp"],
+    deps = [
+        ":main_add-eq-1_common",
+        ":add-eq-1_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-1_direct",
+    srcs = ["add-eq-1/main_add-eq-1_direct.cpp"],
+    deps = [
+        ":main_add-eq-1_common",
+        ":add-eq-1_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-1_bisection",
+    srcs = ["add-eq-1/add-eq-1_bisection.cpp"],
+    hdrs = ["add-eq-1/add-eq-1_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-1_closed",
+    srcs = ["add-eq-1/add-eq-1_closed.cpp"],
+    hdrs = ["add-eq-1/add-eq-1_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-1_direct",
+    srcs = ["add-eq-1/add-eq-1_direct.cpp"],
+    hdrs = ["add-eq-1/add-eq-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-4_common",
+    srcs = ["add-eq-4/main_add-eq-4_common.cpp"],
+    hdrs = ["add-eq-4/main_add-eq-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-4_bisection",
+    srcs = ["add-eq-4/main_add-eq-4_bisection.cpp"],
+    deps = [
+        ":main_add-eq-4_common",
+        ":add-eq-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-4_closed",
+    srcs = ["add-eq-4/main_add-eq-4_closed.cpp"],
+    deps = [
+        ":main_add-eq-4_common",
+        ":add-eq-4_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-4_direct",
+    srcs = ["add-eq-4/main_add-eq-4_direct.cpp"],
+    deps = [
+        ":main_add-eq-4_common",
+        ":add-eq-4_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-4_bisection",
+    srcs = ["add-eq-4/add-eq-4_bisection.cpp"],
+    hdrs = ["add-eq-4/add-eq-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-4_closed",
+    srcs = ["add-eq-4/add-eq-4_closed.cpp"],
+    hdrs = ["add-eq-4/add-eq-4_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-4_direct",
+    srcs = ["add-eq-4/add-eq-4_direct.cpp"],
+    hdrs = ["add-eq-4/add-eq-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-5_common",
+    srcs = ["add-eq-5/main_add-eq-5_common.cpp"],
+    hdrs = ["add-eq-5/main_add-eq-5_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-5_bisection",
+    srcs = ["add-eq-5/main_add-eq-5_bisection.cpp"],
+    deps = [
+        ":main_add-eq-5_common",
+        ":add-eq-5_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-5_closed",
+    srcs = ["add-eq-5/main_add-eq-5_closed.cpp"],
+    deps = [
+        ":main_add-eq-5_common",
+        ":add-eq-5_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-5_direct",
+    srcs = ["add-eq-5/main_add-eq-5_direct.cpp"],
+    deps = [
+        ":main_add-eq-5_common",
+        ":add-eq-5_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-5_bisection",
+    srcs = ["add-eq-5/add-eq-5_bisection.cpp"],
+    hdrs = ["add-eq-5/add-eq-5_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-5_closed",
+    srcs = ["add-eq-5/add-eq-5_closed.cpp"],
+    hdrs = ["add-eq-5/add-eq-5_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-5_direct",
+    srcs = ["add-eq-5/add-eq-5_direct.cpp"],
+    hdrs = ["add-eq-5/add-eq-5_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-6_common",
+    srcs = ["add-eq-6/main_add-eq-6_common.cpp"],
+    hdrs = ["add-eq-6/main_add-eq-6_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-6_bisection",
+    srcs = ["add-eq-6/main_add-eq-6_bisection.cpp"],
+    deps = [
+        ":main_add-eq-6_common",
+        ":add-eq-6_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-6_closed",
+    srcs = ["add-eq-6/main_add-eq-6_closed.cpp"],
+    deps = [
+        ":main_add-eq-6_common",
+        ":add-eq-6_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-6_direct",
+    srcs = ["add-eq-6/main_add-eq-6_direct.cpp"],
+    deps = [
+        ":main_add-eq-6_common",
+        ":add-eq-6_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-6_bisection",
+    srcs = ["add-eq-6/add-eq-6_bisection.cpp"],
+    hdrs = ["add-eq-6/add-eq-6_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-6_closed",
+    srcs = ["add-eq-6/add-eq-6_closed.cpp"],
+    hdrs = ["add-eq-6/add-eq-6_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-6_direct",
+    srcs = ["add-eq-6/add-eq-6_direct.cpp"],
+    hdrs = ["add-eq-6/add-eq-6_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-0_common",
+    srcs = ["add-eq-0/main_add-eq-0_common.cpp"],
+    hdrs = ["add-eq-0/main_add-eq-0_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-0_bisection",
+    srcs = ["add-eq-0/main_add-eq-0_bisection.cpp"],
+    deps = [
+        ":main_add-eq-0_common",
+        ":add-eq-0_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-0_closed",
+    srcs = ["add-eq-0/main_add-eq-0_closed.cpp"],
+    deps = [
+        ":main_add-eq-0_common",
+        ":add-eq-0_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-0_direct",
+    srcs = ["add-eq-0/main_add-eq-0_direct.cpp"],
+    deps = [
+        ":main_add-eq-0_common",
+        ":add-eq-0_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-0_bisection",
+    srcs = ["add-eq-0/add-eq-0_bisection.cpp"],
+    hdrs = ["add-eq-0/add-eq-0_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-0_closed",
+    srcs = ["add-eq-0/add-eq-0_closed.cpp"],
+    hdrs = ["add-eq-0/add-eq-0_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-0_direct",
+    srcs = ["add-eq-0/add-eq-0_direct.cpp"],
+    hdrs = ["add-eq-0/add-eq-0_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-end_common",
+    srcs = ["add-end/main_add-end_common.cpp"],
+    hdrs = ["add-end/main_add-end_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-end_bisection",
+    srcs = ["add-end/main_add-end_bisection.cpp"],
+    deps = [
+        ":main_add-end_common",
+        ":add-end_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-end_closed",
+    srcs = ["add-end/main_add-end_closed.cpp"],
+    deps = [
+        ":main_add-end_common",
+        ":add-end_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-end_direct",
+    srcs = ["add-end/main_add-end_direct.cpp"],
+    deps = [
+        ":main_add-end_common",
+        ":add-end_direct",
+    ],
+)
+
+cc_library(
+    name = "add-end_bisection",
+    srcs = ["add-end/add-end_bisection.cpp"],
+    hdrs = ["add-end/add-end_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-end_closed",
+    srcs = ["add-end/add-end_closed.cpp"],
+    hdrs = ["add-end/add-end_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-end_direct",
+    srcs = ["add-end/add-end_direct.cpp"],
+    hdrs = ["add-end/add-end_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
