@@ -2658,3 +2658,580 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+cc_library(
+    name = "main_add-256-4_common",
+    srcs = ["add-256-4/main_add-256-4_common.cpp"],
+    hdrs = ["add-256-4/main_add-256-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-256-4_bisection",
+    srcs = ["add-256-4/main_add-256-4_bisection.cpp"],
+    deps = [
+        ":main_add-256-4_common",
+        ":add-256-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-256-4_closed",
+    srcs = ["add-256-4/main_add-256-4_closed.cpp"],
+    deps = [
+        ":main_add-256-4_common",
+        ":add-256-4_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-256-4_direct",
+    srcs = ["add-256-4/main_add-256-4_direct.cpp"],
+    deps = [
+        ":main_add-256-4_common",
+        ":add-256-4_direct",
+    ],
+)
+
+cc_library(
+    name = "add-256-4_bisection",
+    srcs = ["add-256-4/add-256-4_bisection.cpp"],
+    hdrs = ["add-256-4/add-256-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-256-4_closed",
+    srcs = ["add-256-4/add-256-4_closed.cpp"],
+    hdrs = ["add-256-4/add-256-4_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-256-4_direct",
+    srcs = ["add-256-4/add-256-4_direct.cpp"],
+    hdrs = ["add-256-4/add-256-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+
+cc_library(
+    name = "main_add-num-1_common",
+    srcs = ["add-num-1/main_add-num-1_common.cpp"],
+    hdrs = ["add-num-1/main_add-num-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-1_bisection",
+    srcs = ["add-num-1/main_add-num-1_bisection.cpp"],
+    deps = [
+        ":main_add-num-1_common",
+        ":add-num-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-1_closed",
+    srcs = ["add-num-1/main_add-num-1_closed.cpp"],
+    deps = [
+        ":main_add-num-1_common",
+        ":add-num-1_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-1_direct",
+    srcs = ["add-num-1/main_add-num-1_direct.cpp"],
+    deps = [
+        ":main_add-num-1_common",
+        ":add-num-1_direct",
+    ],
+)
+
+cc_library(
+    name = "add-num-1_bisection",
+    srcs = ["add-num-1/add-num-1_bisection.cpp"],
+    hdrs = ["add-num-1/add-num-1_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-1_closed",
+    srcs = ["add-num-1/add-num-1_closed.cpp"],
+    hdrs = ["add-num-1/add-num-1_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-1_direct",
+    srcs = ["add-num-1/add-num-1_direct.cpp"],
+    hdrs = ["add-num-1/add-num-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-num-32_common",
+    srcs = ["add-num-32/main_add-num-32_common.cpp"],
+    hdrs = ["add-num-32/main_add-num-32_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-32_bisection",
+    srcs = ["add-num-32/main_add-num-32_bisection.cpp"],
+    deps = [
+        ":main_add-num-32_common",
+        ":add-num-32_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-32_closed",
+    srcs = ["add-num-32/main_add-num-32_closed.cpp"],
+    deps = [
+        ":main_add-num-32_common",
+        ":add-num-32_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-32_direct",
+    srcs = ["add-num-32/main_add-num-32_direct.cpp"],
+    deps = [
+        ":main_add-num-32_common",
+        ":add-num-32_direct",
+    ],
+)
+
+cc_library(
+    name = "add-num-32_bisection",
+    srcs = ["add-num-32/add-num-32_bisection.cpp"],
+    hdrs = ["add-num-32/add-num-32_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-32_closed",
+    srcs = ["add-num-32/add-num-32_closed.cpp"],
+    hdrs = ["add-num-32/add-num-32_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-32_direct",
+    srcs = ["add-num-32/add-num-32_direct.cpp"],
+    hdrs = ["add-num-32/add-num-32_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-num-64_common",
+    srcs = ["add-num-64/main_add-num-64_common.cpp"],
+    hdrs = ["add-num-64/main_add-num-64_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-64_bisection",
+    srcs = ["add-num-64/main_add-num-64_bisection.cpp"],
+    deps = [
+        ":main_add-num-64_common",
+        ":add-num-64_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-64_closed",
+    srcs = ["add-num-64/main_add-num-64_closed.cpp"],
+    deps = [
+        ":main_add-num-64_common",
+        ":add-num-64_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-64_direct",
+    srcs = ["add-num-64/main_add-num-64_direct.cpp"],
+    deps = [
+        ":main_add-num-64_common",
+        ":add-num-64_direct",
+    ],
+)
+
+cc_library(
+    name = "add-num-64_bisection",
+    srcs = ["add-num-64/add-num-64_bisection.cpp"],
+    hdrs = ["add-num-64/add-num-64_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-64_closed",
+    srcs = ["add-num-64/add-num-64_closed.cpp"],
+    hdrs = ["add-num-64/add-num-64_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-64_direct",
+    srcs = ["add-num-64/add-num-64_direct.cpp"],
+    hdrs = ["add-num-64/add-num-64_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-num-128_common",
+    srcs = ["add-num-128/main_add-num-128_common.cpp"],
+    hdrs = ["add-num-128/main_add-num-128_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-128_bisection",
+    srcs = ["add-num-128/main_add-num-128_bisection.cpp"],
+    deps = [
+        ":main_add-num-128_common",
+        ":add-num-128_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-128_closed",
+    srcs = ["add-num-128/main_add-num-128_closed.cpp"],
+    deps = [
+        ":main_add-num-128_common",
+        ":add-num-128_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-num-128_direct",
+    srcs = ["add-num-128/main_add-num-128_direct.cpp"],
+    deps = [
+        ":main_add-num-128_common",
+        ":add-num-128_direct",
+    ],
+)
+
+cc_library(
+    name = "add-num-128_bisection",
+    srcs = ["add-num-128/add-num-128_bisection.cpp"],
+    hdrs = ["add-num-128/add-num-128_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-128_closed",
+    srcs = ["add-num-128/add-num-128_closed.cpp"],
+    hdrs = ["add-num-128/add-num-128_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-num-128_direct",
+    srcs = ["add-num-128/add-num-128_direct.cpp"],
+    hdrs = ["add-num-128/add-num-128_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-num-128_common",
+    srcs = ["rotate-num-128/main_rotate-num-128_common.cpp"],
+    hdrs = ["rotate-num-128/main_rotate-num-128_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-128_bisection",
+    srcs = ["rotate-num-128/main_rotate-num-128_bisection.cpp"],
+    deps = [
+        ":main_rotate-num-128_common",
+        ":rotate-num-128_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-128_closed",
+    srcs = ["rotate-num-128/main_rotate-num-128_closed.cpp"],
+    deps = [
+        ":main_rotate-num-128_common",
+        ":rotate-num-128_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-128_direct",
+    srcs = ["rotate-num-128/main_rotate-num-128_direct.cpp"],
+    deps = [
+        ":main_rotate-num-128_common",
+        ":rotate-num-128_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-128_bisection",
+    srcs = ["rotate-num-128/rotate-num-128_bisection.cpp"],
+    hdrs = ["rotate-num-128/rotate-num-128_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-128_closed",
+    srcs = ["rotate-num-128/rotate-num-128_closed.cpp"],
+    hdrs = ["rotate-num-128/rotate-num-128_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-128_direct",
+    srcs = ["rotate-num-128/rotate-num-128_direct.cpp"],
+    hdrs = ["rotate-num-128/rotate-num-128_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-num-64_common",
+    srcs = ["rotate-num-64/main_rotate-num-64_common.cpp"],
+    hdrs = ["rotate-num-64/main_rotate-num-64_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-64_bisection",
+    srcs = ["rotate-num-64/main_rotate-num-64_bisection.cpp"],
+    deps = [
+        ":main_rotate-num-64_common",
+        ":rotate-num-64_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-64_closed",
+    srcs = ["rotate-num-64/main_rotate-num-64_closed.cpp"],
+    deps = [
+        ":main_rotate-num-64_common",
+        ":rotate-num-64_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-64_direct",
+    srcs = ["rotate-num-64/main_rotate-num-64_direct.cpp"],
+    deps = [
+        ":main_rotate-num-64_common",
+        ":rotate-num-64_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-64_bisection",
+    srcs = ["rotate-num-64/rotate-num-64_bisection.cpp"],
+    hdrs = ["rotate-num-64/rotate-num-64_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-64_closed",
+    srcs = ["rotate-num-64/rotate-num-64_closed.cpp"],
+    hdrs = ["rotate-num-64/rotate-num-64_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-64_direct",
+    srcs = ["rotate-num-64/rotate-num-64_direct.cpp"],
+    hdrs = ["rotate-num-64/rotate-num-64_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-num-32_common",
+    srcs = ["rotate-num-32/main_rotate-num-32_common.cpp"],
+    hdrs = ["rotate-num-32/main_rotate-num-32_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-32_bisection",
+    srcs = ["rotate-num-32/main_rotate-num-32_bisection.cpp"],
+    deps = [
+        ":main_rotate-num-32_common",
+        ":rotate-num-32_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-32_closed",
+    srcs = ["rotate-num-32/main_rotate-num-32_closed.cpp"],
+    deps = [
+        ":main_rotate-num-32_common",
+        ":rotate-num-32_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-32_direct",
+    srcs = ["rotate-num-32/main_rotate-num-32_direct.cpp"],
+    deps = [
+        ":main_rotate-num-32_common",
+        ":rotate-num-32_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-32_bisection",
+    srcs = ["rotate-num-32/rotate-num-32_bisection.cpp"],
+    hdrs = ["rotate-num-32/rotate-num-32_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-32_closed",
+    srcs = ["rotate-num-32/rotate-num-32_closed.cpp"],
+    hdrs = ["rotate-num-32/rotate-num-32_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-32_direct",
+    srcs = ["rotate-num-32/rotate-num-32_direct.cpp"],
+    hdrs = ["rotate-num-32/rotate-num-32_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-num-1_common",
+    srcs = ["rotate-num-1/main_rotate-num-1_common.cpp"],
+    hdrs = ["rotate-num-1/main_rotate-num-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-1_bisection",
+    srcs = ["rotate-num-1/main_rotate-num-1_bisection.cpp"],
+    deps = [
+        ":main_rotate-num-1_common",
+        ":rotate-num-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-1_closed",
+    srcs = ["rotate-num-1/main_rotate-num-1_closed.cpp"],
+    deps = [
+        ":main_rotate-num-1_common",
+        ":rotate-num-1_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-num-1_direct",
+    srcs = ["rotate-num-1/main_rotate-num-1_direct.cpp"],
+    deps = [
+        ":main_rotate-num-1_common",
+        ":rotate-num-1_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-1_bisection",
+    srcs = ["rotate-num-1/rotate-num-1_bisection.cpp"],
+    hdrs = ["rotate-num-1/rotate-num-1_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-1_closed",
+    srcs = ["rotate-num-1/rotate-num-1_closed.cpp"],
+    hdrs = ["rotate-num-1/rotate-num-1_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-num-1_direct",
+    srcs = ["rotate-num-1/rotate-num-1_direct.cpp"],
+    hdrs = ["rotate-num-1/rotate-num-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)

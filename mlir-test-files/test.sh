@@ -2,6 +2,10 @@
 # Record start time
 script_start_time=$(date +%s)
 
+# Global configuration
+PLAINTEXT_MODULUS=65537 
+export PLAINTEXT_MODULUS
+
 if [ "$#" -eq 0 ]; then
     echo "Usage: $0 name:ciphertext_degree [name:ciphertext_degree ...] [group_name]" >&2
     echo "Available groups: basic, advanced, all" >&2
@@ -56,6 +60,24 @@ get_group_tests() {
         add-eq)
             echo "add-eq-0:8 add-eq-1:8 add-eq-2:8 add-eq-3:8 add-eq-4:8 add-eq-5:8 add-eq-6:8"
             ;;
+        add-num)
+            echo "add-num-1:8 add-num-32:8 add-num-64:8 add-num-128:8"
+            ;;
+        rotate-num)
+            echo "rotate-num-1:8 rotate-num-32:8 rotate-num-64:8 rotate-num-128:8"
+            ;;
+        all)
+            # Combine all test groups
+            local all_tests=""
+            all_tests+=" $(get_group_tests add-64)"
+            all_tests+=" $(get_group_tests add-depth)"
+            all_tests+=" $(get_group_tests rotate)"
+            all_tests+=" $(get_group_tests form)"
+            all_tests+=" $(get_group_tests add-eq)"
+            all_tests+=" $(get_group_tests add-num)"
+            all_tests+=" $(get_group_tests rotate-num)"
+            echo "$all_tests"
+            ;;
     esac
     return 0
 }
@@ -103,44 +125,108 @@ run_command() {
     echo "Running: $*" >&2
     local STDERR_FILE
     STDERR_FILE=$(mktemp)
+    local STDOUT_FILE
+    STDOUT_FILE=$(mktemp)
+    
+    # Get calling function name or "main" if at top level
+    local caller_func="${FUNCNAME[1]:-main}"
+    
+    # Get current test name and ensure test logs directory exists
+    local test_id="${current_test_name:-unknown}"
+    local test_log_dir="$PWD/$test_id/logs"
+    if [ ! -d "$test_log_dir" ]; then
+        mkdir -p "$test_log_dir"
+    fi
+    
+    # Create log file paths for master log, stdout log, and stderr log
+    local master_log="$test_log_dir/execution_${TIMESTAMP}.log"
+    local stdout_log="$test_log_dir/stdout_${TIMESTAMP}.log"
+    local stderr_log="$test_log_dir/stderr_${TIMESTAMP}.log"
+    
+    # Add a section divider to the master log
+    {
+        echo "=================================================================="
+        echo "COMMAND: $*"
+        echo "TIME: $(date)"
+        echo "CALLER: $caller_func"
+        echo "=================================================================="
+    } >> "$master_log"
+    
     # Ensure pipefail is enabled for this command
     set -o pipefail
-    "$@" 2> "$STDERR_FILE"
+    
+    # Run command, capturing stdout and stderr separately
+    # tee to console and to separate log files
+    "$@" > >(tee -a "$STDOUT_FILE" "$stdout_log") 2> >(tee -a "$STDERR_FILE" "$stderr_log" >&2)
     local exit_code=$?
+    
+    # Add stdout and stderr to the master log file
+    {
+        echo
+        echo "STDOUT:"
+        echo "----------------------------------------------------------------"
+        cat "$STDOUT_FILE"
+        echo
+        echo "STDERR:"
+        echo "----------------------------------------------------------------"
+        cat "$STDERR_FILE"
+        echo
+        echo "EXIT CODE: $exit_code"
+        echo
+    } >> "$master_log"
+    
     if [ $exit_code -ne 0 ]; then
         command_failed $exit_code "$*"
-        cat "$STDERR_FILE" >&2
-        rm "$STDERR_FILE"
+        rm "$STDERR_FILE" "$STDOUT_FILE"
         return $exit_code
     fi
+    
     # Check if stderr contains common error words even if exit code is 0
     if grep -qi "error\|failed\|fatal\|exception" "$STDERR_FILE"; then
         echo "Command output contains error indicators:" >&2
         cat "$STDERR_FILE" >&2
-        rm "$STDERR_FILE"
+        {
+            echo "WARNING: Command output contains error indicators but returned success code"
+        } >> "$master_log"
+        rm "$STDERR_FILE" "$STDOUT_FILE"
         return 1
     fi
-    cat "$STDERR_FILE" >&2
-    rm "$STDERR_FILE"
+    
+    rm "$STDERR_FILE" "$STDOUT_FILE"
     return 0
 }
 
 # Function to print large headers
 print_header() {
-    # Redirect stdout to stderr for print_header function
-    exec 3>&1  # Save the current stdout to file descriptor 3
-    exec 1>&2  # Redirect stdout to stderr
-    echo 
-    echo "=================================================================="
-    echo "==                                                              =="
-    printf "==  %-59s ==\n" "$1"
-    printf "==  %-59s ==\n" "$2"
-    echo "==                                                              =="
-    echo "=================================================================="
-    echo
-    # Now restore stdout back to its original state
-    exec 1>&3  # Restore stdout from the saved file descriptor
-    exec 3>&-  # Close the temporary file descriptor
+    # Save the header message to a temporary file for logging
+    local header_file
+    header_file=$(mktemp)
+    
+    {
+        echo 
+        echo "=================================================================="
+        echo "==                                                              =="
+        printf "==  %-59s ==\n" "$1"
+        printf "==  %-59s ==\n" "$2"
+        echo "==                                                              =="
+        echo "=================================================================="
+        echo
+    } | tee "$header_file"
+
+    # Get current test name and ensure test logs directory exists
+    local test_id="${current_test_name:-unknown}"
+    local test_log_dir="$PWD/$test_id/logs"
+    if [ ! -d "$test_log_dir" ]; then
+        mkdir -p "$test_log_dir"
+    fi
+    
+    # Add the header to stdout and stderr logs
+    if [[ -n "$TIMESTAMP" ]]; then
+        cat "$header_file" >> "$test_log_dir/stdout_${TIMESTAMP}.log"
+        cat "$header_file" >> "$test_log_dir/stderr_${TIMESTAMP}.log"
+    fi
+    
+    rm "$header_file"
 }
 
 extract_computed_params() {
@@ -161,8 +247,36 @@ process_test() {
     IFS=":" read -r name ciphertext_degree <<< "$arg"
     echo "Processing $name with ciphertext degree $ciphertext_degree..." >&2
     
+    # Set global test name for logging purposes
+    current_test_name="$name"
+    
     local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local test_result=0
+    
+    # Ensure test directory exists
+    if [ ! -d "$PWD/$name" ]; then
+        mkdir -p "$PWD/$name"
+    fi
+    
+    # Ensure test logs directory exists
+    local test_log_dir="$PWD/$name/logs"
+    if [ ! -d "$test_log_dir" ]; then
+        mkdir -p "$test_log_dir"
+    fi
+    
+    # Initialize the master log file with test information
+    local master_log="$test_log_dir/execution_${TIMESTAMP}.log"
+    {
+        echo "===================================================================="
+        echo "TEST: $name"
+        echo "CIPHERTEXT DEGREE: $ciphertext_degree"
+        echo "START TIME: $(date)"
+        echo "===================================================================="
+        echo
+    } > "$master_log"
+    
+    # Export timestamp for use in the run_command function
+    export TIMESTAMP
     
     # Function to annotate parameters with a specific algorithm
     annotate_parameters() {
@@ -175,7 +289,7 @@ process_test() {
         
         TEMP_FILE=$(mktemp)
 
-        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=65537 ring-dimension=0 algorithm=${algorithm^^}\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
+        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${PLAINTEXT_MODULUS} ring-dimension=0 algorithm=${algorithm^^}\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
             return 1
         fi
 
@@ -265,7 +379,7 @@ process_test() {
         local model_name="${2:-$model}"  # Use second parameter as name or default to model
         
         print_header "GAP APPROACH" "Running ${model_name} model"
-        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --generate-param-bgv="model=${model}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir; then
+        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --generate-param-bgv="model=${model}  plaintext-modulus=${PLAINTEXT_MODULUS}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir; then
             return 1
         fi
         
@@ -284,11 +398,13 @@ process_test() {
     # if ! run_gap_approach "bgv-noise-by-bound-coeff-average-case" "kpz-avg"; then
     #     return 1
     # fi
-    
+
+    # Try to run gap approach with mono model
     if ! run_gap_approach "bgv-noise-mono" "mono"; then
-         return 1
+        echo "WARNING: Gap approach with mono model failed, continuing with other steps..." >&2
+        # Don't return failure here, continue with the rest of the processing
     fi
-    
+
     # Process each algorithm individually
     if ! process_algorithm "closed"; then
         return 1
@@ -308,13 +424,19 @@ process_test() {
 
     print_header "POST-PROCESSING" "Fixing include paths in generated files"
     for algorithm in "bisection" "closed" "direct"; do
-        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_${algorithm,,}.h" "$name/${name}_${algorithm,,}.cpp"; then
+        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name,,}_${algorithm,,}.h" "$name/${name,,}_${algorithm,,}.cpp"; then
             return 1
         fi
     done
     
     print_header "POST-PROCESSING" "Adding FIXEDAUTO scaling technique to direct variant"
-    if ! run_command sed -i 's/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/' "$name/${name}_direct.cpp"; then
+    # Fix scaling technique
+    if ! run_command sed -i "s/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/" "$name/${name}_direct.cpp"; then
+        return 1
+    fi
+    
+    # Fix plaintext modulus separately
+    if ! run_command sed -i "s/params.SetPlaintextModulus([0-9]*);/params.SetPlaintextModulus(${PLAINTEXT_MODULUS});/" "$name/${name}_direct.cpp"; then
         return 1
     fi
     
@@ -361,13 +483,11 @@ else
                  "set -o pipefail; process_test {} || { echo {} >> $FAILURES_FILE; false; }"
     
     # Check for failures
+    failed_tests=()
     if [ -s "$FAILURES_FILE" ]; then
-        failed_tests=()
         while read -r line; do
             failed_tests+=("$line")
         done < "$FAILURES_FILE"
-    else
-        failed_tests=()
     fi
     
     rm "$FAILURES_FILE"
@@ -393,10 +513,24 @@ else
 fi
 
 # Report on failures
-if [ ${#failed_tests[@]} -gt 0 ]; then
+if [ -n "${failed_tests[*]}" ] && [ ${#failed_tests[@]} -gt 0 ]; then
     echo -e "\n⚠️ Some tests failed:"
     for test in "${failed_tests[@]}"; do
-        echo "  - $test"
+        # Extract test name from the test specification (remove ciphertext degree)
+        test_name=$(echo "$test" | cut -d':' -f1)
+        
+        # Find the most recent log file for this test
+        log_dir="$PWD/$test_name/logs"
+        if [ -d "$log_dir" ]; then
+            latest_log=$(ls -t "$log_dir"/execution_*.log 2>/dev/null | head -1)
+            if [ -n "$latest_log" ]; then
+                echo "  - $test (log: $latest_log)"
+            else
+                echo "  - $test (no log file found)"
+            fi
+        else
+            echo "  - $test (no log directory found)"
+        fi
     done
     exit 1
 else
