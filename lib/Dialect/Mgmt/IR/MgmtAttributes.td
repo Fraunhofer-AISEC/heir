@@ -53,6 +53,7 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
       - `scalingModSize` : param for OpenFHE SetScalingModSize
       - `evalAddCount` : param for OpenFHE SetEvalAddCount
       - `keySwitchCount` : param for OpenFHE SetKeySwitchCount
+      - `plaintextModulus` : param for OpenFHE SetPlaintextModulus
 
     When this attribute presents, the lowering of openfhe pass
     will use these parameters to set the corresponding OpenFHE
@@ -63,7 +64,7 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
 
     Example:
     ```
-    #openfhe_params = #mgmt.openfhe_params<evalAddCount = 1, keySwitchCount = 1, firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38>
+    #openfhe_params = #mgmt.openfhe_params<evalAddCount = 1, keySwitchCount = 1, firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38, plaintextModulus = 65537>
     ```
   }];
 
@@ -73,7 +74,8 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
     "int": $scalingModSize,
     "int": $firstModSize,
     "int": $evalAddCount,
-    "int": $keySwitchCount
+    "int": $keySwitchCount,
+    "int": $plaintextModulus
   );
   let assemblyFormat = "`<` struct(params) `>`";
 }

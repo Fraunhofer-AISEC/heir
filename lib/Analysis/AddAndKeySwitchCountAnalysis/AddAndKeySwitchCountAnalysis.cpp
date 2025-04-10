@@ -200,7 +200,7 @@ void annotateCount(Operation *top, DataFlowSolver *solver) {
     // annotate mgmt::OpenfheParamsAttr to func::FuncOp containing the genericOp
     auto *funcOp = genericOp->getParentOp();
     auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
-        funcOp->getContext(), 0, 0, 0, 0, maxAddCount, maxKeySwitchCount);
+        funcOp->getContext(), 0, 0, 0, 0, maxAddCount, maxKeySwitchCount, 0);
     //Check if the attribute is already present
     if (!funcOp->getAttrOfType<mgmt::OpenfheParamsAttr>(
             mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {

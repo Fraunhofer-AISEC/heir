@@ -878,7 +878,8 @@ static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
 
 static void annotateOpenfheParams(secret::GenericOp genericOp,
                                   int multiplicativeDepth, int ringDimension,
-                                  const std::vector<int> &moduliSizes) {
+                                  const std::vector<int> &moduliSizes,
+                                  int plaintextModulus) {
   auto *funcOp = ((Operation*) genericOp)->getParentOp();
 
   // Compute the first and scaling moduli sizes
@@ -887,7 +888,7 @@ static void annotateOpenfheParams(secret::GenericOp genericOp,
     
   auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
     funcOp->getContext(), multiplicativeDepth, ringDimension,
-    scalingModSize, firstModSize, 0, 0);
+    scalingModSize, firstModSize, 0, 0, plaintextModulus);
 
   funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName,
           openfheParamAttr);
@@ -1006,7 +1007,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
    }
 
    annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
-   annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli);
+   annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus);
   });
 }
 }  // namespace heir

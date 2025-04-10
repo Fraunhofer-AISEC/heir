@@ -114,6 +114,7 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
   int64_t scalingModSizeAttr = 0;
   int64_t firstModSizeAttr = 0;
   int64_t multDepthAttr = 0;
+  int64_t plaintextModulusAttr = 0;
 
   if (auto openfheParamsAttr = op->getAttrOfType<mgmt::OpenfheParamsAttr>(
           mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {
@@ -123,13 +124,19 @@ LogicalResult generateGenFunc(func::FuncOp op, const std::string &genFuncName,
     firstModSizeAttr = openfheParamsAttr.getFirstModSize();
     scalingModSizeAttr = openfheParamsAttr.getScalingModSize();
     multDepthAttr = openfheParamsAttr.getMultiplicativeDepth();
+    plaintextModulusAttr = openfheParamsAttr.getPlaintextModulus();
     // remove the attribute after reading
     op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
   }
 
   Type openfheParamsType = openfhe::CCParamsType::get(builder.getContext());
+  // If we have a plaintextModulus from the attribute, use it instead of the inferred plainMod
+  if (plaintextModulusAttr != 0) {
+    std::cerr << "Using plaintext modulus from attribute: " << plaintextModulusAttr << "\n";
+    plainMod = plaintextModulusAttr;
+  }
   Value ccParams = builder.create<openfhe::GenParamsOp>(
-      openfheParamsType, mulDepth, plainMod, ringDimensionAttr,scalingModSizeAttr, firstModSizeAttr, insecure, evalAddCount, keySwitchCount, encryptionTechniqueExtended);
+      openfheParamsType, mulDepth, plainMod, ringDimensionAttr, scalingModSizeAttr, firstModSizeAttr, insecure, evalAddCount, keySwitchCount, encryptionTechniqueExtended);
   Value cryptoContext = builder.create<openfhe::GenContextOp>(
       openfheContextType, ccParams,
       BoolAttr::get(builder.getContext(), hasBootstrapOp));
