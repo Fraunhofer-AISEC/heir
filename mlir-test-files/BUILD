@@ -3235,3 +3235,707 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+cc_library(
+    name = "main_add-eq-7_common",
+    srcs = ["add-eq-7/main_add-eq-7_common.cpp"],
+    hdrs = ["add-eq-7/main_add-eq-7_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-7_bisection",
+    srcs = ["add-eq-7/main_add-eq-7_bisection.cpp"],
+    deps = [
+        ":main_add-eq-7_common",
+        ":add-eq-7_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-7_closed",
+    srcs = ["add-eq-7/main_add-eq-7_closed.cpp"],
+    deps = [
+        ":main_add-eq-7_common",
+        ":add-eq-7_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-7_direct",
+    srcs = ["add-eq-7/main_add-eq-7_direct.cpp"],
+    deps = [
+        ":main_add-eq-7_common",
+        ":add-eq-7_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-7_bisection",
+    srcs = ["add-eq-7/add-eq-7_bisection.cpp"],
+    hdrs = ["add-eq-7/add-eq-7_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-7_closed",
+    srcs = ["add-eq-7/add-eq-7_closed.cpp"],
+    hdrs = ["add-eq-7/add-eq-7_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-7_direct",
+    srcs = ["add-eq-7/add-eq-7_direct.cpp"],
+    hdrs = ["add-eq-7/add-eq-7_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-8_common",
+    srcs = ["add-eq-8/main_add-eq-8_common.cpp"],
+    hdrs = ["add-eq-8/main_add-eq-8_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-8_bisection",
+    srcs = ["add-eq-8/main_add-eq-8_bisection.cpp"],
+    deps = [
+        ":main_add-eq-8_common",
+        ":add-eq-8_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-8_closed",
+    srcs = ["add-eq-8/main_add-eq-8_closed.cpp"],
+    deps = [
+        ":main_add-eq-8_common",
+        ":add-eq-8_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-8_direct",
+    srcs = ["add-eq-8/main_add-eq-8_direct.cpp"],
+    deps = [
+        ":main_add-eq-8_common",
+        ":add-eq-8_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-8_bisection",
+    srcs = ["add-eq-8/add-eq-8_bisection.cpp"],
+    hdrs = ["add-eq-8/add-eq-8_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-8_closed",
+    srcs = ["add-eq-8/add-eq-8_closed.cpp"],
+    hdrs = ["add-eq-8/add-eq-8_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-8_direct",
+    srcs = ["add-eq-8/add-eq-8_direct.cpp"],
+    hdrs = ["add-eq-8/add-eq-8_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-10_common",
+    srcs = ["add-eq-10/main_add-eq-10_common.cpp"],
+    hdrs = ["add-eq-10/main_add-eq-10_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-10_bisection",
+    srcs = ["add-eq-10/main_add-eq-10_bisection.cpp"],
+    deps = [
+        ":main_add-eq-10_common",
+        ":add-eq-10_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-10_closed",
+    srcs = ["add-eq-10/main_add-eq-10_closed.cpp"],
+    deps = [
+        ":main_add-eq-10_common",
+        ":add-eq-10_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-10_direct",
+    srcs = ["add-eq-10/main_add-eq-10_direct.cpp"],
+    deps = [
+        ":main_add-eq-10_common",
+        ":add-eq-10_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-10_bisection",
+    srcs = ["add-eq-10/add-eq-10_bisection.cpp"],
+    hdrs = ["add-eq-10/add-eq-10_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-10_closed",
+    srcs = ["add-eq-10/add-eq-10_closed.cpp"],
+    hdrs = ["add-eq-10/add-eq-10_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-10_direct",
+    srcs = ["add-eq-10/add-eq-10_direct.cpp"],
+    hdrs = ["add-eq-10/add-eq-10_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-9_common",
+    srcs = ["add-eq-9/main_add-eq-9_common.cpp"],
+    hdrs = ["add-eq-9/main_add-eq-9_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-9_bisection",
+    srcs = ["add-eq-9/main_add-eq-9_bisection.cpp"],
+    deps = [
+        ":main_add-eq-9_common",
+        ":add-eq-9_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-9_closed",
+    srcs = ["add-eq-9/main_add-eq-9_closed.cpp"],
+    deps = [
+        ":main_add-eq-9_common",
+        ":add-eq-9_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-9_direct",
+    srcs = ["add-eq-9/main_add-eq-9_direct.cpp"],
+    deps = [
+        ":main_add-eq-9_common",
+        ":add-eq-9_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-9_bisection",
+    srcs = ["add-eq-9/add-eq-9_bisection.cpp"],
+    hdrs = ["add-eq-9/add-eq-9_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-9_closed",
+    srcs = ["add-eq-9/add-eq-9_closed.cpp"],
+    hdrs = ["add-eq-9/add-eq-9_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-9_direct",
+    srcs = ["add-eq-9/add-eq-9_direct.cpp"],
+    hdrs = ["add-eq-9/add-eq-9_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-11_common",
+    srcs = ["add-eq-11/main_add-eq-11_common.cpp"],
+    hdrs = ["add-eq-11/main_add-eq-11_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-11_bisection",
+    srcs = ["add-eq-11/main_add-eq-11_bisection.cpp"],
+    deps = [
+        ":main_add-eq-11_common",
+        ":add-eq-11_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-11_closed",
+    srcs = ["add-eq-11/main_add-eq-11_closed.cpp"],
+    deps = [
+        ":main_add-eq-11_common",
+        ":add-eq-11_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-11_direct",
+    srcs = ["add-eq-11/main_add-eq-11_direct.cpp"],
+    deps = [
+        ":main_add-eq-11_common",
+        ":add-eq-11_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-11_bisection",
+    srcs = ["add-eq-11/add-eq-11_bisection.cpp"],
+    hdrs = ["add-eq-11/add-eq-11_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-11_closed",
+    srcs = ["add-eq-11/add-eq-11_closed.cpp"],
+    hdrs = ["add-eq-11/add-eq-11_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-11_direct",
+    srcs = ["add-eq-11/add-eq-11_direct.cpp"],
+    hdrs = ["add-eq-11/add-eq-11_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-12_common",
+    srcs = ["add-eq-12/main_add-eq-12_common.cpp"],
+    hdrs = ["add-eq-12/main_add-eq-12_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-12_bisection",
+    srcs = ["add-eq-12/main_add-eq-12_bisection.cpp"],
+    deps = [
+        ":main_add-eq-12_common",
+        ":add-eq-12_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-12_closed",
+    srcs = ["add-eq-12/main_add-eq-12_closed.cpp"],
+    deps = [
+        ":main_add-eq-12_common",
+        ":add-eq-12_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-12_direct",
+    srcs = ["add-eq-12/main_add-eq-12_direct.cpp"],
+    deps = [
+        ":main_add-eq-12_common",
+        ":add-eq-12_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-12_bisection",
+    srcs = ["add-eq-12/add-eq-12_bisection.cpp"],
+    hdrs = ["add-eq-12/add-eq-12_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-12_closed",
+    srcs = ["add-eq-12/add-eq-12_closed.cpp"],
+    hdrs = ["add-eq-12/add-eq-12_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-12_direct",
+    srcs = ["add-eq-12/add-eq-12_direct.cpp"],
+    hdrs = ["add-eq-12/add-eq-12_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-13_common",
+    srcs = ["add-eq-13/main_add-eq-13_common.cpp"],
+    hdrs = ["add-eq-13/main_add-eq-13_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-13_bisection",
+    srcs = ["add-eq-13/main_add-eq-13_bisection.cpp"],
+    deps = [
+        ":main_add-eq-13_common",
+        ":add-eq-13_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-13_closed",
+    srcs = ["add-eq-13/main_add-eq-13_closed.cpp"],
+    deps = [
+        ":main_add-eq-13_common",
+        ":add-eq-13_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-13_direct",
+    srcs = ["add-eq-13/main_add-eq-13_direct.cpp"],
+    deps = [
+        ":main_add-eq-13_common",
+        ":add-eq-13_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-13_bisection",
+    srcs = ["add-eq-13/add-eq-13_bisection.cpp"],
+    hdrs = ["add-eq-13/add-eq-13_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-13_closed",
+    srcs = ["add-eq-13/add-eq-13_closed.cpp"],
+    hdrs = ["add-eq-13/add-eq-13_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-13_direct",
+    srcs = ["add-eq-13/add-eq-13_direct.cpp"],
+    hdrs = ["add-eq-13/add-eq-13_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-14_common",
+    srcs = ["add-eq-14/main_add-eq-14_common.cpp"],
+    hdrs = ["add-eq-14/main_add-eq-14_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-14_bisection",
+    srcs = ["add-eq-14/main_add-eq-14_bisection.cpp"],
+    deps = [
+        ":main_add-eq-14_common",
+        ":add-eq-14_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-14_closed",
+    srcs = ["add-eq-14/main_add-eq-14_closed.cpp"],
+    deps = [
+        ":main_add-eq-14_common",
+        ":add-eq-14_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-14_direct",
+    srcs = ["add-eq-14/main_add-eq-14_direct.cpp"],
+    deps = [
+        ":main_add-eq-14_common",
+        ":add-eq-14_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-14_bisection",
+    srcs = ["add-eq-14/add-eq-14_bisection.cpp"],
+    hdrs = ["add-eq-14/add-eq-14_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-14_closed",
+    srcs = ["add-eq-14/add-eq-14_closed.cpp"],
+    hdrs = ["add-eq-14/add-eq-14_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-14_direct",
+    srcs = ["add-eq-14/add-eq-14_direct.cpp"],
+    hdrs = ["add-eq-14/add-eq-14_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-16_common",
+    srcs = ["add-eq-16/main_add-eq-16_common.cpp"],
+    hdrs = ["add-eq-16/main_add-eq-16_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-16_bisection",
+    srcs = ["add-eq-16/main_add-eq-16_bisection.cpp"],
+    deps = [
+        ":main_add-eq-16_common",
+        ":add-eq-16_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-16_closed",
+    srcs = ["add-eq-16/main_add-eq-16_closed.cpp"],
+    deps = [
+        ":main_add-eq-16_common",
+        ":add-eq-16_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-16_direct",
+    srcs = ["add-eq-16/main_add-eq-16_direct.cpp"],
+    deps = [
+        ":main_add-eq-16_common",
+        ":add-eq-16_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-16_bisection",
+    srcs = ["add-eq-16/add-eq-16_bisection.cpp"],
+    hdrs = ["add-eq-16/add-eq-16_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-16_closed",
+    srcs = ["add-eq-16/add-eq-16_closed.cpp"],
+    hdrs = ["add-eq-16/add-eq-16_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-16_direct",
+    srcs = ["add-eq-16/add-eq-16_direct.cpp"],
+    hdrs = ["add-eq-16/add-eq-16_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-18_common",
+    srcs = ["add-eq-18/main_add-eq-18_common.cpp"],
+    hdrs = ["add-eq-18/main_add-eq-18_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-18_bisection",
+    srcs = ["add-eq-18/main_add-eq-18_bisection.cpp"],
+    deps = [
+        ":main_add-eq-18_common",
+        ":add-eq-18_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-18_closed",
+    srcs = ["add-eq-18/main_add-eq-18_closed.cpp"],
+    deps = [
+        ":main_add-eq-18_common",
+        ":add-eq-18_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-18_direct",
+    srcs = ["add-eq-18/main_add-eq-18_direct.cpp"],
+    deps = [
+        ":main_add-eq-18_common",
+        ":add-eq-18_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-18_bisection",
+    srcs = ["add-eq-18/add-eq-18_bisection.cpp"],
+    hdrs = ["add-eq-18/add-eq-18_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-18_closed",
+    srcs = ["add-eq-18/add-eq-18_closed.cpp"],
+    hdrs = ["add-eq-18/add-eq-18_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-18_direct",
+    srcs = ["add-eq-18/add-eq-18_direct.cpp"],
+    hdrs = ["add-eq-18/add-eq-18_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-eq-20_common",
+    srcs = ["add-eq-20/main_add-eq-20_common.cpp"],
+    hdrs = ["add-eq-20/main_add-eq-20_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-20_bisection",
+    srcs = ["add-eq-20/main_add-eq-20_bisection.cpp"],
+    deps = [
+        ":main_add-eq-20_common",
+        ":add-eq-20_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-20_closed",
+    srcs = ["add-eq-20/main_add-eq-20_closed.cpp"],
+    deps = [
+        ":main_add-eq-20_common",
+        ":add-eq-20_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-eq-20_direct",
+    srcs = ["add-eq-20/main_add-eq-20_direct.cpp"],
+    deps = [
+        ":main_add-eq-20_common",
+        ":add-eq-20_direct",
+    ],
+)
+
+cc_library(
+    name = "add-eq-20_bisection",
+    srcs = ["add-eq-20/add-eq-20_bisection.cpp"],
+    hdrs = ["add-eq-20/add-eq-20_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-20_closed",
+    srcs = ["add-eq-20/add-eq-20_closed.cpp"],
+    hdrs = ["add-eq-20/add-eq-20_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-eq-20_direct",
+    srcs = ["add-eq-20/add-eq-20_direct.cpp"],
+    hdrs = ["add-eq-20/add-eq-20_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)

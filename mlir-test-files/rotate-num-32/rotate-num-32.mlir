@@ -2059,7 +2059,6 @@ func.func @func(
   %s5_127_sq2 = arith.muli %s5_127_sq1, %s5_127_sq1 : tensor<8xi16>
   %s5_127_sq3 = arith.muli %s5_127_sq2, %s5_127_sq2 : tensor<8xi16>
   %l5_128 = arith.addi %l5_127, %s5_127_sq3 : tensor<8xi16>
-  %m5 = arith.muli %l5_128, %l5_128 : tensor<8xi16>
 
-  return %m5 : tensor<8xi16>
+  return  %l5_128 : tensor<8xi16>
 }

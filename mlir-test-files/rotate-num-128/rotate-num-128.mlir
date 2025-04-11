@@ -2447,7 +2447,6 @@ func.func @func(
   %s5_127_sq3 = arith.muli %s5_127_sq2, %s5_127_sq2 : tensor<8xi16>
   %l5_128 = arith.addi %rot5_127, %s5_127_sq3 : tensor<8xi16>
   %rot5_128 = tensor_ext.rotate %l5_128, %c1 : tensor<8xi16>, index
-  %m5 = arith.muli %rot5_128, %rot5_128 : tensor<8xi16>
 
-  return %m5 : tensor<8xi16>
+  return  %rot5_128 : tensor<8xi16>
 }
