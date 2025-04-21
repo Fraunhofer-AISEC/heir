@@ -3939,3 +3939,259 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+cc_library(
+    name = "main_rotate-of-1_common",
+    srcs = ["rotate-of-1/main_rotate-of-1_common.cpp"],
+    hdrs = ["rotate-of-1/main_rotate-of-1_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-1_bisection",
+    srcs = ["rotate-of-1/main_rotate-of-1_bisection.cpp"],
+    deps = [
+        ":main_rotate-of-1_common",
+        ":rotate-of-1_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-1_closed",
+    srcs = ["rotate-of-1/main_rotate-of-1_closed.cpp"],
+    deps = [
+        ":main_rotate-of-1_common",
+        ":rotate-of-1_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-1_direct",
+    srcs = ["rotate-of-1/main_rotate-of-1_direct.cpp"],
+    deps = [
+        ":main_rotate-of-1_common",
+        ":rotate-of-1_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-1_bisection",
+    srcs = ["rotate-of-1/rotate-of-1_bisection.cpp"],
+    hdrs = ["rotate-of-1/rotate-of-1_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-1_closed",
+    srcs = ["rotate-of-1/rotate-of-1_closed.cpp"],
+    hdrs = ["rotate-of-1/rotate-of-1_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-1_direct",
+    srcs = ["rotate-of-1/rotate-of-1_direct.cpp"],
+    hdrs = ["rotate-of-1/rotate-of-1_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-of-2_common",
+    srcs = ["rotate-of-2/main_rotate-of-2_common.cpp"],
+    hdrs = ["rotate-of-2/main_rotate-of-2_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-2_bisection",
+    srcs = ["rotate-of-2/main_rotate-of-2_bisection.cpp"],
+    deps = [
+        ":main_rotate-of-2_common",
+        ":rotate-of-2_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-2_closed",
+    srcs = ["rotate-of-2/main_rotate-of-2_closed.cpp"],
+    deps = [
+        ":main_rotate-of-2_common",
+        ":rotate-of-2_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-2_direct",
+    srcs = ["rotate-of-2/main_rotate-of-2_direct.cpp"],
+    deps = [
+        ":main_rotate-of-2_common",
+        ":rotate-of-2_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-2_bisection",
+    srcs = ["rotate-of-2/rotate-of-2_bisection.cpp"],
+    hdrs = ["rotate-of-2/rotate-of-2_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-2_closed",
+    srcs = ["rotate-of-2/rotate-of-2_closed.cpp"],
+    hdrs = ["rotate-of-2/rotate-of-2_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-2_direct",
+    srcs = ["rotate-of-2/rotate-of-2_direct.cpp"],
+    hdrs = ["rotate-of-2/rotate-of-2_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-of-3_common",
+    srcs = ["rotate-of-3/main_rotate-of-3_common.cpp"],
+    hdrs = ["rotate-of-3/main_rotate-of-3_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-3_bisection",
+    srcs = ["rotate-of-3/main_rotate-of-3_bisection.cpp"],
+    deps = [
+        ":main_rotate-of-3_common",
+        ":rotate-of-3_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-3_closed",
+    srcs = ["rotate-of-3/main_rotate-of-3_closed.cpp"],
+    deps = [
+        ":main_rotate-of-3_common",
+        ":rotate-of-3_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-3_direct",
+    srcs = ["rotate-of-3/main_rotate-of-3_direct.cpp"],
+    deps = [
+        ":main_rotate-of-3_common",
+        ":rotate-of-3_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-3_bisection",
+    srcs = ["rotate-of-3/rotate-of-3_bisection.cpp"],
+    hdrs = ["rotate-of-3/rotate-of-3_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-3_closed",
+    srcs = ["rotate-of-3/rotate-of-3_closed.cpp"],
+    hdrs = ["rotate-of-3/rotate-of-3_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-3_direct",
+    srcs = ["rotate-of-3/rotate-of-3_direct.cpp"],
+    hdrs = ["rotate-of-3/rotate-of-3_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_rotate-of-4_common",
+    srcs = ["rotate-of-4/main_rotate-of-4_common.cpp"],
+    hdrs = ["rotate-of-4/main_rotate-of-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-4_bisection",
+    srcs = ["rotate-of-4/main_rotate-of-4_bisection.cpp"],
+    deps = [
+        ":main_rotate-of-4_common",
+        ":rotate-of-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-4_closed",
+    srcs = ["rotate-of-4/main_rotate-of-4_closed.cpp"],
+    deps = [
+        ":main_rotate-of-4_common",
+        ":rotate-of-4_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_rotate-of-4_direct",
+    srcs = ["rotate-of-4/main_rotate-of-4_direct.cpp"],
+    deps = [
+        ":main_rotate-of-4_common",
+        ":rotate-of-4_direct",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-4_bisection",
+    srcs = ["rotate-of-4/rotate-of-4_bisection.cpp"],
+    hdrs = ["rotate-of-4/rotate-of-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-4_closed",
+    srcs = ["rotate-of-4/rotate-of-4_closed.cpp"],
+    hdrs = ["rotate-of-4/rotate-of-4_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "rotate-of-4_direct",
+    srcs = ["rotate-of-4/rotate-of-4_direct.cpp"],
+    hdrs = ["rotate-of-4/rotate-of-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)

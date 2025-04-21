@@ -1,30 +1,51 @@
 /data
+/data_*
 
 add-64-*/add-64-*_*.cpp
 add-64-*/add-64-*_*.h
 add-64-*/add-64-*-*.mlir
+add-64-*/logs/*
 
 add-depth-*/add-depth-*_*.cpp
 add-depth-*/add-depth-*_*.h
 add-depth-*/add-depth-*-*.mlir
 add-depth-[0-9][0-9]*/add-depth-[0-9][0-9]*_*
+add-depth-*/logs
 
 add-eq-*/add-eq-*_*.cpp
 add-eq-*/add-eq-*_*.h
 add-eq-*/add-eq-*-*.mlir
+add-eq-*/logs/*
 
 add-end/add-end_*.cpp
 add-end/add-end_*.h
 add-end/add-end-*.mlir
+add-end/logs/*
 
-rotate-*/rotate-*_*.cpp
-rotate-*/rotate-*_*.h
-rotate-*/rotate-*-*.mlir
+add-num-*/add-num-*_*.cpp
+add-num-*/add-num-*_*.h
+add-num-*/add-num-*-*.mlir
+add-num-*/logs/*
+
+rotate-[0-9]/rotate-*_*.cpp
+rotate-[0-9]/rotate-*_*.h
+rotate-[0-9]/rotate-*-*.mlir
+rotate-[0-9]/logs/*
+
+rotate-of-[0-9]/rotate-of-*_*.cpp
+rotate-of-[0-9]/rotate-of-*_*.h
+rotate-of-[0-9]/rotate-of-*-*.mlir
+rotate-of-[0-9]/logs/*
+
+rotate-num-*/rotate-num-*_*.cpp
+rotate-num-*/rotate-num-*_*.h
+rotate-num-*/rotate-num-*-*.mlir
+rotate-num-*/logs/*
 
 form-*/form-*_*.cpp
 form-*/form-*_*.h
 form-*/form-*-*.mlir
-
+form-*/logs/*
 
 dot8/dot8-*.mlir
 dot8/dot8_*.cpp

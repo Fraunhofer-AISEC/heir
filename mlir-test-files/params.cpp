@@ -84,10 +84,6 @@ std::string getParamsAsJsonString(const CryptoContext<DCRTPoly>& cc,
   return ss.str();
 }
 
-void printModulusChain(const CryptoContext<DCRTPoly>& cc) {
-  std::cout << getParamsAsJsonString(cc, "PLEASE USE NEW METHOD!", "") << std::endl;
-}
-
 // Print parameters to standard output
 void printModulusChain(const CryptoContext<DCRTPoly>& cc, const std::string& testname,const std::string& selectionApproach) {
   std::cout << getParamsAsJsonString(cc, testname, selectionApproach) << std::endl;
