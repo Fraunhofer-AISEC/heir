@@ -1,7 +1,7 @@
 func.func @func(
-  %arg0: tensor<8xi16>,  %arg1: tensor<8xi16>,  %arg2: tensor<8xi16>,  %arg3: tensor<8xi16>,
-  %arg4: tensor<8xi16>,  %arg5: tensor<8xi16>,  %arg6: tensor<8xi16>,  %arg7: tensor<8xi16>,
-  %arg8: tensor<8xi16>,  %arg9: tensor<8xi16>,  %arg10: tensor<8xi16>, %arg11: tensor<8xi16>,
+  %arg0: tensor<8xi16>, %arg1: tensor<8xi16>, %arg2: tensor<8xi16>, %arg3: tensor<8xi16>,
+  %arg4: tensor<8xi16>, %arg5: tensor<8xi16>, %arg6: tensor<8xi16>, %arg7: tensor<8xi16>,
+  %arg8: tensor<8xi16>, %arg9: tensor<8xi16>, %arg10: tensor<8xi16>, %arg11: tensor<8xi16>,
   %arg12: tensor<8xi16>, %arg13: tensor<8xi16>, %arg14: tensor<8xi16>, %arg15: tensor<8xi16>,
   %arg16: tensor<8xi16>, %arg17: tensor<8xi16>, %arg18: tensor<8xi16>, %arg19: tensor<8xi16>,
   %arg20: tensor<8xi16>, %arg21: tensor<8xi16>, %arg22: tensor<8xi16>, %arg23: tensor<8xi16>,
@@ -17,18 +17,18 @@ func.func @func(
   %arg60: tensor<8xi16>, %arg61: tensor<8xi16>, %arg62: tensor<8xi16>, %arg63: tensor<8xi16>
 ) -> tensor<8xi16> {
   //-------------------------------------------------------------------------
-  // Level 1: 32 additions (0 squarings)
-  // Using operands: %arg0 ... %arg32 (33 operands for 32 additions)
+  // Level 1: 31 additions (0 squarings)
+  // Use operands: %arg0 ... %arg31 (32 operands for 31 additions)
   %l1_1  = arith.addi %arg0, %arg1 : tensor<8xi16>
-  %l1_2  = arith.addi %l1_1,  %arg2 : tensor<8xi16>
-  %l1_3  = arith.addi %l1_2,  %arg3 : tensor<8xi16>
-  %l1_4  = arith.addi %l1_3,  %arg4 : tensor<8xi16>
-  %l1_5  = arith.addi %l1_4,  %arg5 : tensor<8xi16>
-  %l1_6  = arith.addi %l1_5,  %arg6 : tensor<8xi16>
-  %l1_7  = arith.addi %l1_6,  %arg7 : tensor<8xi16>
-  %l1_8  = arith.addi %l1_7,  %arg8 : tensor<8xi16>
-  %l1_9  = arith.addi %l1_8,  %arg9 : tensor<8xi16>
-  %l1_10 = arith.addi %l1_9,  %arg10 : tensor<8xi16>
+  %l1_2  = arith.addi %l1_1, %arg2 : tensor<8xi16>
+  %l1_3  = arith.addi %l1_2, %arg3 : tensor<8xi16>
+  %l1_4  = arith.addi %l1_3, %arg4 : tensor<8xi16>
+  %l1_5  = arith.addi %l1_4, %arg5 : tensor<8xi16>
+  %l1_6  = arith.addi %l1_5, %arg6 : tensor<8xi16>
+  %l1_7  = arith.addi %l1_6, %arg7 : tensor<8xi16>
+  %l1_8  = arith.addi %l1_7, %arg8 : tensor<8xi16>
+  %l1_9  = arith.addi %l1_8, %arg9 : tensor<8xi16>
+  %l1_10 = arith.addi %l1_9, %arg10 : tensor<8xi16>
   %l1_11 = arith.addi %l1_10, %arg11 : tensor<8xi16>
   %l1_12 = arith.addi %l1_11, %arg12 : tensor<8xi16>
   %l1_13 = arith.addi %l1_12, %arg13 : tensor<8xi16>
@@ -50,7 +50,5 @@ func.func @func(
   %l1_29 = arith.addi %l1_28, %arg29 : tensor<8xi16>
   %l1_30 = arith.addi %l1_29, %arg30 : tensor<8xi16>
   %l1_31 = arith.addi %l1_30, %arg31 : tensor<8xi16>
-  %l1_32 = arith.addi %l1_31, %arg32 : tensor<8xi16>
-
-  return %l1_32 : tensor<8xi16>
+  return %l1_31 : tensor<8xi16>
 }

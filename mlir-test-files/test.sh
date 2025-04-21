@@ -6,13 +6,35 @@ script_start_time=$(date +%s)
 PLAINTEXT_MODULUS=65537 
 export PLAINTEXT_MODULUS
 
+# Define test-specific plaintext moduli
+declare -A TEST_PLAINTEXT_MODULI=(
+    ["add-64-0"]=786433
+    ["add-64-1"]=786433
+    ["add-64-2"]=786433
+    ["add-64-3"]=786433
+    ["add-64-4"]=786433
+)
+
+# Get plaintext modulus for a specific test
+get_test_plaintext_modulus() {
+    local test_name="$1"
+    local base_name="${test_name%%:*}" # Remove ciphertext degree
+
+    # Check if there's a specific modulus for this test
+    if [[ -n "${TEST_PLAINTEXT_MODULI[$base_name]}" ]]; then
+        echo "${TEST_PLAINTEXT_MODULI[$base_name]}"
+    else
+        echo "$PLAINTEXT_MODULUS"  # Return default
+    fi
+}
+
 if [ "$#" -eq 0 ]; then
     echo "Usage: $0 name:ciphertext_degree [name:ciphertext_degree ...] [group_name]" >&2
     echo "Available groups: basic, advanced, all" >&2
     exit 1
 fi
 
-# Check for GNU Parallel
+# Check for GNU Parallel    
 if ! command -v parallel &> /dev/null; then
     echo "GNU Parallel is not installed. Installing it now..."
     sudo apt-get update && sudo apt-get install -y parallel
@@ -21,7 +43,7 @@ if ! command -v parallel &> /dev/null; then
         echo "Failed to install GNU Parallel. Running in sequential mode."
         USE_PARALLEL=false
     else
-        USE_PARALLEL=false
+        USE_PARALLEL=true
     fi
 else
     USE_PARALLEL=true
@@ -58,13 +80,16 @@ get_group_tests() {
             echo "form-equal:8 form-high-low:8 form-low-high:8 form-hill:8 form-valley:8 form-increasing:8 form-decreasing:8"
             ;;
         add-eq)
-            echo "add-eq-0:8 add-eq-1:8 add-eq-2:8 add-eq-3:8 add-eq-4:8 add-eq-5:8 add-eq-6:8"
+            echo "add-eq-0:8 add-eq-2:8 add-eq-4:8 add-eq-6:8 add-eq-8:8 add-eq-10:8 add-eq-12:8 add-eq-14:8 add-eq-16:8 add-eq-18:8 add-eq-20:8"
             ;;
         add-num)
             echo "add-num-1:8 add-num-32:8 add-num-64:8 add-num-128:8"
             ;;
         rotate-num)
             echo "rotate-num-1:8 rotate-num-32:8 rotate-num-64:8 rotate-num-128:8"
+            ;;
+        rotate-of)
+            echo "rotate-of-1:8 rotate-of-2:8 rotate-of-3:8 rotate-of-4:8"
             ;;
         all)
             # Combine all test groups
@@ -76,13 +101,14 @@ get_group_tests() {
             all_tests+=" $(get_group_tests add-eq)"
             all_tests+=" $(get_group_tests add-num)"
             all_tests+=" $(get_group_tests rotate-num)"
+            all_tests+=" $(get_group_tests rotate-of)"
             echo "$all_tests"
             ;;
     esac
     return 0
 }
 
-# Process arguments, expanding any groups
+# Process arguments, expanding any groups and attaching plaintext moduli
 expanded_args=()
 for arg in "$@"; do
     # Check if this is a group name (no colon)
@@ -91,7 +117,14 @@ for arg in "$@"; do
         if [ $? -eq 0 ]; then
             # Add each test from the group to expanded args
             for group_arg in $group_tests; do
-                expanded_args+=("$group_arg")
+                # Get the test name part (before the colon)
+                test_name="${group_arg%%:*}"
+                # Get the ciphertext degree part (after the colon)
+                ciphertext_degree="${group_arg#*:}"
+                # Get the plaintext modulus for this test
+                plaintext_mod=$(get_test_plaintext_modulus "$test_name")
+                # Construct a new argument with plaintext modulus embedded
+                expanded_args+=("${test_name}:${ciphertext_degree}:${plaintext_mod}")
             done
             echo "Expanded group '$arg' to: $group_tests" >&2
         else
@@ -100,7 +133,14 @@ for arg in "$@"; do
         fi
     else
         # Regular test specification
-        expanded_args+=("$arg")
+        # Get the test name part (before the colon)
+        test_name="${arg%%:*}"
+        # Get the ciphertext degree part (after the colon)
+        ciphertext_degree="${arg#*:}"
+        # Get the plaintext modulus for this test
+        plaintext_mod=$(get_test_plaintext_modulus "$test_name")
+        # Construct a new argument with plaintext modulus embedded
+        expanded_args+=("${test_name}:${ciphertext_degree}:${plaintext_mod}")
     fi
 done
 
@@ -244,8 +284,10 @@ extract_computed_params() {
 # Function to process a single test
 process_test() {
     local arg="$1"
-    IFS=":" read -r name ciphertext_degree <<< "$arg"
-    echo "Processing $name with ciphertext degree $ciphertext_degree..." >&2
+    # Split by colon to get test name, ciphertext degree, and plaintext modulus
+    IFS=":" read -r name ciphertext_degree test_plaintext_modulus <<< "$arg"
+    
+    echo "Processing $name with ciphertext degree $ciphertext_degree and plaintext modulus $test_plaintext_modulus..." >&2
     
     # Set global test name for logging purposes
     current_test_name="$name"
@@ -270,6 +312,7 @@ process_test() {
         echo "===================================================================="
         echo "TEST: $name"
         echo "CIPHERTEXT DEGREE: $ciphertext_degree"
+        echo "PLAINTEXT MODULUS: $test_plaintext_modulus"
         echo "START TIME: $(date)"
         echo "===================================================================="
         echo
@@ -289,7 +332,7 @@ process_test() {
         
         TEMP_FILE=$(mktemp)
 
-        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${PLAINTEXT_MODULUS} ring-dimension=0 algorithm=${algorithm^^}\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
+        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=${algorithm^^}\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
             return 1
         fi
 
@@ -379,7 +422,7 @@ process_test() {
         local model_name="${2:-$model}"  # Use second parameter as name or default to model
         
         print_header "GAP APPROACH" "Running ${model_name} model"
-        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --generate-param-bgv="model=${model}  plaintext-modulus=${PLAINTEXT_MODULUS}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir; then
+        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --debug-only=NoiseAnalysis --generate-param-bgv="model=${model}  plaintext-modulus=${test_plaintext_modulus}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir; then
             return 1
         fi
         
@@ -394,10 +437,10 @@ process_test() {
         return 1
     fi
 
-    # # Run gap approach with different noise models
-    # if ! run_gap_approach "bgv-noise-by-bound-coeff-average-case" "kpz-avg"; then
-    #     return 1
-    # fi
+    # Run gap approach with different noise models
+    if ! run_gap_approach "bgv-noise-by-bound-coeff-average-case" "kpz-avg"; then
+        return 1
+    fi
 
     # Try to run gap approach with mono model
     if ! run_gap_approach "bgv-noise-mono" "mono"; then
@@ -435,8 +478,8 @@ process_test() {
         return 1
     fi
     
-    # Fix plaintext modulus separately
-    if ! run_command sed -i "s/params.SetPlaintextModulus([0-9]*);/params.SetPlaintextModulus(${PLAINTEXT_MODULUS});/" "$name/${name}_direct.cpp"; then
+    # Fix plaintext modulus separately - use test_plaintext_modulus instead of PLAINTEXT_MODULUS
+    if ! run_command sed -i "s/params.SetPlaintextModulus([0-9]*);/params.SetPlaintextModulus(${test_plaintext_modulus});/" "$name/${name}_direct.cpp"; then
         return 1
     fi
     
@@ -474,12 +517,13 @@ else
     # Create a temporary file to capture failures
     FAILURES_FILE=$(mktemp)
     # Export the functions so they can be used in parallel
-    export -f process_test run_command command_failed print_header extract_computed_params
+    export -f process_test run_command command_failed print_header extract_computed_params get_test_plaintext_modulus
     
     # Run the tests in parallel with GNU Parallel
     printf "%s\n" "${expanded_args[@]}" | \
         parallel --jobs $NUM_JOBS --progress \
                  --results parallel_results \
+                 --env SERIALIZED_TEST_PLAINTEXT_MODULI \
                  "set -o pipefail; process_test {} || { echo {} >> $FAILURES_FILE; false; }"
     
     # Check for failures
@@ -502,7 +546,7 @@ if [ $elapsed_seconds -lt 60 ]; then
     echo -e "\nTotal execution time: ${elapsed_seconds} seconds"
 else
     elapsed_minutes=$((elapsed_seconds / 60))
-    elapsed_seconds=$((elapsed_seconds % 60))
+    elapsed_seconds=$((elapsed_minutes % 60))
     if [ $elapsed_minutes -lt 60 ]; then
         echo -e "\nTotal execution time: ${elapsed_minutes} minutes and ${elapsed_seconds} seconds"
     else
