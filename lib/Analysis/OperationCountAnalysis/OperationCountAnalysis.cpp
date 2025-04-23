@@ -560,6 +560,10 @@ static double findOptimalScalingModSizeBisection(
   auto checkBounds = [&](double scalingMod) {
     std::vector<double> bounds =
         computeBoundChainFixed(scalingMod, numPrimes, levelOpCounts, noiseBounds);
+        auto firstMod = log2(2 * bounds.back());
+        if (firstMod > kMaxBitSize) {
+          return false;
+        }
     return std::all_of(bounds.begin(), bounds.end(), 
                       [](double b) { return !std::isinf(b) && !std::isnan(b); });
   };
