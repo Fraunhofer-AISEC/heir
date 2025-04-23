@@ -216,29 +216,32 @@ typename Model::StateType Model::evalRelinearizeHYBRID(
   // TODO: prod of Pi() if Pi() is available instead of logPi()
   auto pi = inputParam.getSchemeParam()->getPi();
   double prodPi;
-  double maxPi;
   size_t k;
   if (pi.empty()) {
     // values of pi are not set in schemeParam, so we use this
     std::vector<double> moduliPi(logpi.size());
     std::transform(logpi.begin(), logpi.end(), moduliPi.begin(),
                    [](double value) { return pow(2.0, value); });
-    maxPi = *std::max_element(moduliPi.begin(), moduliPi.end());
     prodPi = std::accumulate(moduliPi.begin(), moduliPi.end(), 1.,
                              std::multiplies<double>());
     k = moduliPi.size();
   } else {
     // if real values of pi are set, we use those
-    maxPi = *std::max_element(pi.begin(), pi.end());
     prodPi =
         std::accumulate(pi.begin(), pi.end(), 1., std::multiplies<double>());
     k = pi.size();
   }
 
-  auto logQi = inputParam.getSchemeParam()->getLogqi();
-  auto maxlogQi = *std::max_element(logQi.begin(), logQi.end());
-  auto maxQi = pow(2.0, maxlogQi);
-
+  auto qi = inputParam.getSchemeParam()->getQi();
+  double maxQi;
+  if (qi.empty()) {
+    auto logQi = inputParam.getSchemeParam()->getLogqi();
+    auto maxlogQi = *std::max_element(logQi.begin(), logQi.end());
+    maxQi = pow(2.0, maxlogQi);
+  } else {
+    maxQi = *std::max_element(qi.begin(), qi.end());
+  }
+  
   // v_ks = v + sqrt(dnum * (currentLevel + 1)) * p_l^(ceil(currentLevel / dnum)
   // * B_ks / P + sqrt(k) * B_scale
   double bKs = getBKs(inputParam);
