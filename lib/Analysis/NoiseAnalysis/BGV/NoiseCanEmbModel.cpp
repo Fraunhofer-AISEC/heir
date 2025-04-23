@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <iomanip>
 #include <ios>
@@ -234,12 +235,16 @@ typename Model::StateType Model::evalRelinearizeHYBRID(
     k = pi.size();
   }
 
+  auto logQi = inputParam.getSchemeParam()->getLogqi();
+  auto maxlogQi = *std::max_element(logQi.begin(), logQi.end());
+  auto maxQi = pow(2.0, maxlogQi);
+
   // v_ks = v + sqrt(dnum * (currentLevel + 1)) * p_l^(ceil(currentLevel / dnum)
   // * B_ks / P + sqrt(k) * B_scale
   double bKs = getBKs(inputParam);
   auto pPower = ceil(static_cast<double>(currentLevel) / dnum);
   auto noiseKs = sqrt(dnum * (currentLevel + 1)) *
-                 pow(static_cast<double>(maxPi), static_cast<double>(pPower)) *
+                 pow(static_cast<double>(maxQi), static_cast<double>(pPower)) *
                  bKs / prodPi;
   double bScale = getBScale(inputParam);
   auto noiseScale = sqrt(k) * bScale;
