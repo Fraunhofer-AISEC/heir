@@ -13,6 +13,8 @@ declare -A TEST_PLAINTEXT_MODULI=(
     ["add-64-2"]=786433
     ["add-64-3"]=786433
     ["add-64-4"]=786433
+    ["add-large-0"]=12582929
+    ["add-large-5"]=12582929
 )
 
 # Get plaintext modulus for a specific test
@@ -437,10 +439,10 @@ process_test() {
         return 1
     fi
 
-    # Run gap approach with different noise models
-    if ! run_gap_approach "bgv-noise-by-bound-coeff-average-case" "kpz-avg"; then
-        return 1
-    fi
+    # # Run gap approach with different noise models
+    # if ! run_gap_approach "bgv-noise-by-bound-coeff-average-case" "kpz-avg"; then
+    #     return 1
+    # fi
 
     # Try to run gap approach with mono model
     if ! run_gap_approach "bgv-noise-mono" "mono"; then

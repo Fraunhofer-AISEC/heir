@@ -4195,3 +4195,131 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+cc_library(
+    name = "main_add-large-0_common",
+    srcs = ["add-large-0/main_add-large-0_common.cpp"],
+    hdrs = ["add-large-0/main_add-large-0_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-0_bisection",
+    srcs = ["add-large-0/main_add-large-0_bisection.cpp"],
+    deps = [
+        ":main_add-large-0_common",
+        ":add-large-0_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-0_closed",
+    srcs = ["add-large-0/main_add-large-0_closed.cpp"],
+    deps = [
+        ":main_add-large-0_common",
+        ":add-large-0_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-0_direct",
+    srcs = ["add-large-0/main_add-large-0_direct.cpp"],
+    deps = [
+        ":main_add-large-0_common",
+        ":add-large-0_direct",
+    ],
+)
+
+cc_library(
+    name = "add-large-0_bisection",
+    srcs = ["add-large-0/add-large-0_bisection.cpp"],
+    hdrs = ["add-large-0/add-large-0_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-large-0_closed",
+    srcs = ["add-large-0/add-large-0_closed.cpp"],
+    hdrs = ["add-large-0/add-large-0_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-large-0_direct",
+    srcs = ["add-large-0/add-large-0_direct.cpp"],
+    hdrs = ["add-large-0/add-large-0_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "main_add-large-5_common",
+    srcs = ["add-large-5/main_add-large-5_common.cpp"],
+    hdrs = ["add-large-5/main_add-large-5_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-5_bisection",
+    srcs = ["add-large-5/main_add-large-5_bisection.cpp"],
+    deps = [
+        ":main_add-large-5_common",
+        ":add-large-5_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-5_closed",
+    srcs = ["add-large-5/main_add-large-5_closed.cpp"],
+    deps = [
+        ":main_add-large-5_common",
+        ":add-large-5_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_add-large-5_direct",
+    srcs = ["add-large-5/main_add-large-5_direct.cpp"],
+    deps = [
+        ":main_add-large-5_common",
+        ":add-large-5_direct",
+    ],
+)
+
+cc_library(
+    name = "add-large-5_bisection",
+    srcs = ["add-large-5/add-large-5_bisection.cpp"],
+    hdrs = ["add-large-5/add-large-5_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-large-5_closed",
+    srcs = ["add-large-5/add-large-5_closed.cpp"],
+    hdrs = ["add-large-5/add-large-5_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "add-large-5_direct",
+    srcs = ["add-large-5/add-large-5_direct.cpp"],
+    hdrs = ["add-large-5/add-large-5_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
