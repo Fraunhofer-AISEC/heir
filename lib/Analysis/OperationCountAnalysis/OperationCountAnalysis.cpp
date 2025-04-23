@@ -622,7 +622,12 @@ static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
 
   auto f0 = 1;
 
-  auto addedNoiseKeySwitching = f0 * boundKeySwitch + boundScale;
+  // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE)
+  auto numPartQ = ComputeNumLargeDigits(0, numPrimes - 1);
+  // Calculate partitions similar to OpenFHE (ceil(sizeQ/numPartQ) towers per digit)
+  int k = ceil(static_cast<double>(numPrimes) / numPartQ);
+
+  auto addedNoiseKeySwitching = f0 * boundKeySwitch + sqrt(k) * boundScale;
 
   return {boundScale, boundClean, addedNoiseKeySwitching};
 }
@@ -794,13 +799,22 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
 
   // Find number and size of individual special primes using the max bit length
   uint32_t maxBits = 0;
+  int maxBitsIndex = 0;
   for (uint32_t j = 0; j < numPartQ; j++) {
     uint32_t bits = moduliPartQ[j].GetLengthForBase(2);
-    if (bits > maxBits) maxBits = bits;
+    if (bits > maxBits) {
+      maxBits = bits;
+      maxBitsIndex = j;
+    }
   }
 
   // Select number of primes in auxiliary CRT basis
   uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
+
+  // Validate assumption regarding
+  if (log2(sqrt(numPartQ * qi.size())) + moduliPartQ[maxBitsIndex].GetLengthForBase(2) > auxBits * sizeP) {
+     throw std::runtime_error("Invalid assumption: Underestimated noise for key switching.");
+  }
 
   // Start with first prime as done in OpenFHE
   lbcrypto::NativeInteger firstP =
