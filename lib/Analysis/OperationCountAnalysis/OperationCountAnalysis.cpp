@@ -382,7 +382,7 @@ static std::vector<double> candidateFirstModUpdate(
     double factor, int offset,
     NoiseBounds noiseBounds) {
     
-  int numberModuli = moduli.size() + 1; // Plus one due to the first modulus
+  int numberModuli = moduli.size(); // Plus one due to the first modulus
   auto boundsOld = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   
   double currentFirstMod = 2 * boundsOld.back();
@@ -390,7 +390,7 @@ static std::vector<double> candidateFirstModUpdate(
 
   auto bound = newFirstMod / 2;
 
-  for (int i = numberModuli - 2; i > numberModuli - offset - 1; i--) {
+  for (int i = numberModuli - 1; i > numberModuli - offset; i--) {
     int ciphertextCount = levelOpCounts[numberModuli - i].getCiphertextCount();
     int keySwitchCount = levelOpCounts[numberModuli - i].getKeySwitchCount();
    
@@ -401,7 +401,7 @@ static std::vector<double> candidateFirstModUpdate(
     bound = sqrt(insideSqrt);
   }
 
-  double x = boundsOld[numberModuli - offset - 1];
+  double x = boundsOld[numberModuli - offset];
   int ciphertextCount = levelOpCounts[offset].getCiphertextCount();
   int keySwitchCount = levelOpCounts[offset].getKeySwitchCount();
   
@@ -412,7 +412,7 @@ static std::vector<double> candidateFirstModUpdate(
   }
   
   std::vector<double> newModuli = moduli;
-  newModuli[numberModuli - offset - 1] = newPartnerModuliValue;
+  newModuli[numberModuli - offset] = newPartnerModuliValue;
   
   return newModuli;
 }
