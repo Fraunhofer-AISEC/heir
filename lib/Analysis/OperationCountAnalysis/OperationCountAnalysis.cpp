@@ -753,6 +753,11 @@ static std::vector<int> computeModuliSizesBalancing(
   for (const auto& p : rebalanced) {
     moduli.push_back(ceil(log2(p)));
   }
+
+  auto sumLast = moduli[0] + moduli[1];
+  moduli[0] = ceil(sumLast / 2);
+  moduli[1] = sumLast - moduli[0];
+  
   return moduli;
 }
 
