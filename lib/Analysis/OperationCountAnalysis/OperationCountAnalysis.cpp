@@ -687,10 +687,6 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
     }
   });
 
-  if (levelOpCounts[maxLevel + 1].getCiphertextCount() == 0) {
-    levelOpCounts[maxLevel + 1] = OperationCount(1, 0);
-  }
-
   return levelOpCounts;
 }
 
