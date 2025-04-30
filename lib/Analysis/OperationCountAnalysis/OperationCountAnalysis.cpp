@@ -104,7 +104,7 @@ LogicalResult OperationCountAnalysis::visitOperation(
         propagate(extractOp.getResult(), OperationCount(1, 1));  
       })
       .Case<mgmt::ModReduceOp>([&] (auto &modReduceOp) {
-        propagate(modReduceOp.getResult(), OperationCount(0, 0));
+        propagate(modReduceOp.getResult(), OperationCount(1, 0));
       });
 
       return success();
