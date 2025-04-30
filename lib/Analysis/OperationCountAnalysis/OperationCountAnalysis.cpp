@@ -116,7 +116,15 @@ struct NoiseBounds {
   double boundScale;
   double boundClean;
   double addedNoiseKeySwitching;
+
+  double boundScaleSquared() {
+    return boundScale * boundScale;
+  }
 };
+
+static int getBitSize(double value) {
+  return static_cast<int>(std::floor(std::log2(value)) + 1);
+}
 
 static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus) {
   uint64_t cyclOrder = 2 * ringDimension;
@@ -137,7 +145,7 @@ static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus
 static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int minFirstModSize,
                                         int numPrimes, int ringDimension,
                                         int plaintextModulus, std::function<int(int)> &recomputeFirstModSize) {
-  if (minFirstModSize > kMaxBitSize || minScalingModSize > kMaxBitSize) {
+  if (minFirstModSize >= kMaxBitSize || minScalingModSize >= kMaxBitSize) {
     throw std::runtime_error("Could not find valid primes! FirstModSize or scalingModSize exeed maximum bit size!");
   }
 
@@ -152,7 +160,7 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int 
       break;
     } catch (lbcrypto::OpenFHEException &e) {
       minFirstModSize += 1;
-      if (minFirstModSize > kMaxBitSize) {
+      if (minFirstModSize >= kMaxBitSize) {
         throw std::runtime_error("Could not find valid primes for firstMod!");
       }
     }
@@ -161,7 +169,7 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int 
   auto firstModSize = minFirstModSize;
   auto scalingModSize = minScalingModSize;
 
-  while (scalingModSize <= kMaxBitSize) {
+  while (scalingModSize < kMaxBitSize) {
     try {
       lbcrypto::NativeInteger q;
       firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
@@ -191,7 +199,6 @@ static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int 
         firstModSize = recomputeFirstModSize(scalingModSize);
         scalingModSize += 1;
       }
-      // TODO Check that in the case if we 
     }
   }
   throw std::runtime_error("Could not find valid primes for scalingMod!");
@@ -237,7 +244,7 @@ static double computeObjectiveFunction(
 
   double firstMod = 2 * bound.back();
 
-  if (log2(firstMod) > kMaxBitSize){
+  if (getBitSize(firstMod) >= kMaxBitSize){
     return std::numeric_limits<double>::max();
   }
 
@@ -250,11 +257,11 @@ static double computeFirstModSizeFromChain(
     NoiseBounds noiseBounds) {
   std::vector<double> bound =
       computeBoundChainFixed(p, numPrimes, levelOpCounts, noiseBounds);
-  auto firstModSize = ceil(log2(2 * bound.back()));
-  if (std::isnan(firstModSize) || std::isinf(firstModSize)){
+  auto firstMod = 2 * bound.back();
+  if (std::isnan(firstMod) || std::isinf(firstMod)){
     return 0;
   }
-  return firstModSize;
+  return getBitSize(firstMod);
 }
 
 static double derivativeObjective(
@@ -278,16 +285,16 @@ static std::tuple<double, double, std::vector<double>> computeObjective(
     NoiseBounds noiseBounds) {
   auto bounds = computeBoundChain(moduli, levelOpCounts, noiseBounds);
   double firstMod = 2 * bounds.back();
-  if (log2(firstMod) > kMaxBitSize){
+  if (getBitSize(firstMod) >= kMaxBitSize){
     return {std::numeric_limits<double>::max(), firstMod, bounds};
   }
   
   double sumModuli = 0;
   for (auto mod : moduli) {
-    if (log2(mod) > kMaxBitSize){
+    if (getBitSize(mod) >= kMaxBitSize){
       return {std::numeric_limits<double>::max(), firstMod, bounds};
     }
-    sumModuli += log2(mod);
+    sumModuli += log2(mod);  
   }
   
   return {sumModuli + log2(firstMod), firstMod, bounds};
@@ -560,8 +567,8 @@ static double findOptimalScalingModSizeBisection(
   auto checkBounds = [&](double scalingMod) {
     std::vector<double> bounds =
         computeBoundChainFixed(scalingMod, numPrimes, levelOpCounts, noiseBounds);
-        auto firstMod = log2(2 * bounds.back());
-        if (firstMod > kMaxBitSize) {
+        auto firstModSize = getBitSize(2 * bounds.back());
+        if (firstModSize >= kMaxBitSize) {
           return false;
         }
     return std::all_of(bounds.begin(), bounds.end(), 
@@ -652,7 +659,7 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
   std::vector<OperationCount> levelOpCounts;
 
   levelOpCounts.resize(maxLevel + 2, OperationCount(0, 0));
-  levelOpCounts[maxLevel + 1] = OperationCount(0, 0, true);
+  levelOpCounts[maxLevel + 1] = OperationCount(1, 0, true);
 
   // Second pass to populate the vector
   op->getBody()->walk<WalkOrder::PreOrder>([&](Operation *op) {
@@ -699,7 +706,7 @@ static void computeModuliSizesBisection(int &firstModSize, int &scalingModSize,
     
     firstModSize = computeFirstModSizeFromChain(
         scalingMod, ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
-    scalingModSize = ceil(log2(scalingMod));
+    scalingModSize = getBitSize(scalingMod);
   } catch (const std::runtime_error& e) {
     throw; // Re-throw the exception to be caught in annotateCountParams
   }
@@ -709,35 +716,33 @@ static void computeModuliSizesClosed(
     int &firstModSize, int &scalingModSize, int ringDimension,
     int plaintextModulus, const std::vector<OperationCount> &levelOpCounts,
     int numPrimes) {
- auto noiseBounds =  calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+  auto noiseBounds =  calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
 
- // Compute OperationCounts over all levels
- OperationCount maxCounts(0, 0);
- for (auto count : levelOpCounts) {
-   maxCounts = OperationCount::max(maxCounts, count);
- }
+  // Compute OperationCounts over all levels
+  OperationCount maxCounts(0, 0);
+  for (auto count : levelOpCounts) {
+    maxCounts = OperationCount::max(maxCounts, count);
+  }
 
- auto boundOptimal = log2(noiseBounds.boundScale +
-                          sqrt(noiseBounds.boundScale * noiseBounds.boundScale +
-                               (maxCounts.getKeySwitchCount() *
-                                noiseBounds.addedNoiseKeySwitching)));
+  auto boundOptimal = noiseBounds.boundScale +
+                      sqrt(noiseBounds.boundScaleSquared() +
+                            (maxCounts.getKeySwitchCount() *
+                            noiseBounds.addedNoiseKeySwitching));
 
- auto b0 = maxCounts.getCiphertextCount() *
-           (noiseBounds.boundClean +
-            maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching);
+  auto boundStart = maxCounts.getCiphertextCount() *
+            (noiseBounds.boundClean +
+              maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching);
 
- if (boundOptimal >= log2(b0)) {
-   scalingModSize =
-       ceil(1 + log2(maxCounts.getCiphertextCount()) + boundOptimal);
-   firstModSize = ceil(1 + boundOptimal);
- } else {
-   scalingModSize =
-       log2(maxCounts.getCiphertextCount() *
-       (b0 * b0 +
-        maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)) - log2(
-       (b0 - noiseBounds.boundScale));
-   firstModSize = ceil(1 + log2(b0));
- }
+  if (boundOptimal >= boundStart) {
+    auto scalingMod = 2 * maxCounts.getCiphertextCount() * boundOptimal;
+    scalingModSize = getBitSize(scalingMod);
+    firstModSize = getBitSize(2 * boundOptimal);
+  } else {
+    auto scalingMod = (maxCounts.getCiphertextCount() * (boundStart * boundStart + maxCounts.getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)) /
+                      (boundStart - noiseBounds.boundScale);
+    scalingModSize = getBitSize(scalingMod);
+    firstModSize = getBitSize(2 * boundStart);
+  }
 }
 
 static std::vector<int> computeModuliSizesBalancing(
@@ -749,14 +754,13 @@ static std::vector<int> computeModuliSizesBalancing(
   double pInit = findOptimalScalingModSizeBisection(
     ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
 
-
   auto rebalanced = rebalancingModuli(pInit, levelOpCounts, noiseBounds);
   
   std::vector<int> moduli;
 
   moduli.reserve(rebalanced.size());
   for (const auto& p : rebalanced) {
-    moduli.push_back(ceil(log2(p)));
+    moduli.push_back(getBitSize(p));
   }
 
   auto sumLast = moduli[0] + moduli[1];
@@ -941,7 +945,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     auto computeModuliSizes([&](int ringDimension) -> std::vector<int> {
       if (numPrimes == 1) {
         auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
-        int firstModSize = ceil(1 + log2(levelOpCounts[1].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[1].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching)));
+        int firstModSize = floor(1 + log2(levelOpCounts[1].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[1].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching))) + 1;
         return {firstModSize};
       }
       try {
@@ -976,7 +980,6 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
                                        numPrimes);
         }
         if (algorithm == "BALANCING") {
-          //TODO: Add validation of moduli sizes
           return computeModuliSizesBalancing(ringDimension, plaintextModulus, 
                                                     levelOpCounts, numPrimes);
         }
@@ -1024,7 +1027,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         }
 
       } else {
-        // New ring dimension is smaller
+        // New ring dimension is smaller/larger
         ringDimension = newRingDimension;
       }
    }
