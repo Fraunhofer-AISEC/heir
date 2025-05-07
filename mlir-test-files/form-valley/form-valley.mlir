@@ -68,22 +68,7 @@ func.func @func(
   %l1_47 = arith.addi %l1_46, %arg47 : tensor<8xi16>
   %l1_48 = arith.addi %l1_47, %arg48 : tensor<8xi16>
   %l1_49 = arith.addi %l1_48, %arg49 : tensor<8xi16>
-  %l1_50 = arith.addi %l1_49, %arg50 : tensor<8xi16>
-  %l1_51 = arith.addi %l1_50, %arg51 : tensor<8xi16>
-  %l1_52 = arith.addi %l1_51, %arg52 : tensor<8xi16>
-  %l1_53 = arith.addi %l1_52, %arg53 : tensor<8xi16>
-  %l1_54 = arith.addi %l1_53, %arg54 : tensor<8xi16>
-  %l1_55 = arith.addi %l1_54, %arg55 : tensor<8xi16>
-  %l1_56 = arith.addi %l1_55, %arg56 : tensor<8xi16>
-  %l1_57 = arith.addi %l1_56, %arg57 : tensor<8xi16>
-  %l1_58 = arith.addi %l1_57, %arg58 : tensor<8xi16>
-  %l1_59 = arith.addi %l1_58, %arg59 : tensor<8xi16>
-  %l1_60 = arith.addi %l1_59, %arg60 : tensor<8xi16>
-  %l1_61 = arith.addi %l1_60, %arg61 : tensor<8xi16>
-  %l1_62 = arith.addi %l1_61, %arg62 : tensor<8xi16>
-  %l1_63 = arith.addi %l1_62, %arg63 : tensor<8xi16>
-  %l1_64 = arith.addi %l1_63, %arg0 : tensor<8xi16>  // reuse %arg0 as 65th operand
-  %m1   = arith.muli %l1_64, %l1_64 : tensor<8xi16>
+  %m1   = arith.muli %l1_49, %l1_49 : tensor<8xi16>
 
   //-------------------------------------------------------------------------
   // Level 2: 32 additions (each new operand squared once), using %arg0..%arg31.
@@ -137,21 +122,7 @@ func.func @func(
   %l2_24 = arith.addi %l2_23, %s2_23 : tensor<8xi16>
   %s2_24 = arith.muli %arg24, %arg24 : tensor<8xi16>
   %l2_25 = arith.addi %l2_24, %s2_24 : tensor<8xi16>
-  %s2_25 = arith.muli %arg25, %arg25 : tensor<8xi16>
-  %l2_26 = arith.addi %l2_25, %s2_25 : tensor<8xi16>
-  %s2_26 = arith.muli %arg26, %arg26 : tensor<8xi16>
-  %l2_27 = arith.addi %l2_26, %s2_26 : tensor<8xi16>
-  %s2_27 = arith.muli %arg27, %arg27 : tensor<8xi16>
-  %l2_28 = arith.addi %l2_27, %s2_27 : tensor<8xi16>
-  %s2_28 = arith.muli %arg28, %arg28 : tensor<8xi16>
-  %l2_29 = arith.addi %l2_28, %s2_28 : tensor<8xi16>
-  %s2_29 = arith.muli %arg29, %arg29 : tensor<8xi16>
-  %l2_30 = arith.addi %l2_29, %s2_29 : tensor<8xi16>
-  %s2_30 = arith.muli %arg30, %arg30 : tensor<8xi16>
-  %l2_31 = arith.addi %l2_30, %s2_30 : tensor<8xi16>
-  %s2_31 = arith.muli %arg31, %arg31 : tensor<8xi16>
-  %l2_32 = arith.addi %l2_31, %s2_31 : tensor<8xi16>
-  %m2    = arith.muli %l2_32, %l2_32 : tensor<8xi16>
+  %m2    = arith.muli %l2_25, %l2_25 : tensor<8xi16>
 
   //-------------------------------------------------------------------------
   // Level 3: 16 additions (each new operand squared twice), using %arg0..%arg15.
@@ -191,19 +162,7 @@ func.func @func(
   %s3_11_1 = arith.muli %arg11, %arg11 : tensor<8xi16>
   %s3_11_2 = arith.muli %s3_11_1, %s3_11_1 : tensor<8xi16>
   %l3_12   = arith.addi %l3_11, %s3_11_2 : tensor<8xi16>
-  %s3_12_1 = arith.muli %arg12, %arg12 : tensor<8xi16>
-  %s3_12_2 = arith.muli %s3_12_1, %s3_12_1 : tensor<8xi16>
-  %l3_13   = arith.addi %l3_12, %s3_12_2 : tensor<8xi16>
-  %s3_13_1 = arith.muli %arg13, %arg13 : tensor<8xi16>
-  %s3_13_2 = arith.muli %s3_13_1, %s3_13_1 : tensor<8xi16>
-  %l3_14   = arith.addi %l3_13, %s3_13_2 : tensor<8xi16>
-  %s3_14_1 = arith.muli %arg14, %arg14 : tensor<8xi16>
-  %s3_14_2 = arith.muli %s3_14_1, %s3_14_1 : tensor<8xi16>
-  %l3_15   = arith.addi %l3_14, %s3_14_2 : tensor<8xi16>
-  %s3_15_1 = arith.muli %arg15, %arg15 : tensor<8xi16>
-  %s3_15_2 = arith.muli %s3_15_1, %s3_15_1 : tensor<8xi16>
-  %l3_16   = arith.addi %l3_15, %s3_15_2 : tensor<8xi16>
-  %m3      = arith.muli %l3_16, %l3_16 : tensor<8xi16>
+  %m3      = arith.muli %l3_12, %l3_12 : tensor<8xi16>
 
   //-------------------------------------------------------------------------
   // Level 4: 32 additions (each new operand squared three times), using %arg0..%arg31.
@@ -307,35 +266,7 @@ func.func @func(
   %s4_24_2 = arith.muli %s4_24_1, %s4_24_1 : tensor<8xi16>
   %s4_24_3 = arith.muli %s4_24_2, %s4_24_2 : tensor<8xi16>
   %l4_25   = arith.addi %l4_24, %s4_24_3 : tensor<8xi16>
-  %s4_25_1 = arith.muli %arg25, %arg25 : tensor<8xi16>
-  %s4_25_2 = arith.muli %s4_25_1, %s4_25_1 : tensor<8xi16>
-  %s4_25_3 = arith.muli %s4_25_2, %s4_25_2 : tensor<8xi16>
-  %l4_26   = arith.addi %l4_25, %s4_25_3 : tensor<8xi16>
-  %s4_26_1 = arith.muli %arg26, %arg26 : tensor<8xi16>
-  %s4_26_2 = arith.muli %s4_26_1, %s4_26_1 : tensor<8xi16>
-  %s4_26_3 = arith.muli %s4_26_2, %s4_26_2 : tensor<8xi16>
-  %l4_27   = arith.addi %l4_26, %s4_26_3 : tensor<8xi16>
-  %s4_27_1 = arith.muli %arg27, %arg27 : tensor<8xi16>
-  %s4_27_2 = arith.muli %s4_27_1, %s4_27_1 : tensor<8xi16>
-  %s4_27_3 = arith.muli %s4_27_2, %s4_27_2 : tensor<8xi16>
-  %l4_28   = arith.addi %l4_27, %s4_27_3 : tensor<8xi16>
-  %s4_28_1 = arith.muli %arg28, %arg28 : tensor<8xi16>
-  %s4_28_2 = arith.muli %s4_28_1, %s4_28_1 : tensor<8xi16>
-  %s4_28_3 = arith.muli %s4_28_2, %s4_28_2 : tensor<8xi16>
-  %l4_29   = arith.addi %l4_28, %s4_28_3 : tensor<8xi16>
-  %s4_29_1 = arith.muli %arg29, %arg29 : tensor<8xi16>
-  %s4_29_2 = arith.muli %s4_29_1, %s4_29_1 : tensor<8xi16>
-  %s4_29_3 = arith.muli %s4_29_2, %s4_29_2 : tensor<8xi16>
-  %l4_30   = arith.addi %l4_29, %s4_29_3 : tensor<8xi16>
-  %s4_30_1 = arith.muli %arg30, %arg30 : tensor<8xi16>
-  %s4_30_2 = arith.muli %s4_30_1, %s4_30_1 : tensor<8xi16>
-  %s4_30_3 = arith.muli %s4_30_2, %s4_30_2 : tensor<8xi16>
-  %l4_31   = arith.addi %l4_30, %s4_30_3 : tensor<8xi16>
-  %s4_31_1 = arith.muli %arg31, %arg31 : tensor<8xi16>
-  %s4_31_2 = arith.muli %s4_31_1, %s4_31_1 : tensor<8xi16>
-  %s4_31_3 = arith.muli %s4_31_2, %s4_31_2 : tensor<8xi16>
-  %l4_32   = arith.addi %l4_31, %s4_31_3 : tensor<8xi16>
-  %m4      = arith.muli %l4_32, %l4_32 : tensor<8xi16>
+  %m4      = arith.muli %l4_25, %l4_25 : tensor<8xi16>
 
   //-------------------------------------------------------------------------
   // Level 5: 64 additions (each new operand squared four times), using %arg0..%arg63.
@@ -584,81 +515,6 @@ func.func @func(
   %s5_48_3 = arith.muli %s5_48_2, %s5_48_2 : tensor<8xi16>
   %s5_48_4 = arith.muli %s5_48_3, %s5_48_3 : tensor<8xi16>
   %l5_49   = arith.addi %l5_48, %s5_48_4 : tensor<8xi16>
-  %s5_49_1 = arith.muli %arg49, %arg49 : tensor<8xi16>
-  %s5_49_2 = arith.muli %s5_49_1, %s5_49_1 : tensor<8xi16>
-  %s5_49_3 = arith.muli %s5_49_2, %s5_49_2 : tensor<8xi16>
-  %s5_49_4 = arith.muli %s5_49_3, %s5_49_3 : tensor<8xi16>
-  %l5_50   = arith.addi %l5_49, %s5_49_4 : tensor<8xi16>
-  %s5_50_1 = arith.muli %arg50, %arg50 : tensor<8xi16>
-  %s5_50_2 = arith.muli %s5_50_1, %s5_50_1 : tensor<8xi16>
-  %s5_50_3 = arith.muli %s5_50_2, %s5_50_2 : tensor<8xi16>
-  %s5_50_4 = arith.muli %s5_50_3, %s5_50_3 : tensor<8xi16>
-  %l5_51   = arith.addi %l5_50, %s5_50_4 : tensor<8xi16>
-  %s5_51_1 = arith.muli %arg51, %arg51 : tensor<8xi16>
-  %s5_51_2 = arith.muli %s5_51_1, %s5_51_1 : tensor<8xi16>
-  %s5_51_3 = arith.muli %s5_51_2, %s5_51_2 : tensor<8xi16>
-  %s5_51_4 = arith.muli %s5_51_3, %s5_51_3 : tensor<8xi16>
-  %l5_52   = arith.addi %l5_51, %s5_51_4 : tensor<8xi16>
-  %s5_52_1 = arith.muli %arg52, %arg52 : tensor<8xi16>
-  %s5_52_2 = arith.muli %s5_52_1, %s5_52_1 : tensor<8xi16>
-  %s5_52_3 = arith.muli %s5_52_2, %s5_52_2 : tensor<8xi16>
-  %s5_52_4 = arith.muli %s5_52_3, %s5_52_3 : tensor<8xi16>
-  %l5_53   = arith.addi %l5_52, %s5_52_4 : tensor<8xi16>
-  %s5_53_1 = arith.muli %arg53, %arg53 : tensor<8xi16>
-  %s5_53_2 = arith.muli %s5_53_1, %s5_53_1 : tensor<8xi16>
-  %s5_53_3 = arith.muli %s5_53_2, %s5_53_2 : tensor<8xi16>
-  %s5_53_4 = arith.muli %s5_53_3, %s5_53_3 : tensor<8xi16>
-  %l5_54   = arith.addi %l5_53, %s5_53_4 : tensor<8xi16>
-  %s5_54_1 = arith.muli %arg54, %arg54 : tensor<8xi16>
-  %s5_54_2 = arith.muli %s5_54_1, %s5_54_1 : tensor<8xi16>
-  %s5_54_3 = arith.muli %s5_54_2, %s5_54_2 : tensor<8xi16>
-  %s5_54_4 = arith.muli %s5_54_3, %s5_54_3 : tensor<8xi16>
-  %l5_55   = arith.addi %l5_54, %s5_54_4 : tensor<8xi16>
-  %s5_55_1 = arith.muli %arg55, %arg55 : tensor<8xi16>
-  %s5_55_2 = arith.muli %s5_55_1, %s5_55_1 : tensor<8xi16>
-  %s5_55_3 = arith.muli %s5_55_2, %s5_55_2 : tensor<8xi16>
-  %s5_55_4 = arith.muli %s5_55_3, %s5_55_3 : tensor<8xi16>
-  %l5_56   = arith.addi %l5_55, %s5_55_4 : tensor<8xi16>
-  %s5_56_1 = arith.muli %arg56, %arg56 : tensor<8xi16>
-  %s5_56_2 = arith.muli %s5_56_1, %s5_56_1 : tensor<8xi16>
-  %s5_56_3 = arith.muli %s5_56_2, %s5_56_2 : tensor<8xi16>
-  %s5_56_4 = arith.muli %s5_56_3, %s5_56_3 : tensor<8xi16>
-  %l5_57   = arith.addi %l5_56, %s5_56_4 : tensor<8xi16>
-  %s5_57_1 = arith.muli %arg57, %arg57 : tensor<8xi16>
-  %s5_57_2 = arith.muli %s5_57_1, %s5_57_1 : tensor<8xi16>
-  %s5_57_3 = arith.muli %s5_57_2, %s5_57_2 : tensor<8xi16>
-  %s5_57_4 = arith.muli %s5_57_3, %s5_57_3 : tensor<8xi16>
-  %l5_58   = arith.addi %l5_57, %s5_57_4 : tensor<8xi16>
-  %s5_58_1 = arith.muli %arg58, %arg58 : tensor<8xi16>
-  %s5_58_2 = arith.muli %s5_58_1, %s5_58_1 : tensor<8xi16>
-  %s5_58_3 = arith.muli %s5_58_2, %s5_58_2 : tensor<8xi16>
-  %s5_58_4 = arith.muli %s5_58_3, %s5_58_3 : tensor<8xi16>
-  %l5_59   = arith.addi %l5_58, %s5_58_4 : tensor<8xi16>
-  %s5_59_1 = arith.muli %arg59, %arg59 : tensor<8xi16>
-  %s5_59_2 = arith.muli %s5_59_1, %s5_59_1 : tensor<8xi16>
-  %s5_59_3 = arith.muli %s5_59_2, %s5_59_2 : tensor<8xi16>
-  %s5_59_4 = arith.muli %s5_59_3, %s5_59_3 : tensor<8xi16>
-  %l5_60   = arith.addi %l5_59, %s5_59_4 : tensor<8xi16>
-  %s5_60_1 = arith.muli %arg60, %arg60 : tensor<8xi16>
-  %s5_60_2 = arith.muli %s5_60_1, %s5_60_1 : tensor<8xi16>
-  %s5_60_3 = arith.muli %s5_60_2, %s5_60_2 : tensor<8xi16>
-  %s5_60_4 = arith.muli %s5_60_3, %s5_60_3 : tensor<8xi16>
-  %l5_61   = arith.addi %l5_60, %s5_60_4 : tensor<8xi16>
-  %s5_61_1 = arith.muli %arg61, %arg61 : tensor<8xi16>
-  %s5_61_2 = arith.muli %s5_61_1, %s5_61_1 : tensor<8xi16>
-  %s5_61_3 = arith.muli %s5_61_2, %s5_61_2 : tensor<8xi16>
-  %s5_61_4 = arith.muli %s5_61_3, %s5_61_3 : tensor<8xi16>
-  %l5_62   = arith.addi %l5_61, %s5_61_4 : tensor<8xi16>
-  %s5_62_1 = arith.muli %arg62, %arg62 : tensor<8xi16>
-  %s5_62_2 = arith.muli %s5_62_1, %s5_62_1 : tensor<8xi16>
-  %s5_62_3 = arith.muli %s5_62_2, %s5_62_2 : tensor<8xi16>
-  %s5_62_4 = arith.muli %s5_62_3, %s5_62_3 : tensor<8xi16>
-  %l5_63   = arith.addi %l5_62, %s5_62_4 : tensor<8xi16>
-  %s5_63_1 = arith.muli %arg63, %arg63 : tensor<8xi16>
-  %s5_63_2 = arith.muli %s5_63_1, %s5_63_1 : tensor<8xi16>
-  %s5_63_3 = arith.muli %s5_63_2, %s5_63_2 : tensor<8xi16>
-  %s5_63_4 = arith.muli %s5_63_3, %s5_63_3 : tensor<8xi16>
-  %l5_64   = arith.addi %l5_63, %s5_63_4 : tensor<8xi16>
 
-  return %l5_64 : tensor<8xi16>
+  return %l5_49 : tensor<8xi16>
 }
