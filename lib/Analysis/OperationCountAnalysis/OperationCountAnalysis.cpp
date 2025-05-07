@@ -902,16 +902,15 @@ static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
 static void annotateOpenfheParams(secret::GenericOp genericOp,
                                   int multiplicativeDepth, int ringDimension,
                                   const std::vector<int> &moduliSizes,
-                                  int plaintextModulus) {
+                                  int plaintextModulus, OperationCount maxCounts) {
   auto *funcOp = ((Operation*) genericOp)->getParentOp();
 
   // Compute the first and scaling moduli sizes
   int firstModSize = moduliSizes[0];
   int scalingModSize = *std::max_element(moduliSizes.begin() + 1, moduliSizes.end());
-    
   auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
     funcOp->getContext(), multiplicativeDepth, ringDimension,
-    scalingModSize, firstModSize, 0, 0, plaintextModulus);
+    scalingModSize, firstModSize, maxCounts.getCiphertextCount(), maxCounts.getKeySwitchCount(), plaintextModulus);
 
   funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName,
           openfheParamAttr);
@@ -937,6 +936,16 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
 
     auto multiplicativeDepth = maxLevel;
     auto numPrimes = multiplicativeDepth + 1;
+
+    if (algorithm == "DIRECT") {
+      OperationCount maxCounts(0, 0);
+      for (auto count : levelOpCounts) {
+        maxCounts = OperationCount::max(maxCounts, count);
+      }
+    
+      annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, {0,0}, plaintextModulus, maxCounts);
+      return;
+    }
 
     auto computeModuliSizes([&](int ringDimension) -> std::vector<int> {
       if (numPrimes == 1) {
@@ -1029,7 +1038,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
    }
 
    annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
-   annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus);
+   annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus, OperationCount(0, 0));
   });
 }
 }  // namespace heir
