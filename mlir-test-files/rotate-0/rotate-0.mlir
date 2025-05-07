@@ -129,7 +129,8 @@ func.func @func(
   %l1_62  = arith.addi %rot1_61, %arg62 : tensor<8xi16>
   %rot1_62 = tensor_ext.rotate %l1_62, %c1 : tensor<8xi16>, index
   %l1_63  = arith.addi %rot1_62, %arg63 : tensor<8xi16>
-  %m1    = arith.muli %l1_63, %l1_63 : tensor<8xi16>
+  %rot1_63 = tensor_ext.rotate %l1_63, %c1 : tensor<8xi16>, index
+  %m1    = arith.muli %l1_63, %rot1_63 : tensor<8xi16>
   //-------------------------------------------------------------------------
   // Level 2: 63 additions (1 squaring, no rotation)
   %sq2_0  = arith.muli %arg0, %arg0 : tensor<8xi16>
