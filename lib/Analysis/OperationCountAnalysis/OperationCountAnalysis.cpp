@@ -480,7 +480,7 @@ static std::vector<double> rebalancingModuli(
     const double pInit,
     const std::vector<OperationCount>& levelOpCounts,
     NoiseBounds noiseBounds,
-    int maxIter = 100, double tolerance = 0.01, double eps = 1e-6) {
+    int maxIter = 100, double tolerance = 0.01) {
   
   int numberModuli = levelOpCounts.size() - 1;
   std::vector<double> moduliCurrent(numberModuli - 1,pInit);
