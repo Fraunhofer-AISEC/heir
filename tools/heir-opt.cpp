@@ -69,6 +69,7 @@
 #include "lib/Transforms/AddClientInterface/AddClientInterface.h"
 #include "lib/Transforms/AnnotateModule/AnnotateModule.h"
 #include "lib/Transforms/AnnotateMulDepth/AnnotateMulDepth.h"
+#include "lib/Transforms/AnnotateParameters/AnnotateParameters.h"
 #include "lib/Transforms/AnnotateSecretness/AnnotateSecretness.h"
 #include "lib/Transforms/ApplyFolders/ApplyFolders.h"
 #include "lib/Transforms/BooleanVectorizer/BooleanVectorizer.h"
@@ -315,6 +316,7 @@ int main(int argc, char** argv) {
   registerConvertToCiphertextSemanticsPasses();
   registerDropUnitDims();
   registerAnnotateModulePasses();
+  registerAnnotateParametersPasses();
   registerAnnotateSecretnessPasses();
   registerAnnotateMulDepthPasses();
   registerApplyFoldersPasses();
