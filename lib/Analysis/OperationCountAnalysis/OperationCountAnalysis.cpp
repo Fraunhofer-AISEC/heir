@@ -767,6 +767,44 @@ static std::vector<int> computeModuliSizesBalancing(
   return moduli;
 }
 
+// Print parameters directly to std::cerr with result tags
+void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension, 
+                               int plaintextModulus, const std::string &testname,
+                               const std::string &selectionApproach) {
+  // Generate Unix timestamp in seconds
+  auto now = std::chrono::system_clock::now();
+  auto unix_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch())
+          .count();
+
+  auto toLowerCase = [](std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return str;
+  };
+
+  // Generate JSON without using CryptoContext
+  std::stringstream ss;
+  ss << "{\n";
+  ss << R"(  "testname": ")" << testname << "\",\n";
+  ss << R"(  "selectionApproach": ")" << toLowerCase(selectionApproach) << "\",\n";
+  ss << R"(  "timestamp": )" << unix_timestamp << ",\n";
+  ss << "  \"modulusSizes\": [";
+  for (size_t i = 0; i < moduli.size(); ++i) {
+    ss << moduli[i];
+    if (i != moduli.size() - 1) {
+      ss << ", ";
+    }
+  }
+  ss << "],\n";
+  ss << "  \"totalSize\": " << std::accumulate(moduli.begin(), moduli.end(), 0) << ",\n";
+  ss << "  \"ringDimension\": " << ringDimension << ",\n";
+  ss << "  \"plaintextModulus\": " << plaintextModulus << "\n";
+  ss << "}";
+
+  std::cerr << "<params>" << ss.str() << "</params>" << std::endl;
+}
+
 using BigInteger = bigintbackend::BigInteger;
 
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
