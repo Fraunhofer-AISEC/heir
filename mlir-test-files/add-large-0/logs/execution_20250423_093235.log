@@ -1,0 +1,44 @@
+==================================================================
+COMMAND: python3 /home/ubuntu/heir-aisec/mlir-test-files/extract_bgv_params.py /home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle-params-gap-mono.mlir /home/ubuntu/heir-aisec/mlir-test-files/data/add-large-0_gap-mono_annotated_20250423_093235.json add-large-0 gap-mono
+TIME: Wed Apr 23 16:14:29 CEST 2025
+CALLER: run_gap_approach
+==================================================================
+
+STDOUT:
+----------------------------------------------------------------
+
+STDERR:
+----------------------------------------------------------------
+Error reading file /home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle-params-gap-mono.mlir: [Errno 2] No such file or directory: '/home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle-params-gap-mono.mlir'
+
+EXIT CODE: 1
+
+==================================================================
+COMMAND: bazel run //tools:heir-opt -- --mlir-to-bgv=ciphertext-degree=8 insert-mgmt=false noise-model=bgv-noise-mono --scheme-to-openfhe=entry-function=func /home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle.mlir
+TIME: Wed Apr 23 16:14:29 CEST 2025
+CALLER: convert_to_bgv_openfhe
+==================================================================
+
+STDOUT:
+----------------------------------------------------------------
+
+STDERR:
+----------------------------------------------------------------
+Computing main repo mapping: 
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+
+INFO: Analyzed target //tools:heir-opt (0 packages loaded, 0 targets configured).
+INFO: Found 1 target...
+Target //tools:heir-opt up-to-date:
+  bazel-bin/tools/heir-opt
+INFO: Elapsed time: 0.305s, Critical Path: 0.00s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/tools/heir-opt <args omitted>
+cannot open input file '/home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle.mlir': No such file or directory
+
+EXIT CODE: 1
+

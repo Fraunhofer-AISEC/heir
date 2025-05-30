@@ -1,0 +1,42 @@
+==================================================================
+COMMAND: bazel run //tools:heir-opt -- --secretize --mlir-to-secret-arithmetic --secret-insert-mgmt-bgv /home/ubuntu/heir-aisec/mlir-test-files//.mlir
+TIME: Tue Apr 22 08:23:53 CEST 2025
+CALLER: process_test
+==================================================================
+
+STDOUT:
+----------------------------------------------------------------
+
+STDERR:
+----------------------------------------------------------------
+Computing main repo mapping: 
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+
+INFO: Analyzed target //tools:heir-opt (0 packages loaded, 0 targets configured).
+[2 / 6] Compiling lib/Transforms/AnnotateParameters/AnnotateParameters.cpp; 1s linux-sandbox ... (2 actions running)
+ERROR: /home/ubuntu/heir-aisec/lib/Transforms/AnnotateParameters/BUILD:8:11: Compiling lib/Transforms/AnnotateParameters/AnnotateParameters.cpp failed: (Exit 1): clang failed: error executing CppCompile command (from target //lib/Transforms/AnnotateParameters:AnnotateParameters) /usr/lib/llvm-14/bin/clang -U_FORTIFY_SOURCE -fstack-protector -Wall -Wthread-safety -Wself-assign -Wunused-but-set-parameter -Wno-free-nonheap-object -fcolor-diagnostics -fno-omit-frame-pointer -g ... (remaining 136 arguments skipped)
+
+Use --sandbox_debug to see verbose messages from the sandbox and retain the sandbox build root for debugging
+In file included from lib/Transforms/AnnotateParameters/AnnotateParameters.cpp:5:
+./lib/Analysis/OperationCountAnalysis/OperationCountAnalysis.h:1:1: error: unknown type name 'o'
+o#ifndef LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
+^
+./lib/Analysis/OperationCountAnalysis/OperationCountAnalysis.h:1:2: error: expected unqualified-id
+o#ifndef LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
+ ^
+./lib/Analysis/OperationCountAnalysis/OperationCountAnalysis.h:139:2: error: #endif without #if
+#endif  // LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
+ ^
+3 errors generated.
+Target //tools:heir-opt failed to build
+Use --verbose_failures to see the command lines of failed build steps.
+INFO: Elapsed time: 2.850s, Critical Path: 2.45s
+INFO: 3 processes: 1 action cache hit, 3 internal.
+ERROR: Build did NOT complete successfully
+ERROR: Build failed. Not running target
+
+EXIT CODE: 1
+
