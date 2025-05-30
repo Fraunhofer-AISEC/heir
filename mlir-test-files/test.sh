@@ -7,27 +7,29 @@ PLAINTEXT_MODULUS=65537
 export PLAINTEXT_MODULUS
 
 # Define test-specific plaintext moduli
-declare -A TEST_PLAINTEXT_MODULI=(
-    ["add-64-0"]=786433
-    ["add-64-1"]=786433
-    ["add-64-2"]=786433
-    ["add-64-3"]=786433
-    ["add-64-4"]=786433
-    ["add-large-0"]=12582929
-    ["add-large-5"]=12582929
+TEST_PLAINTEXT_MODULI=(
+    "add-64-0:786433"
+    "add-64-1:786433"
+    "add-64-2:786433"
+    "add-64-3:786433"
+    "add-64-4:786433"
+    "add-large-0:12582929"
+    "add-large-5:12582929"
 )
 
 # Get plaintext modulus for a specific test
 get_test_plaintext_modulus() {
     local test_name="$1"
-    local base_name="${test_name%%:*}" # Remove ciphertext degree
-
-    # Check if there's a specific modulus for this test
-    if [[ -n "${TEST_PLAINTEXT_MODULI[$base_name]}" ]]; then
-        echo "${TEST_PLAINTEXT_MODULI[$base_name]}"
-    else
-        echo "$PLAINTEXT_MODULUS"  # Return default
-    fi
+    
+    # Loop through the array to find the modulus
+    for entry in "${TEST_PLAINTEXT_MODULI[@]}"; do
+        IFS=':' read -r name value <<< "$entry"
+        if [[ "$name" == "$test_name" ]]; then
+            echo "$value"
+            return
+        fi
+    done
+    echo "$PLAINTEXT_MODULUS"  # Return default if not found
 }
 
 if [ "$#" -eq 0 ]; then
@@ -328,32 +330,32 @@ process_test() {
         local algorithm="$1"
 
         local input_mlir="$PWD/$name/$name-middle.mlir" 
-        local output_mlir="$PWD/$name/$name-middle-params-${algorithm,,}.mlir"
+        local output_mlir="$PWD/$name/$name-middle-params-$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').mlir"
         
-        print_header "${algorithm^^} ALGORITHM" "Annotating parameters"
+        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Annotating parameters"
         
         TEMP_FILE=$(mktemp)
 
-        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=${algorithm^^}\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
+        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
             return 1
         fi
 
-        if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_${algorithm,,}_computed_$TIMESTAMP.json" "$name"; then
+        if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')_computed_$TIMESTAMP.json" "$name"; then
             return 1
         fi
 
         rm "$TEMP_FILE"
 
-        if ! run_command python3 "$PWD/extract_bgv_params.py" $output_mlir "$PWD/data/${name}_${algorithm,,}_annotated_$TIMESTAMP.json" "$name" "${algorithm,,}"; then
+        if ! run_command python3 "$PWD/extract_bgv_params.py" "$output_mlir" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')"; then
             return 1
         fi
 
-        print_header "${algorithm^^} ALGORITHM" "Validating noise with Mono model"
+        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Validating noise with Mono model"
         if ! run_command bash -c "bazel run //tools:heir-opt -- --validate-noise=\"model=bgv-noise-mono\" \"$output_mlir\" --debug --debug-only=\"ValidateNoise\"" ; then
             return 1
         fi
     }
-    
+
     # Function to convert to BGV and OpenFHE
     convert_to_bgv_openfhe() {
         local algorithm="$1"
@@ -362,11 +364,11 @@ process_test() {
         if [ "$noParams" == "noParams" ]; then
             local input_mlir="$PWD/$name/$name-middle.mlir"
         else
-            local input_mlir="$PWD/$name/$name-middle-params-${algorithm,,}.mlir"
+            local input_mlir="$PWD/$name/$name-middle-params-$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').mlir"
         fi
-        local output_mlir="$PWD/$name/$name-openfhe-${algorithm,,}.mlir"
+        local output_mlir="$PWD/$name/$name-openfhe-$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').mlir"
 
-        print_header "${algorithm^^} ALGORITHM" "Converting to BGV and OpenFHE"
+        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Converting to BGV and OpenFHE"
         if ! run_command bazel run //tools:heir-opt -- --mlir-to-bgv="ciphertext-degree=${ciphertext_degree} insert-mgmt=false noise-model=bgv-noise-mono" --scheme-to-openfhe="entry-function=func" "$input_mlir" > "$output_mlir"; then
             return 1
         fi
@@ -375,15 +377,15 @@ process_test() {
     # Function to generate OpenFHE code for a given implementation
     generate_openfhe_code() {
         local algorithm="$1"
-        local input_mlir="$PWD/$name/$name-openfhe-${algorithm,,}.mlir"
+        local input_mlir="$PWD/$name/$name-openfhe-$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').mlir"
         
-        print_header "${algorithm^^} ALGORITHM" "Generating OpenFHE header"
-        if ! run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$input_mlir" > "$name/${name}_${algorithm,,}.h"; then
+        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Generating OpenFHE header"
+        if ! run_command bazel run //tools:heir-translate -- --emit-openfhe-pke-header "$input_mlir" > "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h"; then
             return 1
         fi
         
-        print_header "${algorithm^^} ALGORITHM" "Generating OpenFHE implementation"
-        if ! run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$input_mlir" > "$name/${name}_${algorithm,,}.cpp"; then
+        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Generating OpenFHE implementation"
+        if ! run_command bazel run //tools:heir-translate -- --emit-openfhe-pke "$input_mlir" > "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
             return 1
         fi
     }
@@ -392,8 +394,8 @@ process_test() {
     run_algorithm() {
         local algorithm="$1"
         
-        print_header "EXECUTION" "Running ${algorithm^^} implementation"
-        if ! run_command bazel run //mlir-test-files:main_${name}_${algorithm,,} -- ignoreComputation; then
+        print_header "EXECUTION" "Running $(echo "$algorithm" | tr '[:lower:]' '[:upper:]') implementation"
+        if ! run_command bazel run //mlir-test-files:main_${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]') -- ignoreComputation; then
             return 1
         fi
     }
@@ -407,7 +409,7 @@ process_test() {
                 return 1
             fi
         else 
-            print_header "${algorithm^^} ALGORITHM" "Skipping parameter annotation"
+            print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Skipping parameter annotation"
         fi
         
         if ! convert_to_bgv_openfhe "$algorithm" "$noParams"; then
@@ -424,12 +426,12 @@ process_test() {
         local model_name="${2:-$model}"  # Use second parameter as name or default to model
         
         print_header "GAP APPROACH" "Running ${model_name} model"
-        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --debug-only=NoiseAnalysis --generate-param-bgv="model=${model}  plaintext-modulus=${test_plaintext_modulus}" $PWD/$name/$name-middle.mlir > $PWD/$name/$name-middle-params-gap-${model_name}.mlir; then
+        if ! run_command bazel run //tools:heir-opt -- --debug --debug-only="GenerateParamBGV" --debug-only=NoiseAnalysis --generate-param-bgv="model=${model}  plaintext-modulus=${test_plaintext_modulus}" "$PWD/$name/$name-middle.mlir" > "$PWD/$name/$name-middle-params-gap-$(echo "$model_name" | tr '[:upper:]' '[:lower:]').mlir"; then
             return 1
         fi
         
         print_header "GAP APPROACH" "Extracting ${model_name} parameters"
-        if ! run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-${model_name}.mlir" "$PWD/data/${name}_gap-${model_name}_annotated_$TIMESTAMP.json" "$name" "gap-${model_name}"; then
+        if ! run_command python3 "$PWD/extract_bgv_params.py" "$PWD/$name/$name-middle-params-gap-$(echo "$model_name" | tr '[:upper:]' '[:lower:]').mlir" "$PWD/data/${name}_gap-$(echo "$model_name" | tr '[:upper:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "gap-$(echo "$model_name" | tr '[:upper:]' '[:lower:]')"; then
             return 1
         fi
     }
@@ -469,7 +471,7 @@ process_test() {
 
     print_header "POST-PROCESSING" "Fixing include paths in generated files"
     for algorithm in "bisection" "closed" "direct"; do
-        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name,,}_${algorithm,,}.h" "$name/${name,,}_${algorithm,,}.cpp"; then
+        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h" "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
             return 1
         fi
     done
