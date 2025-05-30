@@ -1,0 +1,40 @@
+
+==================================================================
+==                                                              ==
+==  GAP APPROACH                                                ==
+==  Extracting mono parameters                                  ==
+==                                                              ==
+==================================================================
+
+Error reading file /home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle-params-gap-mono.mlir: [Errno 2] No such file or directory: '/home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle-params-gap-mono.mlir'
+
+==================================================================
+==                                                              ==
+==  DIRECT ALGORITHM                                            ==
+==  Skipping parameter annotation                               ==
+==                                                              ==
+==================================================================
+
+
+==================================================================
+==                                                              ==
+==  DIRECT ALGORITHM                                            ==
+==  Converting to BGV and OpenFHE                               ==
+==                                                              ==
+==================================================================
+
+Computing main repo mapping: 
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+Analyzing: target //tools:heir-opt (0 packages loaded, 0 targets configured)
+
+INFO: Analyzed target //tools:heir-opt (0 packages loaded, 0 targets configured).
+INFO: Found 1 target...
+Target //tools:heir-opt up-to-date:
+  bazel-bin/tools/heir-opt
+INFO: Elapsed time: 0.305s, Critical Path: 0.00s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/tools/heir-opt <args omitted>
+cannot open input file '/home/ubuntu/heir-aisec/mlir-test-files/add-large-0/add-large-0-middle.mlir': No such file or directory
