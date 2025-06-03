@@ -336,17 +336,17 @@ process_test() {
         
         TEMP_FILE=$(mktemp)
 
-        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
+        if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=$(echo "$algorithm" | tr '[:lower:]' '[:upper:]')\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
             return 1
         fi
 
-        if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')_computed_$TIMESTAMP.json" "$name"; then
+        if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_computed_$TIMESTAMP.json" "$name"; then
             return 1
         fi
 
         rm "$TEMP_FILE"
 
-        if ! run_command python3 "$PWD/extract_bgv_params.py" "$output_mlir" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "$(echo "$algorithm" | tr '[:lower:]' '[:lower:]')"; then
+        if ! run_command python3 "$PWD/extract_bgv_params.py" "$output_mlir" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')"; then
             return 1
         fi
 
@@ -471,7 +471,7 @@ process_test() {
 
     print_header "POST-PROCESSING" "Fixing include paths in generated files"
     for algorithm in "bisection" "closed" "direct"; do
-        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h" "$name/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
+        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h" "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
             return 1
         fi
     done
