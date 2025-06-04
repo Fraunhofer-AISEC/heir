@@ -1076,8 +1076,10 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       }
    }
 
-   annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
-   annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus, OperationCount(0, 0));
+    printParamsWithResultTags(moduli, ringDimension, plaintextModulus, "<testname>", algorithm);
+
+    annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
+    annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus, OperationCount(0, 0));
   });
 }
 }  // namespace heir

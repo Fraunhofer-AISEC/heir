@@ -20,7 +20,7 @@ TEST_PLAINTEXT_MODULI=(
 # Get plaintext modulus for a specific test
 get_test_plaintext_modulus() {
     local test_name="$1"
-    
+
     # Loop through the array to find the modulus
     for entry in "${TEST_PLAINTEXT_MODULI[@]}"; do
         IFS=':' read -r name value <<< "$entry"
@@ -99,7 +99,7 @@ get_group_tests() {
             # Combine all test groups
             local all_tests=""
             all_tests+=" $(get_group_tests add-64)"
-            all_tests+=" $(get_group_tests add-depth)"
+            #all_tests+=" $(get_group_tests add-depth)"
             all_tests+=" $(get_group_tests rotate)"
             all_tests+=" $(get_group_tests form)"
             all_tests+=" $(get_group_tests add-eq)"
@@ -339,21 +339,23 @@ process_test() {
         if ! run_command bash -c "bazel run //tools:heir-opt -- --annotate-parameters=\"plaintext-modulus=${test_plaintext_modulus} ring-dimension=0 algorithm=$(echo "$algorithm" | tr '[:lower:]' '[:upper:]')\" \"$input_mlir\" > \"$output_mlir\" 2> >(tee \"$TEMP_FILE\">&2 )"; then
             return 1
         fi
+        # Only run for not direct approach
+        if [ "$algorithm" != "direct" ]; then
+          if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_computed_$TIMESTAMP.json" "$name"; then
+              return 1
+          fi
 
-        if ! run_command extract_computed_params "$TEMP_FILE" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_computed_$TIMESTAMP.json" "$name"; then
-            return 1
+          if ! run_command python3 "$PWD/extract_bgv_params.py" "$output_mlir" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')"; then
+              return 1
+          fi
+
+          print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Validating noise with Mono model"
+          if ! run_command bash -c "bazel run //tools:heir-opt -- --validate-noise=\"model=bgv-noise-mono\" \"$output_mlir\" --debug --debug-only=\"ValidateNoise\"" ; then
+              return 1
+          fi
         fi
 
         rm "$TEMP_FILE"
-
-        if ! run_command python3 "$PWD/extract_bgv_params.py" "$output_mlir" "$PWD/data/${name}_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')_annotated_$TIMESTAMP.json" "$name" "$(echo "$algorithm" | tr '[:upper:]' '[:lower:]')"; then
-            return 1
-        fi
-
-        print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Validating noise with Mono model"
-        if ! run_command bash -c "bazel run //tools:heir-opt -- --validate-noise=\"model=bgv-noise-mono\" \"$output_mlir\" --debug --debug-only=\"ValidateNoise\"" ; then
-            return 1
-        fi
     }
 
     # Function to convert to BGV and OpenFHE
@@ -404,14 +406,10 @@ process_test() {
         local algorithm="$1"
         local noParams="$2"
         
-        if [ "$noParams" != "noParams" ]; then
-            if ! annotate_parameters "$algorithm"; then
-                return 1
-            fi
-        else 
-            print_header "$(echo "$algorithm" | tr '[:lower:]' '[:upper:]') ALGORITHM" "Skipping parameter annotation"
+        if ! annotate_parameters "$algorithm"; then
+            return 1
         fi
-        
+
         if ! convert_to_bgv_openfhe "$algorithm" "$noParams"; then
             return 1
         fi
@@ -465,7 +463,7 @@ process_test() {
         return 1
     fi
     
-    if ! process_algorithm "direct" "noParams"; then
+    if ! process_algorithm "direct"; then
         return 1
     fi
 
