@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Record start time
 script_start_time=$(date +%s)
 
@@ -279,8 +279,8 @@ extract_computed_params() {
     local test_name="$3"
 
     # Clean and extract the JSON content between <params> tags
-    cat "$input_file" | tr -cd '\11\12\15\40-\176' | grep -zo "<params>.*</params>" | \
-        sed 's/<params>//g' | sed 's/<\/params>//g' | \
+    cat "$input_file" | tr -cd '\11\12\15\40-\176' | grep "<params>" -A 10 | \
+        sed 's/<params>//g; s/<\/params>//g' | \
         tr -d '\000-\011\013\014\016-\037\177' | \
         sed "s/<testname>/$test_name/g" > "$output_file"
 }
