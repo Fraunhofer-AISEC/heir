@@ -26,6 +26,7 @@ struct AnnotateParameters : impl::AnnotateParametersBase<AnnotateParameters> {
   void runOnOperation() override {
     DataFlowSolver solver;
     solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::SparseConstantPropagation>();
     solver.load<SecretnessAnalysis>();
     solver.load<LevelAnalysis>();
     solver.load<OperationCountAnalysis>();
