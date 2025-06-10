@@ -118,6 +118,9 @@ class OperationCountAnalysis
     : public dataflow::SparseForwardDataFlowAnalysis<OperationCountLattice>,
       public SecretnessAnalysisDependent<OperationCountAnalysis> {
  public:
+  explicit OperationCountAnalysis(DataFlowSolver &solver)
+      : SparseForwardDataFlowAnalysis(solver) {}
+  ~OperationCountAnalysis() override = default;
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
   friend class SecretnessAnalysisDependent<OperationCountAnalysis>;
 
