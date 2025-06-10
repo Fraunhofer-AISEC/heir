@@ -27,6 +27,7 @@
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"    // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Visitors.h"                 // from @llvm-project
+#include "external/llvm-project/llvm/include/llvm/Support/Debug.h"
 
 #include <cmath> // Required for math functions
 #include <vector>
