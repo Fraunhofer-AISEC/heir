@@ -54,6 +54,10 @@ struct MlirToRLWEPipelineOptions : public SimdVectorizerOptions {
       llvm::cl::desc("Modulus switching right before the first multiplication "
                      "(default to false)"),
       llvm::cl::init(false)};
+  PassOptions::Option<bool> insertMgmt{
+      *this, "insert-mgmt",
+      llvm::cl::desc("Insert management operations for the specified scheme"),
+      llvm::cl::init(true)};
   PassOptions::Option<int64_t> plaintextModulus{
       *this, "plaintext-modulus",
       llvm::cl::desc("Plaintext modulus for BGV scheme (default to 65537)"),
