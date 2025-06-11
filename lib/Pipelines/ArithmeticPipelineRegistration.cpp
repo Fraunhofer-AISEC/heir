@@ -264,36 +264,38 @@ void mlirToRLWEPipeline(OpPassManager& pm,
         secretImportExecutionResultOptions));
   }
 
-  // place mgmt.op and MgmtAttr for BGV
-  // which is required for secret-to-<scheme> lowering
-  switch (scheme) {
-    case RLWEScheme::bgvScheme: {
-      auto secretInsertMgmtBGVOptions = SecretInsertMgmtBGVOptions{};
+  if (options.insertMgmt) {
+    // place mgmt.op and MgmtAttr for BGV
+    // which is required for secret-to-<scheme> lowering
+    switch (scheme) {
+      case RLWEScheme::bgvScheme: {
+        auto secretInsertMgmtBGVOptions = SecretInsertMgmtBGVOptions{};
       secretInsertMgmtBGVOptions.afterMul = options.modulusSwitchAfterMul;
-      secretInsertMgmtBGVOptions.beforeMulIncludeFirstMul =
-          options.modulusSwitchBeforeFirstMul;
-      pm.addPass(createSecretInsertMgmtBGV(secretInsertMgmtBGVOptions));
-      break;
-    }
-    case RLWEScheme::bfvScheme: {
-      pm.addPass(createSecretInsertMgmtBFV());
-      break;
-    }
-    case RLWEScheme::ckksScheme: {
-      auto secretInsertMgmtCKKSOptions = SecretInsertMgmtCKKSOptions{};
+        secretInsertMgmtBGVOptions.beforeMulIncludeFirstMul =
+            options.modulusSwitchBeforeFirstMul;
+        pm.addPass(createSecretInsertMgmtBGV(secretInsertMgmtBGVOptions));
+        break;
+      }
+      case RLWEScheme::bfvScheme: {
+        pm.addPass(createSecretInsertMgmtBFV());
+        break;
+      }
+      case RLWEScheme::ckksScheme: {
+        auto secretInsertMgmtCKKSOptions = SecretInsertMgmtCKKSOptions{};
       secretInsertMgmtCKKSOptions.afterMul = options.modulusSwitchAfterMul;
-      secretInsertMgmtCKKSOptions.beforeMulIncludeFirstMul =
-          options.modulusSwitchBeforeFirstMul;
-      secretInsertMgmtCKKSOptions.slotNumber = options.ciphertextDegree;
-      secretInsertMgmtCKKSOptions.bootstrapWaterline =
-          options.ckksBootstrapWaterline;
+        secretInsertMgmtCKKSOptions.beforeMulIncludeFirstMul =
+            options.modulusSwitchBeforeFirstMul;
+        secretInsertMgmtCKKSOptions.slotNumber = options.ciphertextDegree;
+        secretInsertMgmtCKKSOptions.bootstrapWaterline =
+            options.ckksBootstrapWaterline;
       secretInsertMgmtCKKSOptions.levelBudget = options.levelBudget;
-      pm.addPass(createSecretInsertMgmtCKKS(secretInsertMgmtCKKSOptions));
-      break;
+        pm.addPass(createSecretInsertMgmtCKKS(secretInsertMgmtCKKSOptions));
+        break;
+      }
+      default:
+        llvm::errs() << "Unsupported RLWE scheme: " << scheme;
+        exit(EXIT_FAILURE);
     }
-    default:
-      llvm::errs() << "Unsupported RLWE scheme: " << scheme;
-      exit(EXIT_FAILURE);
   }
 
   // TODO(#2600): support loops in optimize-relinearization

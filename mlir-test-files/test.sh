@@ -467,21 +467,28 @@ process_test() {
         return 1
     fi
 
+    # Detect if running on macOS
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sed_command="sed -i ''"
+    else
+        sed_command="sed -i"
+    fi
+
     print_header "POST-PROCESSING" "Fixing include paths in generated files"
     for algorithm in "bisection" "closed" "direct"; do
-        if ! run_command sed -i 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h" "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
+        if ! run_command $sed_command 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').h" "$name/$(echo "$name" | tr '[:upper:]' '[:lower:]')_$(echo "$algorithm" | tr '[:upper:]' '[:lower:]').cpp"; then
             return 1
         fi
     done
     
     print_header "POST-PROCESSING" "Adding FIXEDAUTO scaling technique to direct variant"
     # Fix scaling technique
-    if ! run_command sed -i "s/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/" "$name/${name}_direct.cpp"; then
+    if ! run_command $sed_command "s/CCParamsT params;/CCParamsT params;\n  params.SetScalingTechnique(FIXEDAUTO);/" "$name/${name}_direct.cpp"; then
         return 1
     fi
     
     # Fix plaintext modulus separately - use test_plaintext_modulus instead of PLAINTEXT_MODULUS
-    if ! run_command sed -i "s/params.SetPlaintextModulus([0-9]*);/params.SetPlaintextModulus(${test_plaintext_modulus});/" "$name/${name}_direct.cpp"; then
+    if ! run_command $sed_command "s/params.SetPlaintextModulus([0-9]*);/params.SetPlaintextModulus(${test_plaintext_modulus});/" "$name/${name}_direct.cpp"; then
         return 1
     fi
     

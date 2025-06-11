@@ -58,15 +58,11 @@ class OperationCount {
   }
 
   OperationCount operator+(const OperationCount &rhs) const {
-    assert(isInitialized() && rhs.isInitialized() &&
-           "OperationCount not initialized");
     return OperationCount(ciphertextCount + rhs.ciphertextCount,
                           std::max(keySwitchCount, rhs.keySwitchCount), highestLevel && rhs.highestLevel );
   }
 
   static OperationCount max(const OperationCount &lhs, const OperationCount &rhs) {
-    assert(lhs.isInitialized() && rhs.isInitialized() &&
-           "OperationCount not initialized");
     return OperationCount(std::max(lhs.ciphertextCount, rhs.ciphertextCount),
                           std::max(lhs.keySwitchCount, rhs.keySwitchCount), 
                           lhs.highestLevel && rhs.highestLevel);
