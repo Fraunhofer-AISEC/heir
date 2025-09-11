@@ -10,18 +10,10 @@ module{
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index
 
-        %R00 = tensor.extract_slice %Key [0] [4] [1] : tensor<16xi8> to tensor<4xi8>
-        %R01 = tensor.extract_slice %Key [4] [4] [1] : tensor<16xi8> to tensor<4xi8>
-        %R02 = tensor.extract_slice %Key [8] [4] [1] : tensor<16xi8> to tensor<4xi8>
-        %R03 = tensor.extract_slice %Key [12] [4] [1] : tensor<16xi8> to tensor<4xi8>
-
         %R0 = tensor.empty() : tensor<11x16xi8>
-        %R1 = tensor.insert_slice %R00 into %R0 [0, 0] [1, 4] [1, 1] : tensor<4xi8> into tensor<11x16xi8>
-        %R2 = tensor.insert_slice %R01 into %R1 [0, 4] [1, 4] [1, 1] : tensor<4xi8> into tensor<11x16xi8>
-        %R3 = tensor.insert_slice %R02 into %R2 [0, 8] [1, 4] [1, 1] : tensor<4xi8> into tensor<11x16xi8>
-        %R4 = tensor.insert_slice %R03 into %R3 [0, 12] [1,4] [1, 1] : tensor<4xi8> into tensor<11x16xi8>
+        %R1 = tensor.insert_slice %Key into %R0 [0, 0] [1, 16] [1, 1] : tensor<16xi8> into tensor<11x16xi8>
 
-        %RoundKey = scf.for %i = %c0 to %c11 step %c1 iter_args(%R_iter = %R4) -> (tensor<11x16xi8>) {
+        %RoundKey = scf.for %i = %c0 to %c11 step %c1 iter_args(%R_iter = %R1) -> (tensor<11x16xi8>) {
 
             %k = arith.addi %i, %c1 : index
             %old1 = tensor.extract_slice %R_iter [%i, 0] [1, 4] [1, 1] : tensor<11x16xi8> to tensor<4xi8>
