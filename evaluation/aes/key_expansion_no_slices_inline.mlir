@@ -1,0 +1,166 @@
+module {
+  func.func @key_expansion(%arg0: tensor<16xi8>) -> tensor<11x16xi8> {
+    %c15 = arith.constant 15 : index
+    %cst = arith.constant dense<"0x637C777BF26B6FC53001672BFED7AB76CA82C97DFA5947F0ADD4A2AF9CA472C0B7FD9326363FF7CC34A5E5F171D8311504C723C31896059A071280E2EB27B27509832C1A1B6E5AA0523BD6B329E32F8453D100ED20FCB15B6ACBBE394A4C58CFD0EFAAFB434D338545F9027F503C9FA851A3408F929D38F5BCB6DA2110FFF3D2CD0C13EC5F974417C4A77E3D645D197360814FDC222A908846EEB814DE5E0BDBE0323A0A4906245CC2D3AC629195E479E7C8376D8DD54EA96C56F4EA657AAE08BA78252E1CA6B4C6E8DD741F4BBD8B8A703EB5664803F60E613557B986C11D9EE1F8981169D98E949B1E87E9CE5528DF8CA1890DBFE6426841992D0FB054BB16"> : tensor<256xi8>
+    %c14 = arith.constant 14 : index
+    %c13 = arith.constant 13 : index
+    %c11 = arith.constant 11 : index
+    %c9 = arith.constant 9 : index
+    %c7 = arith.constant 7 : index
+    %c6 = arith.constant 6 : index
+    %c5 = arith.constant 5 : index
+    %c3 = arith.constant 3 : index
+    %c2 = arith.constant 2 : index
+    %cst_0 = arith.constant dense<[1, 2, 4, 8, 16, 32, 64, -128, 27, 54]> : tensor<10xi8>
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+    %c8 = arith.constant 8 : index
+    %c10 = arith.constant 10 : index
+    %c12 = arith.constant 12 : index
+    %0 = tensor.empty() : tensor<11x16xi8>
+    %extracted = tensor.extract %arg0[%c0] : tensor<16xi8>
+    %inserted = tensor.insert %extracted into %0[%c0, %c0] : tensor<11x16xi8>
+    %extracted_1 = tensor.extract %arg0[%c1] : tensor<16xi8>
+    %inserted_2 = tensor.insert %extracted_1 into %inserted[%c0, %c1] : tensor<11x16xi8>
+    %extracted_3 = tensor.extract %arg0[%c2] : tensor<16xi8>
+    %inserted_4 = tensor.insert %extracted_3 into %inserted_2[%c0, %c2] : tensor<11x16xi8>
+    %extracted_5 = tensor.extract %arg0[%c3] : tensor<16xi8>
+    %inserted_6 = tensor.insert %extracted_5 into %inserted_4[%c0, %c3] : tensor<11x16xi8>
+    %extracted_7 = tensor.extract %arg0[%c4] : tensor<16xi8>
+    %inserted_8 = tensor.insert %extracted_7 into %inserted_6[%c0, %c3] : tensor<11x16xi8>
+    %extracted_9 = tensor.extract %arg0[%c5] : tensor<16xi8>
+    %inserted_10 = tensor.insert %extracted_9 into %inserted_8[%c0, %c3] : tensor<11x16xi8>
+    %extracted_11 = tensor.extract %arg0[%c6] : tensor<16xi8>
+    %inserted_12 = tensor.insert %extracted_11 into %inserted_10[%c0, %c3] : tensor<11x16xi8>
+    %extracted_13 = tensor.extract %arg0[%c7] : tensor<16xi8>
+    %inserted_14 = tensor.insert %extracted_13 into %inserted_12[%c0, %c3] : tensor<11x16xi8>
+    %extracted_15 = tensor.extract %arg0[%c8] : tensor<16xi8>
+    %inserted_16 = tensor.insert %extracted_15 into %inserted_14[%c0, %c3] : tensor<11x16xi8>
+    %extracted_17 = tensor.extract %arg0[%c9] : tensor<16xi8>
+    %inserted_18 = tensor.insert %extracted_17 into %inserted_16[%c0, %c3] : tensor<11x16xi8>
+    %extracted_19 = tensor.extract %arg0[%c10] : tensor<16xi8>
+    %inserted_20 = tensor.insert %extracted_19 into %inserted_18[%c0, %c3] : tensor<11x16xi8>
+    %extracted_21 = tensor.extract %arg0[%c11] : tensor<16xi8>
+    %inserted_22 = tensor.insert %extracted_21 into %inserted_20[%c0, %c3] : tensor<11x16xi8>
+    %extracted_23 = tensor.extract %arg0[%c12] : tensor<16xi8>
+    %inserted_24 = tensor.insert %extracted_23 into %inserted_22[%c0, %c3] : tensor<11x16xi8>
+    %extracted_25 = tensor.extract %arg0[%c13] : tensor<16xi8>
+    %inserted_26 = tensor.insert %extracted_25 into %inserted_24[%c0, %c3] : tensor<11x16xi8>
+    %extracted_27 = tensor.extract %arg0[%c14] : tensor<16xi8>
+    %inserted_28 = tensor.insert %extracted_27 into %inserted_26[%c0, %c3] : tensor<11x16xi8>
+    %1 = scf.for %arg1 = %c0 to %c10 step %c1 iter_args(%arg2 = %inserted_28) -> (tensor<11x16xi8>) {
+      %2 = arith.addi %arg1, %c1 : index
+      %3 = tensor.empty() : tensor<4xi8>
+      %extracted_29 = tensor.extract %arg2[%arg1, %c0] : tensor<11x16xi8>
+      %inserted_30 = tensor.insert %extracted_29 into %3[%c0] : tensor<4xi8>
+      %extracted_31 = tensor.extract %arg2[%arg1, %c1] : tensor<11x16xi8>
+      %inserted_32 = tensor.insert %extracted_31 into %inserted_30[%c1] : tensor<4xi8>
+      %extracted_33 = tensor.extract %arg2[%arg1, %c2] : tensor<11x16xi8>
+      %inserted_34 = tensor.insert %extracted_33 into %inserted_32[%c2] : tensor<4xi8>
+      %extracted_35 = tensor.extract %arg2[%arg1, %c3] : tensor<11x16xi8>
+      %inserted_36 = tensor.insert %extracted_35 into %inserted_34[%c3] : tensor<4xi8>
+      %4 = tensor.empty() : tensor<4xi8>
+      %extracted_37 = tensor.extract %arg2[%arg1, %c4] : tensor<11x16xi8>
+      %inserted_38 = tensor.insert %extracted_37 into %4[%c0] : tensor<4xi8>
+      %extracted_39 = tensor.extract %arg2[%arg1, %c5] : tensor<11x16xi8>
+      %inserted_40 = tensor.insert %extracted_39 into %inserted_38[%c1] : tensor<4xi8>
+      %extracted_41 = tensor.extract %arg2[%arg1, %c6] : tensor<11x16xi8>
+      %inserted_42 = tensor.insert %extracted_41 into %inserted_40[%c2] : tensor<4xi8>
+      %extracted_43 = tensor.extract %arg2[%arg1, %c7] : tensor<11x16xi8>
+      %inserted_44 = tensor.insert %extracted_43 into %inserted_42[%c3] : tensor<4xi8>
+      %5 = tensor.empty() : tensor<4xi8>
+      %extracted_45 = tensor.extract %arg2[%arg1, %c8] : tensor<11x16xi8>
+      %inserted_46 = tensor.insert %extracted_45 into %5[%c0] : tensor<4xi8>
+      %extracted_47 = tensor.extract %arg2[%arg1, %c9] : tensor<11x16xi8>
+      %inserted_48 = tensor.insert %extracted_47 into %inserted_46[%c1] : tensor<4xi8>
+      %extracted_49 = tensor.extract %arg2[%arg1, %c10] : tensor<11x16xi8>
+      %inserted_50 = tensor.insert %extracted_49 into %inserted_48[%c2] : tensor<4xi8>
+      %extracted_51 = tensor.extract %arg2[%arg1, %c11] : tensor<11x16xi8>
+      %inserted_52 = tensor.insert %extracted_51 into %inserted_50[%c3] : tensor<4xi8>
+      %6 = tensor.empty() : tensor<4xi8>
+      %extracted_53 = tensor.extract %arg2[%arg1, %c12] : tensor<11x16xi8>
+      %inserted_54 = tensor.insert %extracted_53 into %6[%c0] : tensor<4xi8>
+      %extracted_55 = tensor.extract %arg2[%arg1, %c13] : tensor<11x16xi8>
+      %inserted_56 = tensor.insert %extracted_55 into %inserted_54[%c1] : tensor<4xi8>
+      %extracted_57 = tensor.extract %arg2[%arg1, %c14] : tensor<11x16xi8>
+      %inserted_58 = tensor.insert %extracted_57 into %inserted_56[%c2] : tensor<4xi8>
+      %extracted_59 = tensor.extract %arg2[%arg1, %c15] : tensor<11x16xi8>
+      %inserted_60 = tensor.insert %extracted_59 into %inserted_58[%c3] : tensor<4xi8>
+      %extracted_61 = tensor.extract %inserted_60[%c0] : tensor<4xi8>
+      %extracted_62 = tensor.extract %inserted_60[%c1] : tensor<4xi8>
+      %extracted_63 = tensor.extract %inserted_60[%c2] : tensor<4xi8>
+      %7 = tensor.empty() : tensor<4xi8>
+      %inserted_64 = tensor.insert %extracted_62 into %7[%c0] : tensor<4xi8>
+      %inserted_65 = tensor.insert %extracted_63 into %inserted_64[%c1] : tensor<4xi8>
+      %inserted_66 = tensor.insert %extracted_59 into %inserted_65[%c2] : tensor<4xi8>
+      %inserted_67 = tensor.insert %extracted_61 into %inserted_66[%c3] : tensor<4xi8>
+      %8 = scf.for %arg3 = %c0 to %c5 step %c1 iter_args(%arg4 = %inserted_67) -> (tensor<4xi8>) {
+        %extracted_102 = tensor.extract %inserted_67[%arg3] : tensor<4xi8>
+        %15 = arith.index_cast %extracted_102 : i8 to index
+        %extracted_103 = tensor.extract %cst[%15] : tensor<256xi8>
+        %inserted_104 = tensor.insert %extracted_103 into %arg4[%arg3] : tensor<4xi8>
+        scf.yield %inserted_104 : tensor<4xi8>
+      } {lower = 4 : i64, upper = 4 : i64}
+      %9 = tensor.empty() : tensor<4xi8>
+      %extracted_68 = tensor.extract %cst_0[%arg1] : tensor<10xi8>
+      %inserted_69 = tensor.insert %extracted_68 into %9[%c0] : tensor<4xi8>
+      %10 = arith.xori %8, %inserted_69 : tensor<4xi8>
+      %11 = arith.xori %10, %inserted_36 : tensor<4xi8>
+      %12 = arith.xori %11, %inserted_44 : tensor<4xi8>
+      %13 = arith.xori %12, %inserted_52 : tensor<4xi8>
+      %14 = arith.xori %13, %inserted_60 : tensor<4xi8>
+      %extracted_70 = tensor.extract %11[%c0] : tensor<4xi8>
+      %inserted_71 = tensor.insert %extracted_70 into %arg2[%2, %c0] : tensor<11x16xi8>
+      %extracted_72 = tensor.extract %11[%c1] : tensor<4xi8>
+      %inserted_73 = tensor.insert %extracted_72 into %inserted_71[%2, %c1] : tensor<11x16xi8>
+      %extracted_74 = tensor.extract %11[%c2] : tensor<4xi8>
+      %inserted_75 = tensor.insert %extracted_74 into %inserted_73[%2, %c2] : tensor<11x16xi8>
+      %extracted_76 = tensor.extract %11[%c3] : tensor<4xi8>
+      %inserted_77 = tensor.insert %extracted_76 into %inserted_75[%2, %c3] : tensor<11x16xi8>
+      %extracted_78 = tensor.extract %12[%c0] : tensor<4xi8>
+      %inserted_79 = tensor.insert %extracted_78 into %inserted_77[%2, %c4] : tensor<11x16xi8>
+      %extracted_80 = tensor.extract %12[%c1] : tensor<4xi8>
+      %inserted_81 = tensor.insert %extracted_80 into %inserted_79[%2, %c5] : tensor<11x16xi8>
+      %extracted_82 = tensor.extract %12[%c2] : tensor<4xi8>
+      %inserted_83 = tensor.insert %extracted_82 into %inserted_81[%2, %c6] : tensor<11x16xi8>
+      %extracted_84 = tensor.extract %12[%c3] : tensor<4xi8>
+      %inserted_85 = tensor.insert %extracted_84 into %inserted_83[%2, %c7] : tensor<11x16xi8>
+      %extracted_86 = tensor.extract %13[%c0] : tensor<4xi8>
+      %inserted_87 = tensor.insert %extracted_86 into %inserted_85[%2, %c8] : tensor<11x16xi8>
+      %extracted_88 = tensor.extract %13[%c1] : tensor<4xi8>
+      %inserted_89 = tensor.insert %extracted_88 into %inserted_87[%2, %c9] : tensor<11x16xi8>
+      %extracted_90 = tensor.extract %13[%c2] : tensor<4xi8>
+      %inserted_91 = tensor.insert %extracted_90 into %inserted_89[%2, %c10] : tensor<11x16xi8>
+      %extracted_92 = tensor.extract %13[%c3] : tensor<4xi8>
+      %inserted_93 = tensor.insert %extracted_92 into %inserted_91[%2, %c11] : tensor<11x16xi8>
+      %extracted_94 = tensor.extract %14[%c0] : tensor<4xi8>
+      %inserted_95 = tensor.insert %extracted_94 into %inserted_93[%2, %c12] : tensor<11x16xi8>
+      %extracted_96 = tensor.extract %14[%c1] : tensor<4xi8>
+      %inserted_97 = tensor.insert %extracted_96 into %inserted_95[%2, %c13] : tensor<11x16xi8>
+      %extracted_98 = tensor.extract %14[%c2] : tensor<4xi8>
+      %inserted_99 = tensor.insert %extracted_98 into %inserted_97[%2, %c14] : tensor<11x16xi8>
+      %extracted_100 = tensor.extract %14[%c3] : tensor<4xi8>
+      %inserted_101 = tensor.insert %extracted_100 into %inserted_99[%2, %c15] : tensor<11x16xi8>
+      scf.yield %inserted_101 : tensor<11x16xi8>
+    }
+    return %1 : tensor<11x16xi8>
+  }
+  func.func @rot_word(%arg0: tensor<4xi8>) -> tensor<4xi8> {
+    %c3 = arith.constant 3 : index
+    %c2 = arith.constant 2 : index
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %extracted = tensor.extract %arg0[%c0] : tensor<4xi8>
+    %extracted_0 = tensor.extract %arg0[%c1] : tensor<4xi8>
+    %extracted_1 = tensor.extract %arg0[%c2] : tensor<4xi8>
+    %extracted_2 = tensor.extract %arg0[%c3] : tensor<4xi8>
+    %0 = tensor.empty() : tensor<4xi8>
+    %inserted = tensor.insert %extracted_0 into %0[%c0] : tensor<4xi8>
+    %inserted_3 = tensor.insert %extracted_1 into %inserted[%c1] : tensor<4xi8>
+    %inserted_4 = tensor.insert %extracted_2 into %inserted_3[%c2] : tensor<4xi8>
+    %inserted_5 = tensor.insert %extracted into %inserted_4[%c3] : tensor<4xi8>
+    return %inserted_5 : tensor<4xi8>
+  }
+}
+
