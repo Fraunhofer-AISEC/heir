@@ -1,0 +1,74 @@
+module {
+func.func @main(%input: tensor<784xi8> ,
+               %layer1_weights: tensor<512x784xi8>,
+               %layer1_bias: tensor<512xi8>,
+               %layer2_weights: tensor<10x512xi8>,
+               %layer2_bias: tensor<10xi8>) -> tensor<10xi8> {
+  // Konstanten als Variablen
+  %c_0_idx = arith.constant 0 : index
+  %c_one = arith.constant 1 : index
+  %c_0_i16 = arith.constant 0 : i16
+  %c_0_i32 = arith.constant 0 : i32
+  %c_512 = arith.constant 512 : index
+  %c_784 = arith.constant 784 : index
+  %c_10 = arith.constant 10 : index
+
+  // Output für erste Schicht
+  %layer1_out = tensor.empty() : tensor<512xi8>
+  scf.for %i = %c_0_idx to %c_512 step %c_one {
+    // Matrix-Vektor-Multiplikation mit scf.for und scf.reduce
+    %acc_final = scf.for %j = %c_0_idx to %c_784 step %c_one iter_args(%acc = %c_0_i32) -> (i32) {
+      %weight = tensor.extract %layer1_weights[%i, %j] : tensor<512x784xi8>
+      %input_val = tensor.extract %input[%j] : tensor<784xi8>
+      %weight_i16 = arith.extsi %weight : i8 to i16
+      %input_val_i16 = arith.extsi %input_val : i8 to i16
+      %prod = arith.muli %weight_i16, %input_val_i16 : i16
+      %prod_i32 = arith.extsi %prod : i16 to i32
+      %acc_next = arith.addi %acc, %prod_i32 : i32
+      scf.yield %acc_next : i32
+    }
+
+    // Bias hinzufügen
+    %bias = tensor.extract %layer1_bias[%i] : tensor<512xi8>
+    %bias_ext = arith.extsi %bias : i8 to i16
+    %sum_ext = arith.trunci %acc_final : i32 to i16
+    %sum_bias = arith.addi %sum_ext, %bias_ext : i16
+
+    // ReLU
+    %relu_mask = arith.cmpi sgt, %sum_bias, %c_0_i16 : i16
+    %relu_value = arith.select %relu_mask, %sum_bias, %c_0_i16 : i16
+
+    // Truncieren auf i8
+    %final_val = arith.trunci %relu_value : i16 to i8
+    tensor.insert %final_val into %layer1_out[%i] : tensor<512xi8>
+  }
+
+  // Zweite Schicht: Matrix-Vektor-Multiplikation + Bias
+  %output = tensor.empty() : tensor<10xi8>
+  scf.for %i = %c_0_idx to %c_10 step %c_one {
+    // Matrix-Vektor-Multiplikation mit scf.for und scf.reduce
+    %acc2_final = scf.for %j = %c_0_idx to %c_512 step %c_one iter_args(%acc2 = %c_0_i32) -> (i32) {
+        %weight2 = tensor.extract %layer2_weights[%i, %j] : tensor<10x512xi8>
+        %input_val2 = tensor.extract %layer1_out[%j] : tensor<512xi8>
+        %weight2_i16 = arith.extsi %weight2 : i8 to i16
+        %input_val2_i16 = arith.extsi %input_val2 : i8 to i16
+        %prod2 = arith.muli %weight2_i16, %input_val2_i16 : i16
+        %prod2_i32 = arith.extsi %prod2 : i16 to i32
+        %acc2_next = arith.addi %acc2, %prod2_i32 : i32
+        scf.yield %acc2_next : i32
+    }
+
+    // Bias hinzufügen
+    %bias2 = tensor.extract %layer2_bias[%i] : tensor<10xi8>
+    %bias2_ext = arith.extsi %bias2 : i8 to i16
+    %sum2_ext = arith.trunci %acc2_final : i32 to i16
+    %sum2_final = arith.addi %sum2_ext, %bias2_ext : i16
+
+    // Truncieren auf i8
+    %final_out = arith.trunci %sum2_final : i16 to i8
+    tensor.insert %final_out into %output[%i] : tensor<10xi8>
+  }
+  // Rückgabe
+  func.return %output : tensor<10xi8>
+  }
+}
