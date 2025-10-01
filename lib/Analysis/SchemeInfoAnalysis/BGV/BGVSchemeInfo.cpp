@@ -6,6 +6,9 @@
 #include <unordered_map>
 
 #include "BGVSchemeInfo.h"
+
+#include <mlir/Dialect/Affine/Analysis/LoopAnalysis.h>
+#include <mlir/Dialect/Affine/IR/AffineOps.h.inc>
 #include "lib/Analysis/Utils.h"
 #include "lib/Dialect/Secret/IR/SecretOps.h"
 #include "lib/Utils/Utils.h"
@@ -13,6 +16,7 @@
 #include "llvm/include/llvm/Support/Debug.h"               // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"      // from @llvm-project
+#include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h"  // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"     // from @llvm-project
 #include "mlir/include/mlir/Dialect/Math/IR/Math.h"        // from @llvm-project
 #include "mlir/include/mlir/IR/Attributes.h"               // from @llvm-project
@@ -84,7 +88,10 @@ LogicalResult BGVSchemeInfoAnalysis::visitOperation(
       })
       .Case<arith::MulIOp>([&](auto op) {
         propagateLevelToResult(true);
-      });
+      })
+  .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
+     // TODO: Implement
+  });
 
   return success();
 }
@@ -101,6 +108,40 @@ static int getMaxLevel(Operation* top, DataFlowSolver* solver) {
   return maxLevel;
 }
 
+
+static int computeRuntimeForRegion(Region &region) {
+  int runtime = 0;
+  auto addRuntime = [&runtime](int additional) {
+    runtime += additional;
+  };
+
+  region.walk<WalkOrder::PreOrder>([&](Operation *top) {
+     llvm::TypeSwitch<Operation &>(*top)
+      // count integer arithmetic ops
+      .Case<arith::AddIOp, arith::SubIOp>([&](auto op) {
+        addRuntime(getRuntime(op));
+      })
+      .Case<arith::MulIOp>([&](auto op) {
+        addRuntime(getRuntime(op));
+        addRuntime(getRuntime("mgmt.relinearize"));
+        addRuntime(getRuntime("mgmt.modreduce"));
+      })
+     .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
+       auto tripCountOpt = affine::getConstantTripCount(forOp);
+       if (!tripCountOpt.has_value()) {
+         return;
+       }
+       auto tripCount = tripCountOpt.value();
+       auto roundTime = computeRuntimeForRegion(forOp.getRegion());
+       addRuntime(tripCount * roundTime);
+     })
+      .Default([&](auto& op) {
+        LLVM_DEBUG(llvm::dbgs() << "Unsupported Operation for BGV runtime estimation " << op.getName() << "\n");
+      });
+   });
+
+  return runtime;
+}
 
 int computeApproximateRuntimeBGV(Operation *top, DataFlowSolver *solver) {
   int maxLevel = getMaxLevel(top, solver);
@@ -122,29 +163,12 @@ int computeApproximateRuntimeBGV(Operation *top, DataFlowSolver *solver) {
   };
 
   int runtime = 0;
-  auto addRuntime = [&runtime](int additional) {
-    runtime += additional;
-  };
-
   top->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
-   funcOp.getBody().walk<WalkOrder::PreOrder>([&](Operation *op) {
-     llvm::TypeSwitch<Operation &>(*op)
-      // count integer arithmetic ops
-      .Case<arith::AddIOp, arith::SubIOp>([&](auto op) {
-        addRuntime(getRuntime(op));
-      })
-      .Case<arith::MulIOp>([&](auto op) {
-        addRuntime(getRuntime(op));
-        addRuntime(getRuntime("mgmt.relinearize"));
-        addRuntime(getRuntime("mgmt.modreduce"));
-      })
-      .Default([&](auto& op) {
-        LLVM_DEBUG(llvm::dbgs() << "Unsupported Operation for BGV runtime estimation " << op.getName() << "\n");
-      });
-   });
- });
+    runtime = computeRuntimeForRegion(funcOp.getBody());
+  });
   return runtime;
 }
+
 
 }  // namespace heir
 }  // namespace mlir
