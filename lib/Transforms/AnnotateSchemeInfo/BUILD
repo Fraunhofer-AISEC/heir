@@ -16,6 +16,7 @@ cc_library(
         "@heir//lib/Analysis/LevelAnalysis",
         "@heir//lib/Analysis/MulDepthAnalysis",
         "@heir//lib/Analysis/SchemeInfoAnalysis",
+        "@heir//lib/Analysis/SchemeInfoAnalysis/BGV:BGVSchemeInfo",
         "@heir//lib/Analysis/SchemeSelectionAnalysis",
         "@heir//lib/Analysis/SecretnessAnalysis",
         "@heir//lib/Transforms/AnnotateModule",

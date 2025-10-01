@@ -2,10 +2,12 @@
 
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
 #include "lib/Analysis/MulDepthAnalysis/MulDepthAnalysis.h"
+#include "../../Analysis/SchemeInfoAnalysis/BGV/BGVSchemeInfo.h"
 #include "lib/Analysis/SchemeInfoAnalysis/SchemeInfoAnalysis.h"
 #include "lib/Analysis/SchemeSelectionAnalysis/SchemeSelectionAnalysis.h"
 #include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
 #include "lib/Transforms/AnnotateModule/AnnotateModule.h"
+#include "llvm/include/llvm/Support/Debug.h"               // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlow/DeadCodeAnalysis.h"  // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
@@ -15,6 +17,8 @@
 
 namespace mlir {
 namespace heir {
+
+#define DEBUG_TYPE "AnnotateSchemeInfo"
 
 #define GEN_PASS_DEF_ANNOTATESCHEMEINFO
 #include "lib/Transforms/AnnotateSchemeInfo/AnnotateSchemeInfo.h.inc"
@@ -27,10 +31,9 @@ struct AnnotateSchemeInfo : impl::AnnotateSchemeInfoBase<AnnotateSchemeInfo> {
     solver.load<dataflow::DeadCodeAnalysis>();
     solver.load<dataflow::SparseConstantPropagation>();
     solver.load<SecretnessAnalysis>();
-    solver.load<LevelAnalysis>();
-    solver.load<MulDepthAnalysis>();
-    solver.load<SchemeInfoAnalysis>();
-    solver.load<SchemeSelectionAnalysis>();
+
+    // Perform Analysis for all available schemes
+    solver.load<BGVSchemeInfoAnalysis>();
 
     auto result = solver.initializeAndRun(getOperation());
 
@@ -40,16 +43,19 @@ struct AnnotateSchemeInfo : impl::AnnotateSchemeInfoBase<AnnotateSchemeInfo> {
       return;
     }
 
-    annotateNatureOfComputation(getOperation(), &solver);
-    auto scheme = annotateModuleWithScheme(getOperation(), &solver);
+    auto runtimeBGV = computeApproximateRuntimeBGV(getOperation(), &solver);
+    LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for BGV: " << runtimeBGV << "ms.\n");
+
+    // Insert comparison between schemes here
+    auto scheme = BGV;
 
     OpPassManager pipeline("builtin.module");
-    auto option = "annotate-module{scheme=" + scheme + "}";
-    mlir::parsePassPipeline(option, pipeline);
+    AnnotateModuleOptions annotateModuleOptions;
+    annotateModuleOptions.scheme = scheme;
+    pipeline.addPass(createAnnotateModule(annotateModuleOptions));
 
     (void)runPipeline(pipeline, getOperation());
   }
 };
-
 }  // namespace heir
 }  // namespace mlir
