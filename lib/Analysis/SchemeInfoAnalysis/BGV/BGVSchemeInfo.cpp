@@ -7,26 +7,21 @@
 
 #include "BGVSchemeInfo.h"
 
-#include <mlir/Dialect/Affine/Analysis/LoopAnalysis.h>
-#include <mlir/Dialect/Affine/IR/AffineOps.h.inc>
-#include "lib/Analysis/Utils.h"
 #include "lib/Dialect/Secret/IR/SecretOps.h"
 #include "lib/Utils/Utils.h"
 #include "llvm/include/llvm/ADT/TypeSwitch.h"              // from @llvm-project
 #include "llvm/include/llvm/Support/Debug.h"               // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
+#include "mlir/include/mlir/Dialect/Affine/Analysis/LoopAnalysis.h"
 #include "mlir/include/mlir/Dialect/Arith/IR/Arith.h"      // from @llvm-project
-#include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h"  // from @llvm-project
+#include "mlir/include/mlir/Dialect/Affine/IR/AffineOps.h" // from @llvm-project
 #include "mlir/include/mlir/Dialect/Func/IR/FuncOps.h"     // from @llvm-project
-#include "mlir/include/mlir/Dialect/Math/IR/Math.h"        // from @llvm-project
-#include "mlir/include/mlir/IR/Attributes.h"               // from @llvm-project
+#include "mlir/include/mlir/Dialect/Linalg/IR/Linalg.h"    // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinAttributes.h"        // from @llvm-project
 #include "mlir/include/mlir/IR/BuiltinTypes.h"             // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"                // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Visitors.h"                 // from @llvm-project
-#include "mlir/include/mlir/Interfaces/CallInterfaces.h"   // from @llvm-project
-#include "mlir/include/mlir/Support/LLVM.h"                // from @llvm-project
 
 #define DEBUG_TYPE "BGVSchemeInfo"
 
@@ -39,6 +34,7 @@ static const std::unordered_map<std::string, int> opRuntimeMap = {
   {"arith.muli", 400},
   {"mgmt.relinearize", 200},
   {"mgmt.modreduce", 300},
+  {"tensor_ext.rotate", 400},
 };
 
 static int getRuntime(const std::string &opName) {
@@ -89,9 +85,13 @@ LogicalResult BGVSchemeInfoAnalysis::visitOperation(
       .Case<arith::MulIOp>([&](auto op) {
         propagateLevelToResult(true);
       })
-  .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
-     // TODO: Implement
-  });
+      .Case<linalg::MatvecOp>([&](linalg::MatvecOp matvecOp) {
+        // Only the main iteration is considered; one mult depth overall.
+        propagateLevelToResult(true);
+      })
+      .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
+         // TODO: Implement
+      });
 
   return success();
 }
@@ -135,9 +135,21 @@ static int computeRuntimeForRegion(Region &region) {
        auto roundTime = computeRuntimeForRegion(forOp.getRegion());
        addRuntime(tripCount * roundTime);
      })
-      .Default([&](auto& op) {
-        LLVM_DEBUG(llvm::dbgs() << "Unsupported Operation for BGV runtime estimation " << op.getName() << "\n");
-      });
+    .Case<linalg::MatvecOp>([&](linalg::MatvecOp matvecOp) {
+        auto inputs = matvecOp.getInputs();
+        auto matrixType = dyn_cast<RankedTensorType>(inputs[0].getType());
+        auto rows = matrixType.getShape()[0];
+
+        // R multiplies (with relinearize + modreduce per mul) and R adds.
+        addRuntime(rows * getRuntime("tensor_ext.rotate"));
+        addRuntime(rows * getRuntime("arith.muli"));
+        addRuntime(rows * getRuntime("mgmt.relinearize"));
+        addRuntime(rows * getRuntime("mgmt.modreduce"));
+        addRuntime(rows * getRuntime("arith.addi"));
+      })
+    .Default([&](auto& op) {
+      LLVM_DEBUG(llvm::dbgs() << "Unsupported Operation for BGV runtime estimation " << op.getName() << "\n");
+    });
    });
 
   return runtime;
