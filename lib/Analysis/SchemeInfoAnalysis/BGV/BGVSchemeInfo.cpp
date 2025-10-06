@@ -28,6 +28,16 @@
 namespace mlir {
 namespace heir {
 
+static const std::vector<std::string> illegalDialects = {
+  "comb"
+};
+
+static const std::vector<std::string> illegalOperations = {
+  "arith.cmpi",
+  "arith.xori",
+  // ...
+};
+
 static const std::unordered_map<std::string, int> opRuntimeMap = {
   {"arith.addi", 100},
   {"arith.subi", 100},
@@ -51,6 +61,16 @@ static int getRuntime(Operation *op) {
   auto const opName = op->getName().getStringRef().lower();
   return getRuntime(opName);
 };
+
+static bool isIllegalDialect(Operation *op) {
+  std::string dialectName = op->getName().getDialect()->getNamespace().str();
+  return std::find(illegalDialects.begin(), illegalDialects.end(), dialectName) != illegalDialects.end();
+}
+
+static bool isIllegalOperation(Operation *op) {
+  std::string opName = op->getName().getStringRef().lower();
+  return std::find(illegalOperations.begin(), illegalOperations.end(), opName) != illegalOperations.end();
+}
 
 LogicalResult BGVSchemeInfoAnalysis::visitOperation(
     Operation *op, ArrayRef<const BGVSchemeInfoLattice *> operands,
@@ -148,6 +168,9 @@ static int computeRuntimeForRegion(Region &region) {
         addRuntime(rows * getRuntime("arith.addi"));
       })
     .Default([&](auto& op) {
+      if (isIllegalDialect(&op) || isIllegalOperation(&op)) {
+        op.emitError("Unsupported Operation for BGV scheme. Cannot provide runtime estimation for scheme selection");
+      }
       LLVM_DEBUG(llvm::dbgs() << "Unsupported Operation for BGV runtime estimation " << op.getName() << "\n");
     });
    });
