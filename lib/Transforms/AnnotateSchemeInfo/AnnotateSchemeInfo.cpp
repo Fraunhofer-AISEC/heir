@@ -2,7 +2,8 @@
 
 #include "lib/Analysis/LevelAnalysis/LevelAnalysis.h"
 #include "lib/Analysis/MulDepthAnalysis/MulDepthAnalysis.h"
-#include "../../Analysis/SchemeInfoAnalysis/BGV/BGVSchemeInfo.h"
+#include "lib/Analysis/SchemeInfoAnalysis/BGV/BGVSchemeInfo.h"
+#include "lib/Analysis/SchemeInfoAnalysis/CGGI/CGGISchemeInfo.h"
 #include "lib/Analysis/SchemeInfoAnalysis/SchemeInfoAnalysis.h"
 #include "lib/Analysis/SchemeSelectionAnalysis/SchemeSelectionAnalysis.h"
 #include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
@@ -34,6 +35,7 @@ struct AnnotateSchemeInfo : impl::AnnotateSchemeInfoBase<AnnotateSchemeInfo> {
 
     // Perform Analysis for all available schemes
     solver.load<BGVSchemeInfoAnalysis>();
+	solver.load<CGGISchemeInfoAnalysis>();
 
     auto result = solver.initializeAndRun(getOperation());
 
@@ -46,8 +48,16 @@ struct AnnotateSchemeInfo : impl::AnnotateSchemeInfoBase<AnnotateSchemeInfo> {
     auto runtimeBGV = computeApproximateRuntimeBGV(getOperation(), &solver);
     LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for BGV: " << runtimeBGV << "ms.\n");
 
+	auto runtimeCGGI = computeApproximateRuntimeCGGI(getOperation(), &solver);
+    LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for CGGI: " << runtimeBGV << "ms.\n");
+
     // Insert comparison between schemes here
-    auto scheme = BGV;
+    std::string scheme;
+	if (runtimeBGV < runtimeCGGI) {
+		scheme = BGV;
+	} else {
+		scheme = CGGI;
+	}
 
     OpPassManager pipeline("builtin.module");
     AnnotateModuleOptions annotateModuleOptions;
