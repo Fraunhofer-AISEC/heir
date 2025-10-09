@@ -38,28 +38,34 @@ static const std::vector<std::string> illegalOperations = {
   // ...
 };
 
-static const std::unordered_map<std::string, int> opRuntimeMap = {
-  {"arith.addi", 100},
-  {"arith.subi", 100},
-  {"arith.muli", 400},
-  {"mgmt.relinearize", 200},
-  {"mgmt.modreduce", 300},
-  {"tensor_ext.rotate", 400},
+// Runtime map: rounded milliseconds (int), indexed by operand level (1-4)
+static const std::unordered_map<std::string, std::vector<int>> opRuntimeMap = {
+  {"arith.addi",        {2,   4,   6,   8}},   // levels 1-4
+  {"arith.subi",        {2,   4,   6,   8}},   // levels 1-4
+  {"arith.muli",        {127, 322, 339, 447}}, // levels 1-4
+  {"mgmt.relinearize",  {0,   1,   2,   2}},   // levels 1-4
+  {"mgmt.modreduce",    {0,   1,   2,   2}},   // levels 1-4
+  {"tensor_ext.rotate", {88,  196, 208, 291}}, // levels 1-4
 };
 
-static int getRuntime(const std::string &opName) {
-  LLVM_DEBUG(llvm::dbgs() << "Looking up: " << opName << "\n");
+static int getRuntime(const std::string &opName, int level) {
+  LLVM_DEBUG(llvm::dbgs() << "Looking up: " << opName << " at level " << level << "\n");
   auto const entry = opRuntimeMap.find(opName);
-  LLVM_DEBUG(llvm::dbgs() << "Found: " << entry->second << "\n");
   if (entry != opRuntimeMap.end()) {
-    return entry->second;
+    const auto &timings = entry->second;
+    // Clamp level to valid range [1-4], use 0-based indexing
+    int idx = std::max(0, std::min(3, level - 1));
+    int runtime = timings[idx];
+    LLVM_DEBUG(llvm::dbgs() << "Found: " << runtime << " ms\n");
+    return runtime;
   }
+  LLVM_DEBUG(llvm::dbgs() << "Operation not found in runtime map\n");
   return -1;
-};
+}
 
-static int getRuntime(Operation *op) {
+static int getRuntime(Operation *op, int level) {
   auto const opName = op->getName().getStringRef().lower();
-  return getRuntime(opName);
+  return getRuntime(opName, level);
 };
 
 static bool isIllegalDialect(Operation *op) {
@@ -116,6 +122,21 @@ LogicalResult BGVSchemeInfoAnalysis::visitOperation(
   return success();
 }
 
+// Helper: compute the operand level for an operation from the solver state.
+// Uses max level among initialized operands; defaults to 1 if unknown/no operands.
+static int getOperandLevel(Operation *op, DataFlowSolver *solver, int maxLevel) {
+  int level = 0;
+  for (auto operand : op->getOperands()) {
+    if (auto *state = solver->lookupState<BGVSchemeInfoLattice>(operand)) {
+      auto val = state->getValue();
+      if (val.isInitialized()) {
+        level = std::min(level, val.getLevel());
+      }
+    }
+  }
+  return maxLevel - level;
+}
+
 static int getMaxLevel(Operation* top, DataFlowSolver* solver) {
   auto maxLevel = 0;
   walkValues(top, [&](Value value) {
@@ -128,23 +149,23 @@ static int getMaxLevel(Operation* top, DataFlowSolver* solver) {
   return maxLevel;
 }
 
-
-static int computeRuntimeForRegion(Region &region) {
+static int computeRuntimeForRegion(Region &region, DataFlowSolver *solver, int maxLevel) {
   int runtime = 0;
   auto addRuntime = [&runtime](int additional) {
     runtime += additional;
   };
 
   region.walk<WalkOrder::PreOrder>([&](Operation *top) {
+     int level = getOperandLevel(top, solver, maxLevel);
+
      llvm::TypeSwitch<Operation &>(*top)
-      // count integer arithmetic ops
       .Case<arith::AddIOp, arith::SubIOp>([&](auto op) {
-        addRuntime(getRuntime(op));
+        addRuntime(getRuntime(op.getOperation(), level));
       })
       .Case<arith::MulIOp>([&](auto op) {
-        addRuntime(getRuntime(op));
-        addRuntime(getRuntime("mgmt.relinearize"));
-        addRuntime(getRuntime("mgmt.modreduce"));
+        addRuntime(getRuntime(op.getOperation(), level));
+        addRuntime(getRuntime("mgmt.relinearize", level));
+        addRuntime(getRuntime("mgmt.modreduce", level));
       })
      .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
        auto tripCountOpt = affine::getConstantTripCount(forOp);
@@ -152,20 +173,21 @@ static int computeRuntimeForRegion(Region &region) {
          return;
        }
        auto tripCount = tripCountOpt.value();
-       auto roundTime = computeRuntimeForRegion(forOp.getRegion());
+       auto roundTime = computeRuntimeForRegion(forOp.getRegion(), solver, maxLevel);
        addRuntime(tripCount * roundTime);
      })
     .Case<linalg::MatvecOp>([&](linalg::MatvecOp matvecOp) {
         auto inputs = matvecOp.getInputs();
         auto matrixType = dyn_cast<RankedTensorType>(inputs[0].getType());
         auto rows = matrixType.getShape()[0];
+        int lvl = getOperandLevel(matvecOp.getOperation(), solver, maxLevel);
 
-        // R multiplies (with relinearize + modreduce per mul) and R adds.
-        addRuntime(rows * getRuntime("tensor_ext.rotate"));
-        addRuntime(rows * getRuntime("arith.muli"));
-        addRuntime(rows * getRuntime("mgmt.relinearize"));
-        addRuntime(rows * getRuntime("mgmt.modreduce"));
-        addRuntime(rows * getRuntime("arith.addi"));
+        // R rotates, R multiplies (with relinearize + modreduce per mul), and R adds.
+        addRuntime(rows * getRuntime("tensor_ext.rotate", lvl));
+        addRuntime(rows * getRuntime("arith.muli", lvl));
+        addRuntime(rows * getRuntime("mgmt.relinearize", lvl));
+        addRuntime(rows * getRuntime("mgmt.modreduce", lvl));
+        addRuntime(rows * getRuntime("arith.addi", lvl));
       })
     .Default([&](auto& op) {
       if (isIllegalDialect(&op) || isIllegalOperation(&op)) {
@@ -179,31 +201,15 @@ static int computeRuntimeForRegion(Region &region) {
 }
 
 int computeApproximateRuntimeBGV(Operation *top, DataFlowSolver *solver) {
-  int maxLevel = getMaxLevel(top, solver);
-
-  auto getLevel = [&](Value value) {
-    auto levelState = solver->lookupState<BGVSchemeInfoLattice>(value)->getValue();
-    if (levelState.isInitialized()) {
-      return maxLevel - levelState.getLevel();
-    }
-    return -1;
-  };
-
-  auto getOperationLevel = [&](Operation *op) {
-    int level = maxLevel;
-    for (auto operand : op->getOperands()) {
-      level = std::min(level, getLevel(operand));
-    }
-    return level;
-  };
+  // maxLevel is currently unused but retained for potential future logic.
+  auto maxLevel = getMaxLevel(top, solver);
 
   int runtime = 0;
   top->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
-    runtime = computeRuntimeForRegion(funcOp.getBody());
+    runtime = computeRuntimeForRegion(funcOp.getBody(), solver, maxLevel);
   });
   return runtime;
 }
-
 
 }  // namespace heir
 }  // namespace mlir

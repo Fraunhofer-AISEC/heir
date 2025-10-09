@@ -11,7 +11,7 @@ using namespace lbcrypto;
 
 // Simple CLI parsing
 struct Cli {
-    std::vector<int> depths{1, 2, 3}; // default depths
+    std::vector<int> depths{1, 2, 3, 4}; // default depths
     size_t warmup = 5;
     size_t iters  = 50;
     uint64_t ptm  = 65537; // plaintext modulus

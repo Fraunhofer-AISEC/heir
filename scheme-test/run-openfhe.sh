@@ -1,20 +1,30 @@
 #!/bin/bash
+set -euo pipefail
 
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <filename>"
+    echo "Usage: $0 <filename.mlir>"
     exit 1
 fi
 
-# Get the filename without extension
-FILENAME=$(basename "$1" .mlir)
+IN="$1"
+FILENAME=$(basename "$IN" .mlir)
+OUTDIR="$PWD/${FILENAME}/openfhe"
 
-bazel run //tools:heir-opt -- "$PWD/$1" --mlir-to-bgv='ciphertext-degree=8' --scheme-to-openfhe='entry-function=foo' > "$PWD/${FILENAME}-openfhe.mlir"
+mkdir -p "$OUTDIR"
 
-bazel run //tools:heir-translate -- --emit-openfhe-pke-header --openfhe-include-type=source-relative "$PWD/${FILENAME}-openfhe.mlir" > "${FILENAME}.h"
+# Convert to BGV and OpenFHE MLIR
+bazel run //tools:heir-opt -- "$PWD/${FILENAME}/${FILENAME}.mlir" --mlir-to-bgv='ciphertext-degree=8' --scheme-to-openfhe='entry-function=foo' > "$OUTDIR/${FILENAME}-openfhe.mlir"
 
-bazel run //tools:heir-translate -- --emit-openfhe-pke --openfhe-include-type=source-relative "$PWD/${FILENAME}-openfhe.mlir" > "${FILENAME}.cpp"
+# Emit OpenFHE headers and sources into openfhe dir
+bazel run //tools:heir-translate -- --emit-openfhe-pke-header --openfhe-include-type=source-relative "$OUTDIR/${FILENAME}-openfhe.mlir" > "$OUTDIR/${FILENAME}.h"
 
-cat > BUILD << EOL
+bazel run //tools:heir-translate -- --emit-openfhe-pke --openfhe-include-type=source-relative "$OUTDIR/${FILENAME}-openfhe.mlir" > "$OUTDIR/${FILENAME}.cpp"
+
+# Copy benchmark main file
+cp "${FILENAME}/${FILENAME}_main.cpp" "$OUTDIR/${FILENAME}_main.cpp"
+
+# BUILD file inside openfhe package
+cat > "$OUTDIR/BUILD" << EOL
 cc_library(
     name = "${FILENAME}_codegen",
     srcs = ["${FILENAME}.cpp"],
@@ -22,21 +32,20 @@ cc_library(
     deps = ["@openfhe//:pke"],
 )
 
-# An executable build target that contains your main function and links
-# against the above.
 cc_binary(
     name = "${FILENAME}_main",
-    srcs = ["${FILENAME}_main.cpp", "bench.hpp"],
+    srcs = ["${FILENAME}_main.cpp"],
     deps = [
         ":${FILENAME}_codegen",
+        "//scheme-test/bench",
         "@openfhe//:pke",
         "@openfhe//:core",
     ],
 )
 EOL
 
-bazel run "${FILENAME}_main"
+# Run the binary from the openfhe package
+bazel run "//scheme-test/${FILENAME}/openfhe:${FILENAME}_main"
 
-rm -rf BUILD
-
-
+# Optional cleanup
+rm -f "$OUTDIR/BUILD"

@@ -49,7 +49,7 @@ struct AnnotateSchemeInfo : impl::AnnotateSchemeInfoBase<AnnotateSchemeInfo> {
     LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for BGV: " << runtimeBGV << "ms.\n");
 
 	auto runtimeCGGI = computeApproximateRuntimeCGGI(getOperation(), &solver);
-    LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for CGGI: " << runtimeBGV << "ms.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Approximate runtime for CGGI: " << runtimeCGGI << "ms.\n");
 
     // Insert comparison between schemes here
     std::string scheme;

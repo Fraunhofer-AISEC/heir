@@ -30,7 +30,7 @@ fn main() {
 
     // 4) Benchmark only the foo operation (exclude encryption/decryption)
     let warmup_iters = 5;
-    let bench_iters = 100;
+    let bench_iters = 10;
 
     println!("Before benchmarking");
 

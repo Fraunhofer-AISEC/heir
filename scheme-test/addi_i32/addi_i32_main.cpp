@@ -3,8 +3,8 @@
 #include <iostream>
 
 #include "src/pke/include/openfhe.h"  // from @openfhe
-#include "arith.h"
-#include "bench.hpp"
+#include "addi_i32.h"
+#include "scheme-test/bench/bench.hpp"
 
 int main(int argc, char *argv[]) {
     CryptoContext<DCRTPoly> cryptoContext = foo__generate_crypto_context();
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
 
     // Benchmark foo (excluding encryption/decryption)
     const size_t warmup = 5;
-    const size_t iters  = 50;
+    const size_t iters  = 10;
     auto stats = bench::run(
         [&]() {
             return foo(cryptoContext, arg0Encrypted, arg1Encrypted);
