@@ -127,14 +127,12 @@ LogicalResult CGGISchemeInfoAnalysis::visitOperation(
       // Only the listed integer arithmetic ops are considered.
       .Case<arith::AddIOp, arith::SubIOp>([&](auto op) {
         (void)op;
-        // Analysis logic would go here if needed.
       })
       .Case<arith::MulIOp>([&](auto op) {
         (void)op;
       })
       .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
         (void)forOp;
-        // TODO: Implement if analysis requires lattice updates across loops.
       });
   return success();
 }
@@ -143,10 +141,6 @@ LogicalResult CGGISchemeInfoAnalysis::visitOperation(
 // If bitWidthFromFunc < 0, fallback to per-op operand integer bit-widths.
 static int computeRuntimeForRegion(Region &region, int bitWidthFromFunc) {
   int runtime = 0;
-  auto addRuntime = [&runtime](int additional) {
-    if (additional > 0)
-      runtime += additional;
-  };
 
   region.walk<WalkOrder::PreOrder>([&](Operation *top) {
     llvm::TypeSwitch<Operation &>(*top)
@@ -161,7 +155,7 @@ static int computeRuntimeForRegion(Region &region, int bitWidthFromFunc) {
             LLVM_DEBUG(llvm::dbgs() << "Unsupported bitWidth (" << bw << ") for op " << opName << "\n");
             return;
           }
-          addRuntime(rt);
+          runtime += rt;
         })
         .Case<affine::AffineForOp>([&](affine::AffineForOp forOp) {
           auto tripCountOpt = affine::getConstantTripCount(forOp);
@@ -171,7 +165,7 @@ static int computeRuntimeForRegion(Region &region, int bitWidthFromFunc) {
           }
           auto tripCount = tripCountOpt.value();
           auto roundTime = computeRuntimeForRegion(forOp.getRegion(), bitWidthFromFunc);
-          addRuntime(static_cast<int>(tripCount * roundTime));
+          runtime += static_cast<int>(tripCount * roundTime);
         })
         .Default([&](auto &op) {
           // Operations not listed are ignored for timing; emit debug for visibility.

@@ -13,5 +13,6 @@ FILENAME=$(basename "$IN" .mlir)
 bazel run //tools:heir-opt -- "$PWD/${FILENAME}/${FILENAME}.mlir" --annotate-scheme-info --debug
 
 bash ./run-openfhe.sh "${FILENAME}"
+bash ./run-tfhe-rust-hl.sh "${FILENAME}"
 bash ./run-tfhe-rust.sh "${FILENAME}"
 

@@ -7,10 +7,10 @@ set -euo pipefail
 #   - Main at: <NAME>/<NAME>_main.rs
 NAME="${1:-foo}"
 MLIR_SRC="${NAME}/${NAME}.mlir"
-MAIN_SRC="${NAME}/${NAME}_main_bool.rs"
+MAIN_SRC="${NAME}/${NAME}_main_hl.rs"
 
 # Subfolder where all work happens (per-name)
-PROJECT_DIR="${NAME}/tfhe/heir_tfhe_project_bool"
+PROJECT_DIR="${NAME}/tfhe/heir_tfhe_project_hl"
 OUT_DIR="${PROJECT_DIR}/generated"
 SRC_DIR="${PROJECT_DIR}/src"
 GENERATED_RS="${NAME}_lib.rs"
@@ -37,12 +37,12 @@ mkdir -p "$OUT_DIR" "$SRC_DIR"
 # 1) heir-opt via Bazel -> write to subfolder
 HEIR_OPT_OUT="${OUT_DIR}/$(basename "${MLIR_SRC%.*}").heir_opt.mlir"
 echo "Running heir-opt..."
-bazel run //tools:heir-opt -- --mlir-to-cggi --scheme-to-tfhe-rs "$PWD/${MLIR_SRC}" > "${HEIR_OPT_OUT}"
+bazel run //tools:heir-opt -- --mlir-to-cggi=data-type=Integer --scheme-to-tfhe-rs "$PWD/${MLIR_SRC}" > "${HEIR_OPT_OUT}"
 
 # 2) heir-translate via Bazel -> write to subfolder
 GENERATED_RS_PATH="${OUT_DIR}/${GENERATED_RS}"
 echo "Running heir-translate..."
-bazel run //tools:heir-translate -- --emit-tfhe-rust "$PWD/${HEIR_OPT_OUT}" > "${GENERATED_RS_PATH}"
+bazel run //tools:heir-translate -- --emit-tfhe-rust-hl "$PWD/${HEIR_OPT_OUT}" > "${GENERATED_RS_PATH}"
 
 # 3) Create Cargo project in subfolder
 if [ ! -f "${PROJECT_DIR}/Cargo.toml" ]; then

@@ -1,6 +1,7 @@
 # bazel output directories
 bazel-bin
 bazel-heir
+bazel-heir-scheme
 bazel-out
 bazel-testlogs
 

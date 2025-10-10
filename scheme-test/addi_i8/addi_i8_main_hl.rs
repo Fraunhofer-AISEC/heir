@@ -16,8 +16,8 @@ fn main() {
     set_server_key(server_key);
 
     // 3) Encrypt input(s) once, reused across all iterations
-    let x1 = FheUint8::encrypt(42u8, &client_key);
-    let x2 = FheUint8::encrypt(42u8, &client_key);
+    let x1 = FheUint8::encrypt(2u8, &client_key);
+    let x2 = FheUint8::encrypt(3u8, &client_key);
 
     println!("Starting position");
 
