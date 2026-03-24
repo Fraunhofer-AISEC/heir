@@ -27,7 +27,7 @@
 #include "mlir/include/mlir/Dialect/Tensor/IR/Tensor.h"    // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"                    // from @llvm-project
 #include "mlir/include/mlir/IR/Visitors.h"                 // from @llvm-project
-#include "external/llvm-project/llvm/include/llvm/Support/Debug.h"
+#include "llvm/include/llvm/Support/Debug.h"
 
 #include <cmath> // Required for math functions
 #include <vector>
@@ -79,12 +79,6 @@ LogicalResult OperationCountAnalysis::visitOperation(
   };
 
   llvm::TypeSwitch<Operation *>(op)
-      .Case<secret::GenericOp>([&](auto genericOp){
-        Block *body = genericOp.getBody();
-        for (auto arg: body->getArguments()) {
-          propagate(arg, OperationCount(1, 0, true));
-        }
-      })
       .Case<arith::AddIOp, arith::SubIOp>([&](auto addOp) {
         SmallVector<OpResult> secretResults;
         getSecretResults(op, secretResults);
@@ -794,6 +788,90 @@ static std::vector<int> computeModuliSizesBalancing(
   return moduli;
 }
 
+static std::vector<int> computeModuliSizesGreedy(
+    int ringDimension, int plaintextModulus,
+    const std::vector<OperationCount>& levelOpCounts, int numPrimes) {
+  auto noiseBounds =
+      calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+
+  // Print the level operation counts and noise bounds for debugging
+  std::cerr << "Level operation counts:" << std::endl;
+  for (size_t i = 0; i < levelOpCounts.size(); ++i) {
+    std::cerr << "Level " << i
+              << ": CiphertextCount=" << levelOpCounts[i].getCiphertextCount()
+              << ", KeySwitchCount=" << levelOpCounts[i].getKeySwitchCount()
+              << std::endl;
+  }
+
+  int numScalingModuli = numPrimes - 1;
+  std::vector<double> scalingModuli;
+  scalingModuli.reserve(numScalingModuli);
+
+  std::cerr << "Starting greedy modulus selection with noise bounds: "
+            << "boundScale=" << noiseBounds.boundScale
+            << ", log2(boundScale)=" << log2(noiseBounds.boundScale)
+            << ", boundClean=" << noiseBounds.boundClean
+            << ", log2(boundClean)=" << log2(noiseBounds.boundClean)
+            << ", addedNoiseKeySwitching=" << noiseBounds.addedNoiseKeySwitching
+            << ", log2(addedNoiseKeySwitching)="
+            << log2(noiseBounds.addedNoiseKeySwitching) << std::endl;
+
+  int startCiphertextCount =
+      levelOpCounts[numScalingModuli + 1].getCiphertextCount();
+  int startKeySwitchCount =
+      levelOpCounts[numScalingModuli + 1].getKeySwitchCount();
+  double currentBound =
+      startCiphertextCount *
+      (noiseBounds.boundClean +
+       startKeySwitchCount * noiseBounds.addedNoiseKeySwitching);
+
+  std::cerr << "Initial noise bound before scaling moduli: " << currentBound
+            << ", log2(currentBound)=" << log2(currentBound) << std::endl;
+
+  for (int i = 0; i < numScalingModuli; ++i) {
+    int levelIndex = numScalingModuli - i;
+    int ciphertextCount = levelOpCounts[levelIndex].getCiphertextCount();
+    int keySwitchCount = levelOpCounts[levelIndex].getKeySwitchCount();
+
+    double levelNoiseTerm =
+        ciphertextCount * (currentBound * currentBound +
+                           keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+
+    std::cerr << "Level " << levelIndex << " noise term: " << levelNoiseTerm
+              << ", log2(levelNoiseTerm)=" << log2(levelNoiseTerm) << std::endl;
+
+    double greedyQi = 2.0 * levelNoiseTerm / noiseBounds.boundScale;
+  
+
+    int greedyQiSize = getBitSize(greedyQi);
+    if (greedyQiSize >= kMaxBitSize) {
+      greedyQi = std::pow(2.0, kMaxBitSize - 1);
+    }
+
+    std::cerr << "Level " << levelIndex << " selected modulus: " << greedyQi
+              << ", bit size: " << greedyQiSize << std::endl;
+
+    scalingModuli.push_back(greedyQi);
+    currentBound = noiseBounds.boundScale + (levelNoiseTerm / greedyQi);
+  }
+
+  double firstMod = 2.0 * currentBound;
+  
+  if (getBitSize(firstMod) >= kMaxBitSize) {
+    throw std::runtime_error(
+        "Greedy selection infeasible: first modulus exceeds maximum bit size");
+  }
+
+  std::vector<int> moduli;
+  moduli.reserve(numPrimes);
+  moduli.push_back(getBitSize(firstMod));
+  for (auto it = scalingModuli.rbegin(); it != scalingModuli.rend(); ++it) {
+    moduli.push_back(getBitSize(*it));
+  }
+
+  return moduli;
+}
+
 // Print parameters directly to std::cerr with result tags
 void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension, 
                                int plaintextModulus, const std::string &testname,
@@ -1053,6 +1131,10 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         if (algorithm == "BALANCING") {
           return computeModuliSizesBalancing(ringDimension, plaintextModulus, 
                                                     levelOpCounts, numPrimes);
+        }
+        if (algorithm == "GREEDY") {
+          return computeModuliSizesGreedy(ringDimension, plaintextModulus,
+                                          levelOpCounts, numPrimes);
         }
       } catch (const std::runtime_error& e) {
         genericOp->emitOpError() << "Parameter optimization failed: " << e.what();

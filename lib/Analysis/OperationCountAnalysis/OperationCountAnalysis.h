@@ -8,6 +8,7 @@
 #include "mlir/include/mlir/IR/Diagnostics.h"  // from @llvm-project
 #include "mlir/include/mlir/IR/Operation.h"    // from @llvm-project
 #include "mlir/include/mlir/IR/Value.h"        // from @llvm-project
+#include "llvm/include/llvm/Support/raw_ostream.h"  // from @llvm-project
 
 namespace mlir {
 namespace heir {
