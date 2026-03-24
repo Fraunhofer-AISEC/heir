@@ -124,9 +124,7 @@ class OperationCountAnalysis
       Operation *op, ArrayRef<const OperationCountLattice *> operands,
       ArrayRef<OperationCountLattice *> results) override;
 
-  void setToEntryState(OperationCountLattice *lattice) override {
-    propagateIfChanged(lattice, lattice->join(OperationCount()));
-  }
+  void setToEntryState(OperationCountLattice *lattice) override;
 };
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,

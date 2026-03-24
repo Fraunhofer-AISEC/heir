@@ -39,6 +39,33 @@ namespace heir {
 
 constexpr int kMaxBitSize = 60;
 
+void OperationCountAnalysis::setToEntryState(OperationCountLattice *lattice) {
+  Value value = lattice->getAnchor();
+
+  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
+    if (auto genericOp = dyn_cast<secret::GenericOp>(blockArg.getOwner()->getParentOp())) {
+      if (blockArg.getArgNumber() < genericOp.getNumOperands()) {
+        Value genericOperand = genericOp.getOperand(blockArg.getArgNumber());
+        auto *operandLattice = getLatticeElement(genericOperand);
+        auto operandCount = operandLattice->getValue();
+        if (operandCount.isInitialized()) {
+          propagateIfChanged(lattice, lattice->join(operandCount));
+          return;
+        }
+      }
+      propagateIfChanged(lattice, lattice->join(OperationCount(1, 0, true)));
+      return;
+    }
+  }
+
+  if (isa<secret::SecretType>(value.getType())) {
+    propagateIfChanged(lattice, lattice->join(OperationCount(1, 0, true)));
+    return;
+  }
+
+  propagateIfChanged(lattice, lattice->join(OperationCount()));
+}
+
 LogicalResult OperationCountAnalysis::visitOperation(
     Operation *op, 
     ArrayRef<const OperationCountLattice *> operands,
