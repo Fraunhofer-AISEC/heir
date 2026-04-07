@@ -962,7 +962,7 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
 
   // Start with first prime as done in OpenFHE
   lbcrypto::NativeInteger firstP =
-      lbcrypto::FirstPrime<lbcrypto::NativeInteger>(auxBits, ringDimension);
+      lbcrypto::FirstPrime<lbcrypto::NativeInteger>(auxBits, 2 * ringDimension);
   lbcrypto::NativeInteger pPrev = firstP;
 
   // Generate each auxiliary prime
@@ -972,7 +972,7 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
     bool foundInQ;
     do {
       currentP =
-          lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(pPrev, ringDimension);
+          lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(pPrev, 2 * ringDimension);
       foundInQ = false;
       for (long j : qi) {
         if (currentP.ConvertToInt() == j) {
