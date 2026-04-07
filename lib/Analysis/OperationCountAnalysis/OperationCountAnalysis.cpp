@@ -668,7 +668,7 @@ static int getMaxLevel(secret::GenericOp *op) {
     if (op->getNumResults() == 0) {
       return;
     }
-    int level = getLevelFromMgmtAttr(op->getResult(0));
+    int level = getLevelFromMgmtAttr(op->getResult(0)).getInt();
     maxLevel = std::max(maxLevel, level);
   });
 
@@ -700,7 +700,7 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
     }
 
     // Get the level for the operation's result
-    int level = getLevelFromMgmtAttr(op->getResult(0));
+    int level = getLevelFromMgmtAttr(op->getResult(0)).getInt();
 
     if (count.isHighestLevel()) {
       levelOpCounts[maxLevel + 1] = OperationCount::max(levelOpCounts[maxLevel + 1], count);
