@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <chrono>
 #include <iomanip>
+#include <cstdlib>
 
 using namespace lbcrypto;
 
@@ -93,24 +94,32 @@ void printModulusChain(const CryptoContext<DCRTPoly>& cc, const std::string& tes
 bool saveParamsToJsonFile(const CryptoContext<DCRTPoly>& cc, 
                          const std::string& testname, 
                          const std::string& selectionApproach) {
-    // Create filename with timestamp
+  std::filesystem::path filename;
+  const char* outputPath = std::getenv("HEIR_EXECUTION_PARAMS_FILE");
+
+  if (outputPath != nullptr && outputPath[0] != '\0') {
+    filename = std::filesystem::path(outputPath);
+  } else {
+    // Fall back to timestamped file in ./data for ad-hoc runs.
     std::filesystem::path cwd = std::filesystem::current_path();
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
     std::stringstream timestamp;
     timestamp << std::put_time(std::localtime(&time_t_now), "%Y%m%d_%H%M%S");
-    std::string filename = (cwd / "data" / (testname + "_" + selectionApproach + "_execution_" + timestamp.str() + ".json")).string();
-    
-    // Check if the directory exists, create if it doesn't
-    std::filesystem::path dir = "data/";
-    if (!std::filesystem::exists(dir)) {
-        if (!std::filesystem::create_directory(dir)) {
-            std::cerr << "Failed to create directory: " << dir << std::endl;
-            return false;
-        }
+    filename = cwd / "data" /
+           (testname + "_" + selectionApproach + "_execution_" +
+          timestamp.str() + ".json");
+  }
+
+  std::filesystem::path dir = filename.parent_path();
+  if (!dir.empty() && !std::filesystem::exists(dir)) {
+    if (!std::filesystem::create_directories(dir)) {
+      std::cerr << "Failed to create directory: " << dir << std::endl;
+      return false;
     }
-    
-    std::ofstream outFile(filename);
+  }
+
+  std::ofstream outFile(filename.string());
     if (!outFile.is_open()) {
         std::cerr << "Failed to open file for writing: " << filename << std::endl;
         return false;
