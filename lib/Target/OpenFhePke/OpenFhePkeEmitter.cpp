@@ -1865,6 +1865,10 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   if (keySwitchCount != 0) {
     os << paramsName << ".SetKeySwitchCount(" << keySwitchCount << ");\n";
   }
+  if (evalAddCount != 0 || keySwitchCount != 0) {
+    os << paramsName
+       << ".SetScalingTechnique(FIXEDAUTO);\n";
+  }
   // Key switching technique parameters
   if (op.getDigitSize() != 0) {
     os << paramsName << ".SetDigitSize(" << op.getDigitSize() << ");\n";
