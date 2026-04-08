@@ -129,8 +129,13 @@ struct SecretForToStaticForConversion : OpRewritePattern<scf::ForOp> {
       // we can directly copy the body
       IRMapping mp;
       for (BlockArgument blockArg : forOp.getBody()->getArguments()) {
-        mp.map(blockArg,
-               newForOp.getBody()->getArguments()[blockArg.getArgNumber()]);
+        Value mappedArg =
+            newForOp.getBody()->getArguments()[blockArg.getArgNumber()];
+        if (mappedArg.getType() != blockArg.getType()) {
+          mappedArg = arith::IndexCastOp::create(builder, forOp.getLoc(),
+                                                 blockArg.getType(), mappedArg);
+        }
+        mp.map(blockArg, mappedArg);
       }
       for (auto& op : forOp.getBody()->getOperations()) {
         // Convert scf.yield to affine.yield
@@ -183,8 +188,13 @@ struct SecretForToStaticForConversion : OpRewritePattern<scf::ForOp> {
           // Copy body of the scf::ForOp
           IRMapping mp;
           for (BlockArgument blockArg : forOp.getBody()->getArguments()) {
-            mp.map(blockArg,
-                   newForOp.getBody()->getArguments()[blockArg.getArgNumber()]);
+            Value mappedArg =
+                newForOp.getBody()->getArguments()[blockArg.getArgNumber()];
+            if (mappedArg.getType() != blockArg.getType()) {
+              mappedArg = arith::IndexCastOp::create(
+                  b, loc, blockArg.getType(), mappedArg);
+            }
+            mp.map(blockArg, mappedArg);
           }
           for (auto& op : forOp.getBody()->getOperations()) {
             b.clone(op, mp);
