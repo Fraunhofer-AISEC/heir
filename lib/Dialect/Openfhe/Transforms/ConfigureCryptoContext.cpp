@@ -338,28 +338,59 @@ struct ConfigureCryptoContext
     });
     config.rotIndices = indices;
 
-    // get evalAddCount/KeySwitchCount from func attribute, if present
+    // get OpenFHE params from func attribute, if present
     config.evalAddCount = 0;
     config.keySwitchCount = 0;
+    config.firstModSize = 0;
+    config.scalingModSize = 0;
+    config.ringDim = 0;
     if (auto openfheParamsAttr = op->getAttrOfType<mgmt::OpenfheParamsAttr>(
             mgmt::MgmtDialect::kArgOpenfheParamsAttrName)) {
+      config.mulDepth = openfheParamsAttr.getMultiplicativeDepth();
+      config.ringDim = openfheParamsAttr.getRingDimension();
+      config.firstModSize = openfheParamsAttr.getFirstModSize();
+      config.scalingModSize = openfheParamsAttr.getScalingModSize();
       config.evalAddCount = openfheParamsAttr.getEvalAddCount();
       config.keySwitchCount = openfheParamsAttr.getKeySwitchCount();
+      
+      if (config.plaintextModulus == 0) {
+        config.plaintextModulus = openfheParamsAttr.getPlaintextModulus();
+      }
+
+      bool isDirectStyle =
+          openfheParamsAttr.getFirstModSize() == 0 &&
+          openfheParamsAttr.getScalingModSize() == 0;
+      if (isDirectStyle) {
+        config.scalingTechniqueFixedManual = false;
+      } else {
+        config.evalAddCount = 0;
+        config.keySwitchCount = 0;
+        config.scalingTechniqueFixedManual = true;
+      }
+
       // remove the attribute after reading
       op->removeAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName);
     }
 
-    // fill config with pass options
-    config.ringDim = ringDim;
+    // Fill config with pass options, overriding attribute-derived values only
+    // when explicitly provided.
+    if (mulDepth != 0) {
+      config.mulDepth = mulDepth;
+    }
+    config.ringDim = (ringDim != 0) ? ringDim : config.ringDim;
     config.batchSize = batchSize;
-    config.firstModSize = firstModSize;
-    config.scalingModSize = scalingModSize;
+    config.firstModSize =
+        (firstModSize != 0) ? firstModSize : config.firstModSize;
+    config.scalingModSize =
+        (scalingModSize != 0) ? scalingModSize : config.scalingModSize;
     config.digitSize = digitSize;
     config.numLargeDigits = numLargeDigits;
     config.maxRelinSkDeg = maxRelinSkDeg;
     config.insecure = insecure;
     config.keySwitchingTechniqueBV = keySwitchingTechniqueBV;
-    config.scalingTechniqueFixedManual = scalingTechniqueFixedManual;
+    if (scalingTechniqueFixedManual) {
+      config.scalingTechniqueFixedManual = true;
+    }
     config.levelBudgetDecode = levelBudgetDecode;
     config.levelBudgetEncode = levelBudgetEncode;
 

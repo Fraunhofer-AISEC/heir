@@ -1053,8 +1053,14 @@ static void annotateOpenfheParams(secret::GenericOp genericOp,
   int firstModSize = moduliSizes[0];
   int scalingModSize = *std::max_element(moduliSizes.begin() + 1, moduliSizes.end());
   auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
-    funcOp->getContext(), multiplicativeDepth, ringDimension,
-    scalingModSize, firstModSize, maxCounts.getCiphertextCount(), maxCounts.getKeySwitchCount(), plaintextModulus);
+    funcOp->getContext(),
+    /*evalAddCount=*/maxCounts.getCiphertextCount(),
+    /*firstModSize=*/firstModSize,
+    /*keySwitchCount=*/maxCounts.getKeySwitchCount(),
+    /*multiplicativeDepth=*/multiplicativeDepth,
+    /*plaintextModulus=*/plaintextModulus,
+    /*ringDimension=*/ringDimension,
+    /*scalingModSize=*/scalingModSize);
 
   funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName,
           openfheParamAttr);
