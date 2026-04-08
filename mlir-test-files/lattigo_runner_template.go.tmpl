@@ -1,0 +1,132 @@
+package main
+
+import (
+  "encoding/json"
+  "fmt"
+  "math/bits"
+  "os"
+  "time"
+
+  "github.com/tuneinsight/lattigo/v6/schemes/bgv"
+)
+
+const ARITY = __ARITY__
+const TEST_NAME = "__TEST_NAME__"
+const SELECTION_APPROACH = "__SELECTION_APPROACH__"
+const PARAMS_OUTPUT_PATH = "__PARAMS_OUTPUT_PATH__"
+
+type executionParams struct {
+  TestName             string   `json:"testname"`
+  SelectionApproach    string   `json:"selectionApproach"`
+  Timestamp            int64    `json:"timestamp"`
+  Backend              string   `json:"backend"`
+  LogN                 int      `json:"logN"`
+  RingDimension        int      `json:"ringDimension"`
+  PlaintextModulus     uint64   `json:"plaintextModulus"`
+  Q                    []uint64 `json:"Q"`
+  P                    []uint64 `json:"P"`
+  ModulusSizes         []int    `json:"modulusSizes"`
+  ExtensionModuliSizes []int    `json:"extensionModuliSizes"`
+  TotalSize            int      `json:"totalSize"`
+  ExtensionModuliSize  int      `json:"extensionModuliSize"`
+}
+
+func writeExecutionParams(path string, params bgv.Parameters) error {
+  q := params.Q()
+  p := params.P()
+
+  modulusSizes := make([]int, 0, len(q))
+  for _, value := range q {
+    modulusSizes = append(modulusSizes, bits.Len64(value))
+  }
+
+  extensionModuliSizes := make([]int, 0, len(p))
+  for _, value := range p {
+    extensionModuliSizes = append(extensionModuliSizes, bits.Len64(value))
+  }
+
+  totalSize := 0
+  if len(q) > 0 {
+    totalSize = params.QBigInt().BitLen()
+  }
+
+  extensionModuliSize := 0
+  if len(p) > 0 {
+    extensionModuliSize = params.PBigInt().BitLen()
+  }
+
+  payload := executionParams{
+    TestName:             TEST_NAME,
+    SelectionApproach:    SELECTION_APPROACH,
+    Timestamp:            time.Now().Unix(),
+    Backend:              "lattigo",
+    LogN:                 params.LogN(),
+    RingDimension:        1 << params.LogN(),
+    PlaintextModulus:     params.PlaintextModulus(),
+    Q:                    q,
+    P:                    p,
+    ModulusSizes:         modulusSizes,
+    ExtensionModuliSizes: extensionModuliSizes,
+    TotalSize:            totalSize,
+    ExtensionModuliSize:  extensionModuliSize,
+  }
+
+  encoded, err := json.MarshalIndent(payload, "", "  ")
+  if err != nil {
+    return err
+  }
+  encoded = append(encoded, '\n')
+  return os.WriteFile(path, encoded, 0o644)
+}
+
+func main() {
+  evaluator, param, encoder, encryptor, decryptor := func__configure()
+  if err := writeExecutionParams(PARAMS_OUTPUT_PATH, param); err != nil {
+    fmt.Fprintf(os.Stderr, "WARNING: failed to write Lattigo execution params: %v\n", err)
+  }
+
+  if os.Getenv("STOP_AFTER_BACKEND_PARAM_EXTRACTION") == "1" {
+    fmt.Println("Lattigo backend params extracted; skipping encrypted computation")
+    return
+  }
+
+  values := make([][]int16, ARITY)
+  for i := 0; i < ARITY; i++ {
+    values[i] = make([]int16, 8)
+    if i == 0 {
+      for j := 0; j < 8; j++ {
+        values[i][j] = 1
+      }
+    }
+  }
+
+__ENCRYPT_CALLS__
+
+  out := fheFunc(evaluator, param, encoder__OUT_ARGS__)
+
+  actual := func__decrypt__result0(evaluator, param, encoder, decryptor, out)
+  expected := make([]int16, 8)
+  for i := range expected {
+    expected[i] = __EXPECTED_VALUE__
+  }
+
+  ok := len(actual) == len(expected)
+  if ok {
+    for i := range expected {
+      if actual[i] != expected[i] {
+        ok = false
+        break
+      }
+    }
+  }
+
+  fmt.Printf("Lattigo actual  : %v\n", actual)
+  fmt.Printf("Lattigo expected: %v\n", expected)
+
+  if !ok {
+    fmt.Fprintln(os.Stderr, "Lattigo check failed")
+    os.Exit(1)
+  }
+
+  fmt.Println("Lattigo check passed")
+}
