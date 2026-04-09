@@ -18,6 +18,7 @@
 #include "src/core/include/math/nbtheory.h"                //from @openfhe
 #include "src/core/include/lattice/stdlatticeparms.h"       //from @openfhe
 #include "src/pke/include/scheme/scheme-utils.h"            //from @openfhe
+#include "src/pke/include/schemerns/rns-cryptoparameters.h" //from @openfhe
 #include "src/core/include/math/hal/nativeintbackend.h"        //from @openfhe
 #include "llvm/include/llvm/ADT/TypeSwitch.h"              // from @llvm-project
 #include "mlir/include/mlir/Analysis/DataFlowFramework.h"  // from @llvm-project
@@ -653,7 +654,8 @@ static int computeRingDimension(const std::vector<int> &moduli) {
 };
 
 static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
-                                        int numPrimes) {
+                                        int numPrimes,
+                                        double keySwitchNoiseFactor = 1.0) {
   auto phi = ringDimension;  // Pessimistic
   auto t = plaintextModulus;
   auto d = 6.0;
@@ -667,7 +669,7 @@ static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
 
   auto boundKeySwitch = d * t * phi * sqrt(vErr / 12.0);
 
-  auto f0 = 1;
+  auto f0 = keySwitchNoiseFactor;
 
   // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE)
   auto numPartQ = ComputeNumLargeDigits(0, numPrimes - 1);
@@ -733,8 +735,10 @@ static std::vector<OperationCount> getLevelOpCounts(secret::GenericOp *op,
 static void computeModuliSizesBisection(int &firstModSize, int &scalingModSize,
                                         int ringDimension, int plaintextModulus,
                                         const std::vector<OperationCount> &levelOpCounts,
-                                        int numPrimes) {
-  auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+                                        int numPrimes,
+                                        double keySwitchNoiseFactor = 1.0) {
+  auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus,
+                                          numPrimes, keySwitchNoiseFactor);
 
   try {
     double scalingMod = findOptimalScalingModSizeBisection(
@@ -751,8 +755,10 @@ static void computeModuliSizesBisection(int &firstModSize, int &scalingModSize,
 static void computeModuliSizesClosed(
     int &firstModSize, int &scalingModSize, int ringDimension,
     int plaintextModulus, const std::vector<OperationCount> &levelOpCounts,
-    int numPrimes) {
-  auto noiseBounds =  calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+    int numPrimes, double keySwitchNoiseFactor = 1.0) {
+  auto noiseBounds =
+      calculateBoundParams(ringDimension, plaintextModulus, numPrimes,
+                           keySwitchNoiseFactor);
 
   // Compute OperationCounts over all levels
   OperationCount maxCounts(0, 0);
@@ -783,8 +789,11 @@ static void computeModuliSizesClosed(
 
 static std::vector<int> computeModuliSizesBalancing(
     int ringDimension, int plaintextModulus,
-    const std::vector<OperationCount> &levelOpCounts, int numPrimes) {
-  auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+    const std::vector<OperationCount> &levelOpCounts, int numPrimes,
+    double keySwitchNoiseFactor = 1.0) {
+  auto noiseBounds =
+      calculateBoundParams(ringDimension, plaintextModulus, numPrimes,
+                           keySwitchNoiseFactor);
 
   // Use bisection result as init value
   double pInit = findOptimalScalingModSizeBisection(
@@ -808,9 +817,11 @@ static std::vector<int> computeModuliSizesBalancing(
 
 static std::vector<int> computeModuliSizesGreedy(
     int ringDimension, int plaintextModulus,
-    const std::vector<OperationCount>& levelOpCounts, int numPrimes) {
+    const std::vector<OperationCount>& levelOpCounts, int numPrimes,
+    double keySwitchNoiseFactor = 1.0) {
   auto noiseBounds =
-      calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+      calculateBoundParams(ringDimension, plaintextModulus, numPrimes,
+                           keySwitchNoiseFactor);
 
   // Print the level operation counts and noise bounds for debugging
   std::cerr << "Level operation counts:" << std::endl;
@@ -974,8 +985,11 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
   uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
 
   // Validate assumption regarding
-  if (log2(sqrt(numPartQ * qi.size())) + moduliPartQ[maxBitsIndex].GetLengthForBase(2) > auxBits * sizeP) {
-     throw std::runtime_error("Invalid assumption: Underestimated noise for key switching.");
+  if (log2(sqrt(numPartQ * qi.size())) +
+          moduliPartQ[maxBitsIndex].GetLengthForBase(2) >
+      auxBits * sizeP) {
+    throw std::runtime_error(
+        "Invalid assumption: Underestimated noise for key switching.");
   }
 
   // Start with first prime as done in OpenFHE
@@ -1115,9 +1129,12 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       return;
     }
 
-    auto computeModuliSizes([&](int ringDimension) -> std::vector<int> {
+    auto computeModuliSizes =
+        [&](int ringDimension,
+            double keySwitchNoiseFactor) -> std::vector<int> {
       if (numPrimes == 1) {
-        auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+        auto noiseBounds = calculateBoundParams(
+            ringDimension, plaintextModulus, numPrimes, keySwitchNoiseFactor);
         int firstModSize = floor(1 + log2(levelOpCounts[1].getCiphertextCount()) + log2(noiseBounds.boundClean + (levelOpCounts[1].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching))) + 1;
         return {firstModSize};
       }
@@ -1126,10 +1143,13 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         int scalingModSize = 0;
         if (algorithm == "BISECTION") {
           computeModuliSizesBisection(firstModSize, scalingModSize, ringDimension,
-                                      plaintextModulus, levelOpCounts, numPrimes);
+                                      plaintextModulus, levelOpCounts,
+                                      numPrimes, keySwitchNoiseFactor);
           std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
             double scalingMod = pow(2.0, currentScalingModSize);
-            auto noiseBounds = calculateBoundParams(ringDimension, plaintextModulus, numPrimes);
+            auto noiseBounds = calculateBoundParams(
+                ringDimension, plaintextModulus, numPrimes,
+                keySwitchNoiseFactor);
             int firstModSize = computeFirstModSizeFromChain(
                 scalingMod, ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
             return firstModSize;
@@ -1142,7 +1162,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         }
         if (algorithm == "CLOSED") {
           computeModuliSizesClosed(firstModSize, scalingModSize, ringDimension,
-                                  plaintextModulus, levelOpCounts, numPrimes);
+                                  plaintextModulus, levelOpCounts, numPrimes,
+                                  keySwitchNoiseFactor);
           std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
               return firstModSize;
           };
@@ -1154,61 +1175,84 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         }
         if (algorithm == "BALANCING") {
           return computeModuliSizesBalancing(ringDimension, plaintextModulus, 
-                                                    levelOpCounts, numPrimes);
+                                             levelOpCounts, numPrimes,
+                                             keySwitchNoiseFactor);
         }
         if (algorithm == "GREEDY") {
           return computeModuliSizesGreedy(ringDimension, plaintextModulus,
-                                          levelOpCounts, numPrimes);
+                                          levelOpCounts, numPrimes,
+                                          keySwitchNoiseFactor);
         }
       } catch (const std::runtime_error& e) {
         genericOp->emitOpError() << "Parameter optimization failed: " << e.what();
         return {};
       }
       return {};
-    });
+    };
 
-    if (!isRingDimensionSet) {
-      ringDimension = 16384;
-    }
-
-    auto newRingDimension = ringDimension;
+    const int initialRingDimension = isRingDimensionSet ? ringDimension : 16384;
+    double keySwitchNoiseFactor = 1.0;
 
     std::vector<int> moduli;
-    while (true) {
-      // Compute param sizes for HYBRID Key Switching
-      moduli = computeModuliSizes(ringDimension);
 
-      if (isRingDimensionSet) {
+    while (true) {
+      ringDimension = initialRingDimension;
+      int newRingDimension = ringDimension;
+      moduli.clear();
+
+      while (true) {
+        moduli = computeModuliSizes(ringDimension, keySwitchNoiseFactor);
+        if (moduli.empty()) {
+          break;
+        }
+
+        if (isRingDimensionSet) {
+          break;
+        }
+
+        newRingDimension = computeRingDimension(moduli);
+
+        if (newRingDimension == ringDimension) {
+          // Try smaller ring dimension
+          int smallerDimension = ringDimension / 2;
+
+          auto newModuli =
+              computeModuliSizes(smallerDimension, keySwitchNoiseFactor);
+
+          if (newModuli.empty()) {
+            break;
+          }
+          newRingDimension = computeRingDimension(newModuli);
+
+          if (newRingDimension == smallerDimension) {
+            ringDimension = smallerDimension;
+            moduli = newModuli;
+          } else {
+            // No further improvement possible
+            break;
+          }
+
+        } else {
+          // New ring dimension is smaller/larger
+          ringDimension = newRingDimension;
+        }
+      }
+
+      if (moduli.empty()) {
         break;
       }
-  
-      newRingDimension = computeRingDimension(moduli);
-  
-      if (newRingDimension == ringDimension) {
-        // Try smaller ring dimension
-        int smallerDimension = ringDimension / 2;
-  
-        auto newModuli = computeModuliSizes(smallerDimension);
 
-        if (moduli.size() == 0) {
-          break;
-        }
-        newRingDimension = computeRingDimension(newModuli);
-  
-        if (newRingDimension == smallerDimension) {
-          ringDimension = smallerDimension;
-          moduli = newModuli;
-        } else {
-          // No further improvement possible
-          break;
-        }
-
-      } else {
-        // New ring dimension is smaller/larger
-        ringDimension = newRingDimension;
+      try {
+        auto qi =
+            computeQiModuliFromSizes(moduli, ringDimension, plaintextModulus);
+        (void)computePiModuli(qi, ringDimension, plaintextModulus);
+      } catch (const std::runtime_error &) {
+        keySwitchNoiseFactor += 0.1;
+        continue;
       }
-   }
 
+      break;
+    }
     printParamsWithResultTags(moduli, ringDimension, plaintextModulus, "<testname>", algorithm);
 
     annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
