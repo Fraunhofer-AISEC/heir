@@ -621,11 +621,29 @@ static double findOptimalScalingModSizeBisection(
 }
 
 static int computeLogPQ(const std::vector<int> &moduli) {
+  if (moduli.empty()) {
+    return 0;
+  }
+
   auto numPartQ = ComputeNumLargeDigits(0, moduli.size() - 1);
   auto logQ = std::accumulate(moduli.begin(), moduli.end(), 0);
-  auto logP = ceil(ceil(static_cast<double>(logQ) / numPartQ) / kMaxBitSize) *
-              kMaxBitSize;
-  return logP + logQ;
+
+  int qBound = logQ;
+  if (qBound != kMaxBitSize) {
+    qBound += 1;
+  }
+
+  double dcrtBits = (moduli.size() > 1) ? moduli[1] : moduli[0];
+  auto hybridKSInfo = lbcrypto::CryptoParametersRNS::EstimateLogP(
+      numPartQ, moduli[0], dcrtBits,
+      /*extraModulusSize=*/0,
+      /*numPrimes=*/moduli.size(),
+      /*auxBits=*/kMaxBitSize,
+      /*scalTech=*/lbcrypto::FIXEDAUTO,
+      /*addOne=*/true);
+
+  auto logP = static_cast<int>(std::ceil(std::get<0>(hybridKSInfo)));
+  return qBound + logP;
 };
 
 static int computeRingDimension(const std::vector<int> &moduli) {
