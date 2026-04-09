@@ -2,6 +2,7 @@
 #define ADD_64_0_COMMON_H
 
 #include <cstdint>
+#include <array>
 #include <iostream>
 #include <vector>
 
@@ -65,12 +66,11 @@ int run(FuncGenerator generateCryptoContext,
   std::vector<int16_t> expected_vector(8, sum_per_position);
 
   // Encrypt all arguments
-  std::vector<ConstCiphertext<DCRTPoly>> encryptedArgs;
+  std::array<std::vector<Ciphertext<DCRTPoly>>, 64> encryptedArgs;
   for (int i = 0; i < 64; i++) {
     // Fix the encryption function call - use the numbered version corresponding
     // to each arg
-    auto encrypted = encryptArg0(cc, args[i], keyPair.publicKey);
-    encryptedArgs.push_back(encrypted);
+    encryptedArgs[i] = encryptArg0(cc, args[i], keyPair.publicKey);
   }
 
   // Call the function with all encrypted arguments

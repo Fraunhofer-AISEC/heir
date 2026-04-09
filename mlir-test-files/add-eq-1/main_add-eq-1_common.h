@@ -2,6 +2,7 @@
 #define ADD_DEPTH_0_COMMON_H
 
 #include <cstdint>
+#include <array>
 #include <iostream>
 #include <vector>
 
@@ -49,24 +50,22 @@ int run(FuncGenerator generateCryptoContext,
     args.push_back(arg);
   }
 
-  // Calculate expected result
-  int64_t sum_per_position = 0;
-  for (int i = 0; i < 64; i++) {
-    auto pos = i % 64 == 0 ? 1 : 0;
-
-    sum_per_position += pos;  // Each tensor has value i at all positions
+  // add-eq-1 returns l2_32, which counts arg0^2 twice and arg1..arg31 once.
+  int64_t sum_per_position = args[0][0] * args[0][0];
+  for (int i = 0; i < 32; i++) {
+    int64_t value = args[i][0];
+    sum_per_position += value * value;
   }
 
-  // The expected result is a vector where each element is sum_per_position^2
-  std::vector<int16_t> expected_vector(8, sum_per_position);
+  std::vector<int16_t> expected_vector(8, static_cast<int16_t>(sum_per_position));
 
   // Encrypt all arguments
-  std::vector<ConstCiphertext<DCRTPoly>> encryptedArgs;
+  std::array<std::vector<Ciphertext<DCRTPoly>>, 64> encryptedArgs;
   for (int i = 0; i < 64; i++) {
     // Fix the encryption function call - use the numbered version corresponding
     // to each arg
     auto encrypted = encryptArg0(cc, args[i], keyPair.publicKey);
-    encryptedArgs.push_back(encrypted);
+    encryptedArgs[i] = encrypted;
   }
 
   // Call the function with all encrypted arguments

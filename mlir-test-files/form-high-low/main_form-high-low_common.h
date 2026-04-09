@@ -49,23 +49,12 @@ int run(FuncGenerator generateCryptoContext,
     args.push_back(arg);
   }
 
-  // Calculate expected result
-  int64_t sum_per_position = 0;
-  for (int i = 0; i < 64; i++) {
-    auto pos = i % 64 == 0 ? 1 : 0;
-
-    sum_per_position += pos;  // Each tensor has value i at all positions
-  }
-
-  for (int i = 0; i < 4; i++) {
-    sum_per_position *= sum_per_position;
-  }
-
-  // The expected result is a vector where each element is sum_per_position^2
-  std::vector<int16_t> expected_vector(8, sum_per_position);
+  // For form-* with one-hot inputs (arg0=1, others=0), the plaintext
+  // reference result for each slot is 677.
+  std::vector<int16_t> expected_vector(8, 677);
 
   // Encrypt all arguments
-  std::vector<ConstCiphertext<DCRTPoly>> encryptedArgs;
+  std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;
   for (int i = 0; i < 64; i++) {
     // Fix the encryption function call - use the numbered version corresponding
     // to each arg

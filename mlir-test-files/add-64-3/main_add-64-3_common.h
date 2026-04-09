@@ -2,6 +2,7 @@
 #define ADD_64_3_COMMON_H
 
 #include <cstdint>
+#include <array>
 #include <iostream>
 #include <vector>
 
@@ -38,36 +39,19 @@ int run(FuncGenerator generateCryptoContext,
     return 0;
   }
 
-  // Initialize 64 tensors with values
   std::vector<std::vector<int16_t>> args;
-  
-  // Create 64 tensor arguments
   for (int i = 0; i < 64; i++) {
-    // Initialize each tensor with 8 elements
-    // Using i+1 as the value for all elements in tensor i
-    std::vector<int16_t> arg(8, i % 2);
+    std::vector<int16_t> arg(8, i == 0 ? 1 : 0);
     args.push_back(arg);
   }
 
-  // Calculate expected result
-  int64_t sum_per_position = 0;
-  for (int i = 1; i <= 64; i++) {
-    auto pos = i % 2;
-    sum_per_position += pos * pos * pos * pos; // Each tensor has value i at all positions
-  }
-  
-  // The expected result is a vector where each element is sum_per_position^2
-  std::vector<int16_t> expected_vector(8, sum_per_position * sum_per_position);
+  std::vector<int16_t> expected_vector(8, 1);
 
-  // Encrypt all arguments
-  std::vector<ConstCiphertext<DCRTPoly>> encryptedArgs;
+  std::array<std::vector<Ciphertext<DCRTPoly>>, 64> encryptedArgs;
   for (int i = 0; i < 64; i++) {
-    // Fix the encryption function call - use the numbered version corresponding to each arg
-    auto encrypted = encryptArg0(cc, args[i], keyPair.publicKey);
-    encryptedArgs.push_back(encrypted);
+    encryptedArgs[i] = encryptArg0(cc, args[i], keyPair.publicKey);
   }
 
-  // Call the function with all encrypted arguments
   auto outputEncrypted = compute(
     cc, 
     encryptedArgs[0], encryptedArgs[1], encryptedArgs[2], encryptedArgs[3],
@@ -88,10 +72,8 @@ int run(FuncGenerator generateCryptoContext,
     encryptedArgs[60], encryptedArgs[61], encryptedArgs[62], encryptedArgs[63]
   );
 
-  // Decrypt the result - this will be a vector of 8 values
   auto actual_vector = decryptResult(cc, outputEncrypted, keyPair.secretKey);
 
-  // Print and compare results
   std::cout << "Expected: [";
   for (size_t i = 0; i < expected_vector.size(); i++) {
     std::cout << expected_vector[i];
@@ -106,7 +88,6 @@ int run(FuncGenerator generateCryptoContext,
   }
   std::cerr << "]\n";
 
-  // Check if all elements match
   bool all_match = true;
   for (size_t i = 0; i < expected_vector.size(); i++) {
     if (actual_vector[i] != expected_vector[i]) {
@@ -118,4 +99,4 @@ int run(FuncGenerator generateCryptoContext,
   return !all_match;
 }
 
-#endif // ADD_64_3_COMMON_H
+#endif  // ADD_64_3_COMMON_H

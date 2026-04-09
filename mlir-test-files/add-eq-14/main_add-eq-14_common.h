@@ -61,7 +61,7 @@ int run(FuncGenerator generateCryptoContext,
   std::vector<int16_t> expected_vector(8, sum_per_position);
 
   // Encrypt all arguments
-  std::vector<ConstCiphertext<DCRTPoly>> encryptedArgs;
+  std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;
   for (int i = 0; i < 64; i++) {
     // Fix the encryption function call - use the numbered version corresponding
     // to each arg
