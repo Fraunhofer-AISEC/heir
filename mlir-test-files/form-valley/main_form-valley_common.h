@@ -45,13 +45,13 @@ int run(FuncGenerator generateCryptoContext,
   for (int i = 0; i < 64; i++) {
     // Initialize each tensor with 8 elements
     // Using i+1 as the value for all elements in tensor i
-    std::vector<int16_t> arg(8, i % 64 == 0 ? 1 : 0);
+    std::vector<int16_t> arg(8, i == 49 ? 1 : 0);
     args.push_back(arg);
   }
 
   // For form-* with one-hot inputs (arg0=1, others=0), the plaintext
   // reference result for each slot is 677.
-  std::vector<int16_t> expected_vector(8, 677);
+  std::vector<int16_t> expected_vector(8, 2);
 
   // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;

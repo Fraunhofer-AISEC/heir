@@ -24,7 +24,7 @@ DASHBOARD_REFRESH_SEC="${DASHBOARD_REFRESH_SEC:-10}"
 
 OPENFHE_APPROACHES="${OPENFHE_APPROACHES:-direct closed bisection}"
 LATTIGO_APPROACHES="${LATTIGO_APPROACHES:-greedy gap-mono}"
-STOP_AFTER_PARAM_EXTRACTION="${STOP_AFTER_PARAM_EXTRACTION:-1}"
+STOP_AFTER_PARAM_EXTRACTION="${STOP_AFTER_PARAM_EXTRACTION:-0}"
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 SCRIPT_START_EPOCH="$(date +%s)"
@@ -499,11 +499,9 @@ annotate_algorithm() {
       print_header "$TEST_NAME $algorithm" "Skipping noise validation (SKIP_NOISE_ANALYSIS=1)"
     else
       print_header "$TEST_NAME $algorithm" "Validating noise with Mono model"
-      if ! run_command bash -c '"$1" "$2" "$3" "$4" "$5" > /dev/null' _ \
+      if ! run_command bash -c '"$1" "$2" "$3" > /dev/null' _ \
         "$HEIR_OPT" \
-        #--validate-noise=model=bgv-noise-mono \
-        #--debug \
-        #--debug-only=ValidateNoise \
+        --validate-noise=model=bgv-noise-mono \
         "$output_mlir"; then
         echo "WARNING: Noise validation failed for $algorithm in $TEST_NAME; continuing." >&2
       fi
