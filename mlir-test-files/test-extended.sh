@@ -31,6 +31,77 @@ SCRIPT_START_EPOCH="$(date +%s)"
 
 source "$SCRIPT_DIR/lib/codegen_steps.sh"
 
+declare -a ACTIVE_PARALLEL_PIDS=()
+ABORT_CLEANUP_DONE=0
+
+cleanup_parallel_workers() {
+  local reason="${1:-abort}"
+  local -a live_pids=()
+  local pid
+
+  for pid in "${ACTIVE_PARALLEL_PIDS[@]}"; do
+    [[ -n "$pid" ]] || continue
+    if kill -0 "$pid" 2>/dev/null; then
+      live_pids+=("$pid")
+    fi
+  done
+
+  if [[ ${#live_pids[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  echo
+  echo "Abort cleanup (${reason}): terminating ${#live_pids[@]} parallel worker(s)..." >&2
+
+  for pid in "${live_pids[@]}"; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+
+  for pid in "${live_pids[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+
+  for pid in "${live_pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
+
+  ACTIVE_PARALLEL_PIDS=()
+}
+
+on_abort_signal() {
+  local signal_name="$1"
+  if [[ "$ABORT_CLEANUP_DONE" -eq 0 ]]; then
+    ABORT_CLEANUP_DONE=1
+    cleanup_parallel_workers "$signal_name"
+  fi
+
+  if [[ "$signal_name" == "INT" ]]; then
+    exit 130
+  fi
+  if [[ "$signal_name" == "TERM" ]]; then
+    exit 143
+  fi
+  exit 1
+}
+
+on_exit_cleanup() {
+  local exit_code="$1"
+  if [[ "$exit_code" -eq 0 ]]; then
+    return
+  fi
+  if [[ "$ABORT_CLEANUP_DONE" -eq 0 ]]; then
+    ABORT_CLEANUP_DONE=1
+    cleanup_parallel_workers "EXIT($exit_code)"
+  fi
+}
+
+trap 'on_abort_signal INT' INT
+trap 'on_abort_signal TERM' TERM
+trap 'on_exit_cleanup "$?"' EXIT
+
 default_parallel_jobs() {
   local cpu_count
   cpu_count="$(nproc 2>/dev/null || echo 2)"
@@ -356,6 +427,35 @@ to_lower() {
   echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+fix_openfhe_include_paths() {
+  # Detect if running on macOS for sed in-place flag compatibility.
+  local sed_command
+  if [[ "$(uname)" == "Darwin" ]]; then
+    sed_command="sed -i ''"
+  else
+    sed_command="sed -i"
+  fi
+
+  print_header "$TEST_NAME POST-PROCESSING" "Fixing include paths in generated OpenFHE files"
+
+  local tag
+  for tag in "$@"; do
+    local lower_tag
+    lower_tag="$(to_lower "$tag")"
+    local header_file="$TEST_DIR/${TEST_NAME}_${lower_tag}.h"
+    local impl_file="$TEST_DIR/${TEST_NAME}_${lower_tag}.cpp"
+
+    if [[ ! -f "$header_file" || ! -f "$impl_file" ]]; then
+      echo "WARNING: Skipping include path fix for '$tag' due to missing generated files." >&2
+      continue
+    fi
+
+    if ! run_command $sed_command 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$header_file" "$impl_file"; then
+      echo "WARNING: Include path fix failed for '$tag'; continuing." >&2
+    fi
+  done
+}
+
 format_duration() {
   local total_seconds="$1"
   local hours=$((total_seconds / 3600))
@@ -659,6 +759,9 @@ process_test() {
   set_test_state "GEN_OPENFHE_BISECTION"
   generate_openfhe "$bisection_bgv_mlir" bisection
 
+  set_test_state "POSTPROCESS_OPENFHE_INCLUDES"
+  fix_openfhe_include_paths direct closed bisection
+
   local greedy_mlir greedy_bgv_mlir
   set_test_state "ANNOTATE_GREEDY"
   greedy_mlir="$(annotate_algorithm GREEDY)"
@@ -854,6 +957,8 @@ run_parallel_tests() {
       started=$((started + 1))
     done
 
+    ACTIVE_PARALLEL_PIDS=("${running_pids[@]}")
+
     local -a next_running_tests=()
     local -a next_running_pids=()
 
@@ -911,10 +1016,13 @@ run_parallel_tests() {
 
     running_tests=("${next_running_tests[@]}")
     running_pids=("${next_running_pids[@]}")
+    ACTIVE_PARALLEL_PIDS=("${running_pids[@]}")
 
     render_status_table "$completed" "$total" "${#running_pids[@]}" "$passed" "$failed" "$runtime_failed" "$started" "$parallel_start" "$run_root"
     sleep "$DASHBOARD_REFRESH_SEC"
   done
+
+  ACTIVE_PARALLEL_PIDS=()
 
   render_status_table "$completed" "$total" 0 "$passed" "$failed" "$runtime_failed" "$started" "$parallel_start" "$run_root"
   echo
