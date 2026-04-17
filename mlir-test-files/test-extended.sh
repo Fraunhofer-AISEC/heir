@@ -431,9 +431,9 @@ fix_openfhe_include_paths() {
   # Detect if running on macOS for sed in-place flag compatibility.
   local sed_command
   if [[ "$(uname)" == "Darwin" ]]; then
-    sed_command="sed -i ''"
+    sed_command=(sed -i '')
   else
-    sed_command="sed -i"
+    sed_command=(sed -i)
   fi
 
   print_header "$TEST_NAME POST-PROCESSING" "Fixing include paths in generated OpenFHE files"
@@ -450,7 +450,9 @@ fix_openfhe_include_paths() {
       continue
     fi
 
-    if ! run_command $sed_command 's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' "$header_file" "$impl_file"; then
+    if ! run_command "${sed_command[@]}" \
+      's|#include "openfhe/pke/openfhe.h"|#include "src/pke/include/openfhe.h" // from @openfhe|g' \
+      "$header_file" "$impl_file"; then
       echo "WARNING: Include path fix failed for '$tag'; continuing." >&2
     fi
   done
@@ -487,8 +489,7 @@ annotate_algorithm() {
     fi
 
     print_header "$TEST_NAME $algorithm" "Extracting annotated params"
-    run_command bash -c '"$1" "$2" "$3" "$4" "$5" "$6" > /dev/null' _ \
-      python3 \
+    run_command bash -c 'python3 "$1" "$2" "$3" "$4" "$5" > /dev/null' _ \
       "$SCRIPT_DIR/extract_bgv_params.py" \
       "$output_mlir" \
       "$annotated_json" \
@@ -499,9 +500,9 @@ annotate_algorithm() {
       print_header "$TEST_NAME $algorithm" "Skipping noise validation (SKIP_NOISE_ANALYSIS=1)"
     else
       print_header "$TEST_NAME $algorithm" "Validating noise with Mono model"
-      if ! run_command bash -c '"$1" "$2" "$3" > /dev/null' _ \
+      if ! run_command bash -c '"$1" "$2" "$3" > /dev/null' _\
         "$HEIR_OPT" \
-        --validate-noise=model=bgv-noise-mono \
+        '--validate-noise=model=bgv-noise-mono' \
         "$output_mlir"; then
         echo "WARNING: Noise validation failed for $algorithm in $TEST_NAME; continuing." >&2
       fi
@@ -577,9 +578,8 @@ lower_to_bgv() {
 
   print_header "$TEST_NAME $tag" "Post-annotate lowering to BGV"
   
-  run_command bash -c '"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" > "${16}"' _ \
+  run_command bash -c '"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" > "${15}"' _ \
     "$HEIR_OPT" \
-    --optimize-relinearization \
     "--generate-param-bgv=model=${NOISE_MODEL} plaintext-modulus=${PLAINTEXT_MODULUS} slot-number=${CIPHERTEXT_DEGREE} use-public-key=true encryption-technique-extended=false" \
     --populate-scale-bgv \
     --canonicalize \
