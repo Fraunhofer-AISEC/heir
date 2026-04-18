@@ -1,12 +1,16 @@
 import sys
+import subprocess
+import ctypes
+import numpy as np
+
 sys.path.insert(0, "/Users/mar69689/Documents/Projekte/Google/llvm-project/build/tools/mlir/python_packages/mlir_core")
 
-import mlir.execution_engine as exe
 import mlir.passmanager as pm
 import mlir.ir as ir
 from mlir._mlir_libs._mlirRegisterEverything import register_dialects, register_llvm_translations
-import ctypes
-import numpy as np
+
+BUILD_DIR  = "/Users/mar69689/Documents/Projekte/Google/llvm-project/build"
+MLIR_TRANSLATE = f"{BUILD_DIR}/bin/mlir-translate"
 
 class MemRefDescriptor(ctypes.Structure):
     _fields_ = [
@@ -19,7 +23,7 @@ class MemRefDescriptor(ctypes.Structure):
 
 def make_memref(np_array):
     desc = MemRefDescriptor()
-    ptr = np_array.ctypes.data
+    ptr  = np_array.ctypes.data
     desc.allocated = ptr
     desc.aligned   = ptr
     desc.offset    = 0
@@ -27,6 +31,7 @@ def make_memref(np_array):
     desc.stride    = 1
     return desc
 
+# ── 1. Parse & lower ────────────────────────────────────────────────────────
 with open("form-decreasing.mlir", "r") as f:
     src = f.read()
 
@@ -57,45 +62,50 @@ with ir.Context() as ctx:
     )
     pm.PassManager.parse(f"builtin.module({pipeline})").run(module.operation)
 
-    # Write lowered IR for inspection
     with open("lowered.mlir", "w") as f:
         f.write(str(module))
     print("Lowered IR written to lowered.mlir")
 
-    # Create execution engine
-    print("Creating execution engine...")
-    engine = exe.ExecutionEngine(module, opt_level=0)
-    print("Engine created successfully")
+# ── 2. MLIR (LLVM dialect) → LLVM IR ────────────────────────────────────────
+print("Translating to LLVM IR...")
+r = subprocess.run(
+    [MLIR_TRANSLATE, "--mlir-to-llvmir", "lowered.mlir", "-o", "lowered.ll"],
+    capture_output=True, text=True
+)
+if r.returncode != 0:
+    print("mlir-translate failed:\n", r.stderr)
+    sys.exit(1)
+print("LLVM IR written to lowered.ll")
 
-    # --- Diagnostic: check symbol via ctypes in current process ---
-    lib = ctypes.CDLL(None)
-    for name in ["_mlir_ciface_func", "__mlir_ciface_func", "func", "_func"]:
-        try:
-            sym = getattr(lib, name)
-            print(f"Found symbol via ctypes: {name} -> {sym}")
-        except AttributeError:
-            print(f"Symbol NOT found via ctypes: {name}")
+# ── 3. Compile to shared library ─────────────────────────────────────────────
+print("Compiling to shared library...")
+r = subprocess.run(
+    ["clang", "-shared", "-fPIC", "-O0", "lowered.ll", "-o", "libfunc.dylib"],
+    capture_output=True, text=True
+)
+if r.returncode != 0:
+    print("clang failed:\n", r.stderr)
+    sys.exit(1)
+print("Shared library written to libfunc.dylib")
 
-    # --- Try engine.invoke (uses ciface internally) ---
-    print("Trying engine.invoke...")
-    inputs = [np.ones(8, dtype=np.int16)] + [np.zeros(8, dtype=np.int16) for _ in range(64)]
-    output = np.zeros(8, dtype=np.int16)
+# ── 4. Load  ───────────────────────────────────────────────────────────
+lib    = ctypes.CDLL("./libfunc.dylib")
+cfunc  = getattr(lib, "_mlir_ciface_func")
+cfunc.restype  = None
+cfunc.argtypes = [ctypes.POINTER(MemRefDescriptor)] * 66
 
-    all_arrays = [output] + inputs
-    descs = [make_memref(a) for a in all_arrays]
-    args = [ctypes.pointer(d) for d in descs]
+# ── Call the function ─────────────────────────────────────────────────────────
+inputs = [np.ones(8, dtype=np.int16)] + [np.zeros(8, dtype=np.int16) for _ in range(64)]
+output = np.zeros(8, dtype=np.int16)
 
-    try:
-        engine.invoke("func", *args)
-        print("invoke succeeded!")
-        print("Output:", output)
-    except Exception as e:
-        print(f"invoke failed: {e}")
+all_arrays = [output] + inputs
+descs = [make_memref(a) for a in all_arrays]
+args  = [ctypes.pointer(d) for d in descs]
 
-    # --- Try lookup with various name variants ---
-    for name in ["_mlir_ciface_func", "__mlir_ciface_func", "func", "_func"]:
-        try:
-            fptr = engine.lookup(name)
-            print(f"engine.lookup succeeded for: {name} -> {fptr}")
-        except RuntimeError as e:
-            print(f"engine.lookup failed for '{name}': {e}")
+cfunc(*args)
+
+# ── Read result from the descriptor the function wrote into ───────────────────
+# The function fills descs[0].aligned with a pointer to the result data
+result_ptr = ctypes.cast(descs[0].aligned, ctypes.POINTER(ctypes.c_int16))
+result = np.ctypeslib.as_array(result_ptr, shape=(8,)).copy()
+print("Output:", result)
