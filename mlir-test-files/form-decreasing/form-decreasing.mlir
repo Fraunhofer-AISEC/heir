@@ -14,7 +14,8 @@ func.func @func(
   %arg48: tensor<8xi16>, %arg49: tensor<8xi16>, %arg50: tensor<8xi16>, %arg51: tensor<8xi16>,
   %arg52: tensor<8xi16>, %arg53: tensor<8xi16>, %arg54: tensor<8xi16>, %arg55: tensor<8xi16>,
   %arg56: tensor<8xi16>, %arg57: tensor<8xi16>, %arg58: tensor<8xi16>, %arg59: tensor<8xi16>,
-  %arg60: tensor<8xi16>, %arg61: tensor<8xi16>, %arg62: tensor<8xi16>, %arg63: tensor<8xi16>
+  %arg60: tensor<8xi16>, %arg61: tensor<8xi16>, %arg62: tensor<8xi16>, %arg63: tensor<8xi16>,
+  %arg64: tensor<8xi16>
 ) -> tensor<8xi16> {
   //-------------------------------------------------------------------------
   // Level 1: 64 additions (no squaring)
@@ -82,7 +83,7 @@ func.func @func(
   %l1_61 = arith.addi %l1_60, %arg61 : tensor<8xi16>
   %l1_62 = arith.addi %l1_61, %arg62 : tensor<8xi16>
   %l1_63 = arith.addi %l1_62, %arg63 : tensor<8xi16>
-  %l1_64 = arith.addi %l1_63, %arg0 : tensor<8xi16>  // reuse %arg0 for the 65th operand
+  %l1_64 = arith.addi %l1_63, %arg64 : tensor<8xi16> 
   %m1 = arith.muli %l1_64, %l1_64 : tensor<8xi16>
 
   //-------------------------------------------------------------------------

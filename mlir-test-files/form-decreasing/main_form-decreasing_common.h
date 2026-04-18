@@ -31,6 +31,9 @@ int run(FuncGenerator generateCryptoContext,
 
   std::cout << *(cc->GetCryptoParameters()) << std::endl;
 
+  
+
+
   printModulusChain(cc, "form-decreasing", selectionApproach);
   saveParamsToJsonFile(cc, "form-decreasing", selectionApproach);
   
@@ -42,19 +45,19 @@ int run(FuncGenerator generateCryptoContext,
   std::vector<std::vector<int16_t>> args;
 
   // Create 64 tensor arguments
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < 65; i++) {
     // Initialize each tensor with 8 elements
-    std::vector<int16_t> arg(8, i == 63 ? 1 : 0);
+    std::vector<int16_t> arg(8, i == 64 ? 1 : 0);
     args.push_back(arg);
   }
 
   // For form-decreasing with one-hot inputs (arg0=1, others=0), each output
   // slot evaluates to 1.
-  std::vector<int16_t> expected_vector(8, 1);
+  std::vector<int16_t> expected_vector(8, 0);
 
   // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < 65; i++) {
     // Fix the encryption function call - use the numbered version corresponding
     // to each arg
     auto encrypted = encryptArg0(cc, args[i], keyPair.publicKey);
@@ -83,7 +86,7 @@ int run(FuncGenerator generateCryptoContext,
       encryptedArgs[53], encryptedArgs[54], encryptedArgs[55],
       encryptedArgs[56], encryptedArgs[57], encryptedArgs[58],
       encryptedArgs[59], encryptedArgs[60], encryptedArgs[61],
-      encryptedArgs[62], encryptedArgs[63]);
+      encryptedArgs[62], encryptedArgs[63], encryptedArgs[64]);
 
   // Decrypt the result - this will be a vector of 8 values
   auto actual_vector = decryptResult(cc, outputEncrypted, keyPair.secretKey);
