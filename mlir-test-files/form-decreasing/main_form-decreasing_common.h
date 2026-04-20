@@ -47,13 +47,13 @@ int run(FuncGenerator generateCryptoContext,
   // Create 64 tensor arguments
   for (int i = 0; i < 65; i++) {
     // Initialize each tensor with 8 elements
-    std::vector<int16_t> arg(8, i == 64 ? 1 : 0);
+    std::vector<int16_t> arg(8, i == 0 ? 1 : 0);
     args.push_back(arg);
   }
 
   // For form-decreasing with one-hot inputs (arg0=1, others=0), each output
   // slot evaluates to 1.
-  std::vector<int16_t> expected_vector(8, 0);
+  std::vector<int16_t> expected_vector(8, 676);
 
   // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;

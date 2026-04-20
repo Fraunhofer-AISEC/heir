@@ -19,7 +19,7 @@ func.func @func(
 ) -> tensor<8xi16> {
   //-------------------------------------------------------------------------
   // Level 1: 64 additions (no squaring)
-  // We need 65 operands for 64 additions. We use %arg0..%arg63 and then reuse %arg0.
+  // We need 65 operands for 64 additions. We use %arg0..%arg64
   %l1_1  = arith.addi %arg0, %arg1 : tensor<8xi16>
   %l1_2  = arith.addi %l1_1, %arg2 : tensor<8xi16>
   %l1_3  = arith.addi %l1_2, %arg3 : tensor<8xi16>
