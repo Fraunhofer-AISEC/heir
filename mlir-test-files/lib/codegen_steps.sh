@@ -116,6 +116,17 @@ lattigo_expected_value_for_test() {
   esac
 }
 
+lattigo_value_mode_for_test() {
+  case "$1" in
+    add-eq-*)
+      echo "all"
+      ;;
+    *)
+      echo "first_only"
+      ;;
+  esac
+}
+
 # Render the Lattigo runner from a reusable template.
 generate_lattigo_runner() {
   local runner_go="$1"
@@ -123,6 +134,8 @@ generate_lattigo_runner() {
   local arity="$3"
   local input_go="$4"
   local params_output="$5"
+  local values_mode
+  value_mode="$(lattigo_value_mode_for_test "$TEST_NAME")"
   local expected_value
   expected_value="$(lattigo_expected_value_for_test "$TEST_NAME")"
 
@@ -134,5 +147,6 @@ generate_lattigo_runner() {
     "$arity" \
     "$input_go" \
     "$expected_value" \
-    "$params_output"
+    "$params_output" \
+    "$value_mode"
 }

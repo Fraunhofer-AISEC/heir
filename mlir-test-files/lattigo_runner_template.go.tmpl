@@ -90,15 +90,7 @@ func main() {
     return
   }
 
-  values := make([][]int16, ARITY)
-  for i := 0; i < ARITY; i++ {
-    values[i] = make([]int16, 8)
-    if i == 0 {
-      for j := 0; j < 8; j++ {
-        values[i][j] = 1
-      }
-    }
-  }
+  __VALUES_INIT__
 
 __ENCRYPT_CALLS__
 
