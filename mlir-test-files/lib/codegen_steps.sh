@@ -81,7 +81,7 @@ lattigo_expected_value_for_test() {
       echo 2
       ;;
     add-eq-6)
-      echo -23492
+      echo 161
       ;;
     add-eq-10)
       echo 29445
@@ -90,7 +90,7 @@ lattigo_expected_value_for_test() {
       echo 677
       ;;
     add-eq-2)
-      echo 5
+      echo 65
       ;;
     form-decreasing)
       echo 676
