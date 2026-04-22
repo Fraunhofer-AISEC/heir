@@ -115,6 +115,14 @@ while IFS= read -r test_dir; do
     enqueue_path "$test_dir/logs"
   fi
 
+ # Generated artifacts from expected results check
+  while IFS= read -r path; do
+    enqueue_path "$path"
+  done < <(find "$test_dir" -mindepth 1 -maxdepth 1 -type f \
+    \( -name "libfunc.dylib" -o -name "lowered.ll" -o -name "lowered.mlir" \) \
+    -print 2>/dev/null || true)
+
+
 done < <(
   find "$SCRIPT_DIR" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null \
     | while IFS= read -r candidate; do
