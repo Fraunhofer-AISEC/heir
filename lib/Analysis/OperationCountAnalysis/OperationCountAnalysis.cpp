@@ -145,7 +145,8 @@ struct NoiseBounds {
   }
 };
 
-static int getBitSize(double value) {
+template<typename T>
+static int getBitSize(T value) {
   return static_cast<int>(std::floor(std::log2(value)) + 1);
 }
 
@@ -163,68 +164,6 @@ static uint64_t computeModulusOrder(int ringDimension, uint64_t plaintextModulus
   }
 
   return pow2ptm * plaintextModulus;
-}
-
-static std::pair<uint64_t, uint64_t> findValidPrimes(int minScalingModSize, int minFirstModSize,
-                                        int numPrimes, int ringDimension,
-                                        int plaintextModulus, std::function<int(int)> &recomputeFirstModSize) {
-  if (minFirstModSize >= kMaxBitSize || minScalingModSize >= kMaxBitSize) {
-    throw std::runtime_error("Could not find valid primes! FirstModSize or scalingModSize exeed maximum bit size!");
-  }
-
-  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
-
-  lbcrypto::NativeInteger firstMod = 0;
-
-  // Find valid firstModulusSize and respective firstModulus prime
-  while (true) {
-    try {
-      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(minFirstModSize, modulusOrder);
-      break;
-    } catch (lbcrypto::OpenFHEException &e) {
-      minFirstModSize += 1;
-      if (minFirstModSize >= kMaxBitSize) {
-        throw std::runtime_error("Could not find valid primes for firstMod!");
-      }
-    }
-  }
-
-  auto firstModSize = minFirstModSize;
-  auto scalingModSize = minScalingModSize;
-
-  while (scalingModSize < kMaxBitSize) {
-    try {
-      lbcrypto::NativeInteger q;
-      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(firstModSize,
-        modulusOrder);
-      if (firstModSize == scalingModSize){
-        q = firstMod;
-      } else {
-        q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
-                                                         modulusOrder);
-      }
-      bool allFound = true;
-      for (int i = 1; i < numPrimes; i++) {
-        q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
-        if (q == firstMod) {
-          firstModSize += 1;
-          allFound = false;
-          break;
-        }
-      }
-      if (allFound || numPrimes == 1) {
-        return {firstModSize, scalingModSize};
-      }
-    } catch (lbcrypto::OpenFHEException &e) {
-      if (firstModSize <= scalingModSize) {
-        firstModSize +=1;
-      } else {
-        firstModSize = recomputeFirstModSize(scalingModSize);
-        scalingModSize += 1;
-      }
-    }
-  }
-  throw std::runtime_error("Could not find valid primes for scalingMod!");
 }
 
 static std::vector<double> computeBoundChain(
@@ -941,6 +880,40 @@ void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension
 
 using BigInteger = bigintbackend::BigInteger;
 
+static bool validateHybridAssumptionFromSizes(const std::vector<int> &moduliSizes,
+                                              int auxBits) {
+  if (moduliSizes.empty()) {
+    return false;
+  }
+
+  auto numPartQ = ComputeNumLargeDigits(0, moduliSizes.size() - 1);
+  if (numPartQ == 0) {
+    return false;
+  }
+
+  uint32_t towersPerPart =
+      ceil(static_cast<double>(moduliSizes.size()) / numPartQ);
+
+  uint32_t maxBits = 0;
+  for (uint32_t j = 0; j < numPartQ; ++j) {
+    uint32_t partBits = 0;
+    for (uint32_t i = towersPerPart * j; i < (j + 1) * towersPerPart; ++i) {
+      if (i < moduliSizes.size()) {
+        partBits += moduliSizes[i];
+      }
+    }
+    maxBits = std::max(maxBits, partBits);
+  }
+
+  uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
+  if (sizeP == 0) {
+    return false;
+  }
+
+  return log2(sqrt(static_cast<double>(numPartQ) * moduliSizes.size())) +
+         maxBits <= static_cast<double>(auxBits) * sizeP;
+}
+
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
                                             int ringDimension,
                                             int plaintextModulus) {
@@ -972,25 +945,15 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
 
   // Find number and size of individual special primes using the max bit length
   uint32_t maxBits = 0;
-  int maxBitsIndex = 0;
   for (uint32_t j = 0; j < numPartQ; j++) {
     uint32_t bits = moduliPartQ[j].GetLengthForBase(2);
     if (bits > maxBits) {
       maxBits = bits;
-      maxBitsIndex = j;
     }
   }
 
   // Select number of primes in auxiliary CRT basis
   uint32_t sizeP = ceil(static_cast<double>(maxBits) / auxBits);
-
-  // Validate assumption regarding
-  if (log2(sqrt(numPartQ * qi.size())) +
-          moduliPartQ[maxBitsIndex].GetLengthForBase(2) >
-      auxBits * sizeP) {
-    throw std::runtime_error(
-        "Invalid assumption: Underestimated noise for key switching.");
-  }
 
   // Start with first prime as done in OpenFHE
   lbcrypto::NativeInteger firstP =
@@ -1021,46 +984,47 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
   return pi;
 }
 
-static std::vector<int64_t> computeQiModuliFromSizes(
+static std::vector<int64_t> selectLattigoPrimesFromSizes(
     const std::vector<int> &moduliSizes, int ringDimension,
     int plaintextModulus) {
-  std::vector<int64_t> qi;
-  qi.reserve(moduliSizes.size());
-  
-  // Use order for non GHS BGV Variant (for BGV GHS, use computeModulusOrder(ringDimension, plaintextModulus))
-  uint64_t modulusOrder = 2 * ringDimension;
-  // Process each modulus size in sequence
-  lbcrypto::NativeInteger currentPrime = 0;
-  for (int moduliSize : moduliSizes) {
-    // First modulus or reset needed, get the last prime of this size
-    currentPrime = lbcrypto::FirstPrime<lbcrypto::NativeInteger>(moduliSize, modulusOrder);
-    // Get the previous prime with appropriate size
-    while (true) {
-       // Check for collisions with previously selected primes
-      bool foundDuplicate = false;
-       for (const auto& existingPrime : qi) {
-        if (existingPrime == currentPrime.ConvertToInt()) {
-          currentPrime = lbcrypto::NextPrime<lbcrypto::NativeInteger>(currentPrime, modulusOrder);
-          foundDuplicate = true;
-          break;
-        }
-      }
-      if (!foundDuplicate) {
-        break;
-      }
-    }
-    
-    qi.push_back(currentPrime.ConvertToInt());
+  if (moduliSizes.empty()) {
+    return {};
   }
 
-  return qi;
+  uint64_t modulusOrder =
+      computeModulusOrder(ringDimension, plaintextModulus);
+  std::vector<int64_t> selectedPrimes;
+  selectedPrimes.reserve(moduliSizes.size());
+
+  for (int requestedSize : moduliSizes) {
+    if (requestedSize >= kMaxBitSize) {
+      throw std::runtime_error("Requested modulus size exceeds maximum bit size");
+    }
+
+    auto currentPrime = lbcrypto::FirstPrime<lbcrypto::NativeInteger>(
+        requestedSize - 1, modulusOrder);
+
+    while (std::any_of(selectedPrimes.begin(), selectedPrimes.end(),
+                       [&](int64_t existingPrime) {
+                         return existingPrime ==
+                                static_cast<int64_t>(currentPrime.ConvertToInt());
+                       })) {
+      currentPrime = lbcrypto::NextPrime<lbcrypto::NativeInteger>(currentPrime, modulusOrder);
+    }
+
+    selectedPrimes.push_back(
+        static_cast<int64_t>(currentPrime.ConvertToInt()));
+  }
+
+  return selectedPrimes;
 }
 
 static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
                          const uint64_t ringDimension, const std::vector<int>& moduliSizes) {
   // Compute qi moduli from the vector of moduli sizes
   std::vector<int64_t> qi =
-      computeQiModuliFromSizes(moduliSizes, ringDimension, plaintextModulus);
+      selectLattigoPrimesFromSizes(moduliSizes, ringDimension,
+                     plaintextModulus);
 
   // Compute pi moduli (extension moduli)
   std::vector<int64_t> pi =
@@ -1076,62 +1040,175 @@ static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
 }
 
 static void annotateOpenfheParams(secret::GenericOp genericOp,
-                                  int multiplicativeDepth, int ringDimension,
-                                  const std::vector<int> &moduliSizes,
-                                  int plaintextModulus, OperationCount maxCounts) {
+                  int multiplicativeDepth, int ringDimension,
+                                  int firstModSize, int scalingModSize,
+                  int plaintextModulus,
+                  OperationCount maxCounts) {
   auto *funcOp = ((Operation*) genericOp)->getParentOp();
 
-  // Compute the first and scaling moduli sizes
-  int firstModSize = moduliSizes[0];
-  int scalingModSize = *std::max_element(moduliSizes.begin() + 1, moduliSizes.end());
   auto openfheParamAttr = mgmt::OpenfheParamsAttr::get(
     funcOp->getContext(),
-    /*evalAddCount=*/maxCounts.getCiphertextCount(),
-    /*firstModSize=*/firstModSize,
-    /*keySwitchCount=*/maxCounts.getKeySwitchCount(),
-    /*multiplicativeDepth=*/multiplicativeDepth,
-    /*plaintextModulus=*/plaintextModulus,
-    /*ringDimension=*/ringDimension,
-    /*scalingModSize=*/scalingModSize);
+    maxCounts.getCiphertextCount(),
+    firstModSize,
+    maxCounts.getKeySwitchCount(),
+    multiplicativeDepth,
+    plaintextModulus,
+    ringDimension,
+    scalingModSize
+  );
 
   funcOp->setAttr(mgmt::MgmtDialect::kArgOpenfheParamsAttrName,
           openfheParamAttr);
 }
 
-static std::vector<int> createModuliSizeChain(int firstModSize, int scalingModSize, int numPrimes) {
-  std::vector<int> moduli;
-  moduli.push_back(firstModSize);
-  for (int i = 1; i < numPrimes; i++) {
-    moduli.push_back(scalingModSize);
+static std::pair<int, int> findValidOpenFhePrimeSizes(
+    int computedFirstModSize, int computedScalingModSize, int numPrimes,
+    int ringDimension, int plaintextModulus,
+    std::function<int(int)> recomputeFirstModSize) {
+  uint64_t modulusOrder = computeModulusOrder(ringDimension, plaintextModulus);
+  lbcrypto::NativeInteger firstMod = 0;
+
+  auto firstModSize = computedFirstModSize;
+  auto scalingModSize = computedScalingModSize;
+
+  while (scalingModSize < kMaxBitSize && firstModSize < kMaxBitSize) {
+    try {
+      firstMod = lbcrypto::LastPrime<lbcrypto::NativeInteger>(
+          firstModSize, modulusOrder);
+    } catch (lbcrypto::OpenFHEException &) {
+      firstModSize += 1;
+      continue;
+    }
+
+    if (getBitSize(firstMod.ConvertToInt()) < computedFirstModSize) {
+        firstModSize += 1;
+        continue;
+    }
+
+    lbcrypto::NativeInteger q;
+    if (firstModSize == scalingModSize) {
+      q = firstMod;
+    } else {
+      q = lbcrypto::LastPrime<lbcrypto::NativeInteger>(scalingModSize,
+                                                        modulusOrder);
+    }
+    bool allFound = true;
+    try {
+      for (int i = 1; i < numPrimes; i++) {
+        q = lbcrypto::PreviousPrime<lbcrypto::NativeInteger>(q, modulusOrder);
+        if (q == firstMod || getBitSize(q.ConvertToInt()) < computedScalingModSize) {
+          allFound = false;
+          break;
+        }
+      }
+      if (allFound || numPrimes == 1) {
+        break;
+      }
+    } catch (lbcrypto::OpenFHEException &) {
+      allFound = false;
+    }
+
+    if (!allFound) {
+      if (firstModSize == scalingModSize) {
+        firstModSize += 1;
+      } else {
+        scalingModSize += 1;
+        firstModSize = recomputeFirstModSize(scalingModSize);
+      }
+    }
   }
-  return moduli;
+
+  if (scalingModSize >= kMaxBitSize || firstModSize >= kMaxBitSize) {
+    throw std::runtime_error(
+      "OpenFHE prime validation failed: could not find valid prime sizes.");
+  }
+
+  return {firstModSize, scalingModSize};
+}
+
+static int computeRingDimensionFromOpenfheSizes(int firstModSize,
+                                                int scalingModSize,
+                                                int numPrimes) {
+  auto numPartQ = ComputeNumLargeDigits(0, numPrimes - 1);
+  auto logQ = firstModSize + (numPrimes - 1) * scalingModSize;
+
+  if (logQ != kMaxBitSize) {
+    logQ += 1;
+  }
+
+  double dcrtBits = (numPrimes > 1) ? scalingModSize : firstModSize;
+  auto hybridKSInfo = lbcrypto::CryptoParametersRNS::EstimateLogP(
+      numPartQ, firstModSize, dcrtBits,
+      /*extraModulusSize=*/0,
+      /*numPrimes=*/numPrimes,
+      /*auxBits=*/kMaxBitSize,
+      /*scalTech=*/lbcrypto::FIXEDAUTO,
+      /*addOne=*/true);
+
+  auto logP = static_cast<int>(std::ceil(std::get<0>(hybridKSInfo)));
+  auto logQP = logQ + logP;
+
+  return lbcrypto::StdLatticeParm::FindRingDim(
+      lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
+}
+
+static std::vector<int> findValidPrimesLattigo(
+    const std::vector<int> &computedModuliSizes, int ringDimension,
+    int plaintextModulus) {
+  auto selectedPrimes =
+      selectLattigoPrimesFromSizes(computedModuliSizes, ringDimension,
+                                   plaintextModulus);
+
+  std::vector<int> validatedModuliSizes;
+  validatedModuliSizes.reserve(selectedPrimes.size());
+
+  for (const auto &prime : selectedPrimes) {
+    validatedModuliSizes.push_back(getBitSize(prime));
+  }
+
+  return validatedModuliSizes;
 }
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
                          int ringDimension, int plaintextModulus,
                          std::string algorithm) {
   top->walk<WalkOrder::PreOrder>([&](secret::GenericOp genericOp) {
+    if (algorithm != "DIRECT" && algorithm != "CLOSED" &&
+        algorithm != "BISECTION" && algorithm != "GREEDY" &&
+        algorithm != "BALANCING") {
+      genericOp->emitOpError()
+          << "Unsupported algorithm '" << algorithm
+          << "'. Supported values are: DIRECT, CLOSED, BISECTION, GREEDY, BALANCING.";
+      return;
+    }
+
     bool isRingDimensionSet = ringDimension != 0;
 
     auto maxLevel = getMaxLevel(&genericOp);
     auto levelOpCounts = getLevelOpCounts(&genericOp, solver, maxLevel);
 
+    OperationCount maxCounts(0, 0);
+    for (auto count : levelOpCounts) {
+      maxCounts = OperationCount::max(maxCounts, count);
+    }
+
     auto multiplicativeDepth = maxLevel;
     auto numPrimes = multiplicativeDepth + 1;
 
     if (algorithm == "DIRECT") {
-      OperationCount maxCounts(0, 0);
-      for (auto count : levelOpCounts) {
-        maxCounts = OperationCount::max(maxCounts, count);
-      }
-    
-      annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, {0,0}, plaintextModulus, maxCounts);
+      annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension,
+                            0, 0, plaintextModulus, maxCounts);
       return;
     }
 
+    const int initialRingDimension = isRingDimensionSet ? ringDimension : 16384;
+
+    double keySwitchNoiseFactor = 1.0;
+    int validatedFirstModSize = 0;
+    int validatedScalingModSize = 0;
+
     auto computeModuliSizes =
-        [&](int ringDimension,
-            double keySwitchNoiseFactor) -> std::vector<int> {
+        [&](int ringDimension) -> std::vector<int> {
       if (numPrimes == 1) {
         auto noiseBounds = calculateBoundParams(
             ringDimension, plaintextModulus, numPrimes, keySwitchNoiseFactor);
@@ -1139,42 +1216,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
         return {firstModSize};
       }
       try {
-        int firstModSize = 0;
-        int scalingModSize = 0;
-        if (algorithm == "BISECTION") {
-          computeModuliSizesBisection(firstModSize, scalingModSize, ringDimension,
-                                      plaintextModulus, levelOpCounts,
-                                      numPrimes, keySwitchNoiseFactor);
-          std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
-            double scalingMod = pow(2.0, currentScalingModSize);
-            auto noiseBounds = calculateBoundParams(
-                ringDimension, plaintextModulus, numPrimes,
-                keySwitchNoiseFactor);
-            int firstModSize = computeFirstModSizeFromChain(
-                scalingMod, ringDimension, plaintextModulus, levelOpCounts, numPrimes, noiseBounds);
-            return firstModSize;
-          };
-          auto modSizes =
-              findValidPrimes(scalingModSize, firstModSize, numPrimes,
-                              ringDimension, plaintextModulus, recomputeFirstModSize);
-          return createModuliSizeChain(modSizes.first, modSizes.second,
-                                       numPrimes);
-        }
-        if (algorithm == "CLOSED") {
-          computeModuliSizesClosed(firstModSize, scalingModSize, ringDimension,
-                                  plaintextModulus, levelOpCounts, numPrimes,
-                                  keySwitchNoiseFactor);
-          std::function<int(int)> recomputeFirstModSize = [&](int currentScalingModSize) -> int {
-              return firstModSize;
-          };
-          auto modSizes =
-              findValidPrimes(scalingModSize, firstModSize, numPrimes,
-                              ringDimension, plaintextModulus, recomputeFirstModSize);
-          return createModuliSizeChain(modSizes.first, modSizes.second,
-                                       numPrimes);
-        }
         if (algorithm == "BALANCING") {
-          return computeModuliSizesBalancing(ringDimension, plaintextModulus, 
+          return computeModuliSizesBalancing(ringDimension, plaintextModulus,
                                              levelOpCounts, numPrimes,
                                              keySwitchNoiseFactor);
         }
@@ -1190,73 +1233,207 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       return {};
     };
 
-    const int initialRingDimension = isRingDimensionSet ? ringDimension : 16384;
-    double keySwitchNoiseFactor = 1.0;
+    auto computeValidatedOpenfheSizes = [&](int candidateRingDimension,
+                                            int &outFirstModSize,
+                                            int &outScalingModSize) -> bool {
+      int computedFirstModSize = 0;
+      int computedScalingModSize = 0;
+      try {
+        if (algorithm == "BISECTION") {
+          computeModuliSizesBisection(computedFirstModSize, computedScalingModSize,
+                                      candidateRingDimension, plaintextModulus,
+                                      levelOpCounts, numPrimes,
+                                      keySwitchNoiseFactor);
+        } else {
+          computeModuliSizesClosed(computedFirstModSize, computedScalingModSize,
+                                   candidateRingDimension, plaintextModulus,
+                                   levelOpCounts, numPrimes,
+                                   keySwitchNoiseFactor);
+        }
+
+        std::function<int(int)> recomputeFirstModSize;
+        if (algorithm == "BISECTION") {
+          recomputeFirstModSize = [&](int currentScalingModSize) -> int {
+            double scalingMod = pow(2.0, currentScalingModSize);
+            auto noiseBounds = calculateBoundParams(
+                candidateRingDimension, plaintextModulus, numPrimes,
+                keySwitchNoiseFactor);
+            return computeFirstModSizeFromChain(
+                scalingMod, candidateRingDimension, plaintextModulus,
+                levelOpCounts, numPrimes, noiseBounds);
+          };
+        } else {
+          recomputeFirstModSize =
+              [computedFirstModSize](int) { return computedFirstModSize; };
+        }
+
+        auto validatedSizes = findValidOpenFhePrimeSizes(
+            computedFirstModSize, computedScalingModSize, numPrimes,
+            candidateRingDimension, plaintextModulus, recomputeFirstModSize);
+        outFirstModSize = validatedSizes.first;
+        outScalingModSize = validatedSizes.second;
+        return true;
+      } catch (const std::runtime_error &e) {
+        genericOp->emitOpError() << e.what();
+        return false;
+      }
+    };
 
     std::vector<int> moduli;
 
     while (true) {
       ringDimension = initialRingDimension;
       int newRingDimension = ringDimension;
+      
       moduli.clear();
 
+      validatedFirstModSize = 0;
+      validatedScalingModSize = 0;
+
       while (true) {
-        moduli = computeModuliSizes(ringDimension, keySwitchNoiseFactor);
-        if (moduli.empty()) {
-          break;
-        }
+        if (algorithm == "BISECTION" || algorithm == "CLOSED") {
+          if (!computeValidatedOpenfheSizes(
+                  ringDimension, validatedFirstModSize,
+                  validatedScalingModSize)) {
+            return;
+          }
 
-        if (isRingDimensionSet) {
-          break;
-        }
-
-        newRingDimension = computeRingDimension(moduli);
-
-        if (newRingDimension == ringDimension) {
-          // Try smaller ring dimension
-          int smallerDimension = ringDimension / 2;
-
-          auto newModuli =
-              computeModuliSizes(smallerDimension, keySwitchNoiseFactor);
-
-          if (newModuli.empty()) {
+          if (isRingDimensionSet) {
             break;
           }
-          newRingDimension = computeRingDimension(newModuli);
 
-          if (newRingDimension == smallerDimension) {
-            ringDimension = smallerDimension;
-            moduli = newModuli;
+          newRingDimension = computeRingDimensionFromOpenfheSizes(
+              validatedFirstModSize, validatedScalingModSize, numPrimes);
+          
+          if (newRingDimension == ringDimension) {
+            int smallerDimension = ringDimension / 2;
+            int smallerFirstModSize = 0;
+            int smallerScalingModSize = 0;
+            if (!computeValidatedOpenfheSizes(
+                    smallerDimension, smallerFirstModSize,
+                      smallerScalingModSize)) {
+              break;
+            }
+
+            newRingDimension = computeRingDimensionFromOpenfheSizes(
+                smallerFirstModSize, smallerScalingModSize, numPrimes);
+
+            if (newRingDimension == smallerDimension) {
+              ringDimension = smallerDimension;
+              validatedFirstModSize = smallerFirstModSize;
+              validatedScalingModSize = smallerScalingModSize;
+            } else {
+              break;
+            }
           } else {
-            // No further improvement possible
+            ringDimension = newRingDimension;
+          }
+        } else {
+          auto computedModuliSizes = computeModuliSizes(ringDimension);
+          if (computedModuliSizes.empty()) {
             break;
           }
 
-        } else {
-          // New ring dimension is smaller/larger
-          ringDimension = newRingDimension;
+          try {
+            moduli = findValidPrimesLattigo(computedModuliSizes, ringDimension,
+                                            plaintextModulus);
+          } catch (const std::runtime_error &e) {
+            genericOp->emitOpError()
+                << "Prime validation failed: " << e.what();
+            moduli.clear();
+            break;
+          }
+
+          if (moduli.empty()) {
+            break;
+          }
+
+          if (isRingDimensionSet) {
+            break;
+          }
+
+          newRingDimension = computeRingDimension(moduli);
+
+          if (newRingDimension == ringDimension) {
+            // Try smaller ring dimension.
+            int smallerDimension = ringDimension / 2;
+
+            auto smallerComputedModuliSizes =
+                computeModuliSizes(smallerDimension);
+
+            if (smallerComputedModuliSizes.empty()) {
+              break;
+            }
+
+            std::vector<int> smallerValidatedModuliSizes;
+            try {
+              smallerValidatedModuliSizes =
+                  findValidPrimesLattigo(smallerComputedModuliSizes,
+                                         smallerDimension, plaintextModulus);
+            } catch (const std::runtime_error &) {
+              break;
+            }
+
+            if (smallerValidatedModuliSizes.empty()) {
+              break;
+            }
+
+            newRingDimension = computeRingDimension(smallerValidatedModuliSizes);
+
+            if (newRingDimension == smallerDimension) {
+              ringDimension = smallerDimension;
+              moduli = smallerValidatedModuliSizes;
+            } else {
+              break;
+            }
+          } else {
+            ringDimension = newRingDimension;
+          }
         }
       }
 
-      if (moduli.empty()) {
-        break;
+      if (algorithm == "GREEDY" || algorithm == "BALANCING") {
+        if (moduli.empty()) {
+          throw std::runtime_error("Failed to find valid modulus sizes.");
+          return;
+        }
+
+        if (!validateHybridAssumptionFromSizes(moduli, kMaxBitSize)) {
+          keySwitchNoiseFactor += 0.1;
+          continue;
+        }
+
+        annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
+        return;
+
       }
 
-      try {
-        auto qi =
-            computeQiModuliFromSizes(moduli, ringDimension, plaintextModulus);
-        (void)computePiModuli(qi, ringDimension, plaintextModulus);
-      } catch (const std::runtime_error &) {
-        keySwitchNoiseFactor += 0.1;
-        continue;
-      }
+      if (algorithm == "BISECTION" || algorithm == "CLOSED") {
+        if (validatedFirstModSize == 0 || validatedScalingModSize == 0) {
+          genericOp->emitOpError() << "Unable to derive valid OpenFHE modulus sizes.";
+          return;
+        }
 
+        std::vector<int> openfheModuliSizes;
+        openfheModuliSizes.reserve(numPrimes);
+        openfheModuliSizes.push_back(validatedFirstModSize);
+        for (int i = 1; i < numPrimes; ++i) {
+          openfheModuliSizes.push_back(validatedScalingModSize);
+        }
+        if (!validateHybridAssumptionFromSizes(openfheModuliSizes, kMaxBitSize)) {
+           keySwitchNoiseFactor += 0.1;
+           continue;
+        }
+
+        annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension,
+                              validatedFirstModSize, validatedScalingModSize,
+                              plaintextModulus, maxCounts);
+        return;
+      }
       break;
     }
-    printParamsWithResultTags(moduli, ringDimension, plaintextModulus, "<testname>", algorithm);
+    //printParamsWithResultTags(moduli, ringDimension, plaintextModulus, "<testname>", algorithm);
 
-    annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
-    annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension, moduli, plaintextModulus, OperationCount(0, 0));
   });
 }
 }  // namespace heir
