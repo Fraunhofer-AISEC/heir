@@ -558,7 +558,7 @@ run_gap_mono() {
   print_header "$TEST_NAME GAP APPROACH" "Running mono model"
 
   run_command "$HEIR_OPT" \
-    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} slot-number=${CIPHERTEXT_DEGREE}" \
+    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} slot-number=${RING_DIMENSION}" \
     "$MIDDLE_MLIR" \
     > "$GAP_MONO_MLIR"
 
