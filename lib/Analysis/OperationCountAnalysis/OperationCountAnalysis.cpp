@@ -586,8 +586,12 @@ static int computeLogPQ(const std::vector<int> &moduli) {
   return qBound + logP;
 };
 
-static int computeRingDimension(const std::vector<int> &moduli) {
-  auto logQP = computeLogPQ(moduli);
+static int computeRingDimensionFromPrimes(const std::vector<int64_t> &moduli) {
+  std::vector<int> moduliSizes;
+  for (auto mod : moduli) {
+    moduliSizes.push_back(getBitSize(mod));
+  }
+  auto logQP = computeLogPQ(moduliSizes);
   return lbcrypto::StdLatticeParm::FindRingDim(
       lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
 };
@@ -914,6 +918,15 @@ static bool validateHybridAssumptionFromSizes(const std::vector<int> &moduliSize
          maxBits <= static_cast<double>(auxBits) * sizeP;
 }
 
+static bool validateHybridAssumptionFromPrimes(const std::vector<int64_t> &moduli,
+                                              int auxBits) {
+  std::vector<int> moduliSizes;
+  for (auto mod : moduli) {
+    moduliSizes.push_back(getBitSize(mod));
+  }
+  return validateHybridAssumptionFromSizes(moduliSizes, auxBits);
+}
+
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
                                             int ringDimension,
                                             int plaintextModulus) {
@@ -1020,11 +1033,8 @@ static std::vector<int64_t> selectLattigoPrimesFromSizes(
 }
 
 static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
-                         const uint64_t ringDimension, const std::vector<int>& moduliSizes) {
-  // Compute qi moduli from the vector of moduli sizes
-  std::vector<int64_t> qi =
-      selectLattigoPrimesFromSizes(moduliSizes, ringDimension,
-                     plaintextModulus);
+                         const uint64_t ringDimension, const std::vector<int64_t>& moduli) {
+  std::vector<int64_t> qi = moduli;
 
   // Compute pi moduli (extension moduli)
   std::vector<int64_t> pi =
@@ -1152,21 +1162,14 @@ static int computeRingDimensionFromOpenfheSizes(int firstModSize,
       lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
 }
 
-static std::vector<int> findValidPrimesLattigo(
+static std::vector<int64_t> findValidPrimesLattigo(
     const std::vector<int> &computedModuliSizes, int ringDimension,
     int plaintextModulus) {
   auto selectedPrimes =
       selectLattigoPrimesFromSizes(computedModuliSizes, ringDimension,
                                    plaintextModulus);
 
-  std::vector<int> validatedModuliSizes;
-  validatedModuliSizes.reserve(selectedPrimes.size());
-
-  for (const auto &prime : selectedPrimes) {
-    validatedModuliSizes.push_back(getBitSize(prime));
-  }
-
-  return validatedModuliSizes;
+  return selectedPrimes;
 }
 
 void annotateCountParams(Operation *top, DataFlowSolver *solver,
@@ -1279,7 +1282,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
       }
     };
 
-    std::vector<int> moduli;
+    std::vector<int64_t> moduli;
 
     while (true) {
       ringDimension = initialRingDimension;
@@ -1352,7 +1355,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
             break;
           }
 
-          newRingDimension = computeRingDimension(moduli);
+          newRingDimension = computeRingDimensionFromPrimes(moduli);
 
           if (newRingDimension == ringDimension) {
             // Try smaller ring dimension.
@@ -1365,24 +1368,24 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
               break;
             }
 
-            std::vector<int> smallerValidatedModuliSizes;
+            std::vector<int64_t> smallerValidatedModuli;
             try {
-              smallerValidatedModuliSizes =
+              smallerValidatedModuli =
                   findValidPrimesLattigo(smallerComputedModuliSizes,
                                          smallerDimension, plaintextModulus);
             } catch (const std::runtime_error &) {
               break;
             }
 
-            if (smallerValidatedModuliSizes.empty()) {
+            if (smallerValidatedModuli.empty()) {
               break;
             }
 
-            newRingDimension = computeRingDimension(smallerValidatedModuliSizes);
+            newRingDimension = computeRingDimensionFromPrimes(smallerValidatedModuli);
 
             if (newRingDimension == smallerDimension) {
               ringDimension = smallerDimension;
-              moduli = smallerValidatedModuliSizes;
+              moduli = smallerValidatedModuli;
             } else {
               break;
             }
@@ -1398,7 +1401,7 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
           return;
         }
 
-        if (!validateHybridAssumptionFromSizes(moduli, kMaxBitSize)) {
+        if (!validateHybridAssumptionFromPrimes(moduli, kMaxBitSize)) {
           keySwitchNoiseFactor += 0.1;
           continue;
         }
