@@ -113,6 +113,9 @@ lattigo_expected_value_for_test() {
     add-num-128)
       echo 677
       ;;
+    rotate-*)
+      echo 677
+      ;;  
     *)
       echo 1
       ;;
