@@ -23,6 +23,28 @@ VALUES_INIT_FIRST_ONLY = """\
     }}
   }}"""
 
+VALUES_INIT_LAST_ONLY = """\
+  values := make([][]int16, {arity})
+  for i := 0; i < {arity}; i++ {{
+    values[i] = make([]int16, 8)
+    if i == 63 {{
+      for j := 0; j < 8; j++ {{
+        values[i][j] = 1
+      }}
+    }}
+  }}"""
+
+VALUES_INIT_FIRST_NINE_NEG1 = """\
+  values := make([][]int16, {arity})
+  for i := 0; i < {arity}; i++ {{
+    values[i] = make([]int16, 8)
+    if i < 9 {{
+      for j := 0; j < 8; j++ {{
+        values[i][j] = -1
+      }}
+    }}
+  }}"""
+
 def main() -> int:
   if len(sys.argv) != 10:
     raise SystemExit(
@@ -39,8 +61,8 @@ def main() -> int:
   params_output_path = sys.argv[8]
   values_mode = sys.argv[9]
 
-  if values_mode not in ("all", "first_only"):
-    raise SystemExit("values_mode must be 'all' or 'first_only'")
+  if values_mode not in ("all", "first_only", "last_only", "negative"):
+    raise SystemExit("values_mode must be 'all' or 'first_only' or 'last_only' or 'negative'")
 
   template = template_path.read_text()
   input_text = input_go.read_text()
@@ -56,7 +78,12 @@ def main() -> int:
     )
     out_args.append(f", ct{idx}")
 
-  values_template = VALUES_INIT_ALL if values_mode == "all" else VALUES_INIT_FIRST_ONLY
+  values_template = (
+    VALUES_INIT_ALL if values_mode == "all"
+    else VALUES_INIT_LAST_ONLY if values_mode == "last_only"
+    else VALUES_INIT_FIRST_NINE_NEG1 if values_mode == "negative"
+    else VALUES_INIT_FIRST_ONLY
+  )
   values_init = values_template.format(arity=arity)
 
   rendered = template

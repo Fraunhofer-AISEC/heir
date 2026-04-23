@@ -83,11 +83,11 @@ FAMILY_TEST_LABELS: Dict[str, List[Tuple[str, str]]] = {
     ],
     "form": [
         ("form-equal", "Equal"),
-        ("form-high-low", "High-Low"),
+        ("form-high-low", "High-Low$^*$"),
         ("form-low-high", "Low-High"),
         ("form-hill", "Hill"),
         ("form-valley", "Valley"),
-        ("form-increasing", "Increasing"),
+        ("form-increasing", "Increasing$^*$"),
         ("form-decreasing", "Decreasing"),
     ],
 }
@@ -95,6 +95,12 @@ JSON_FILE_RE = re.compile(
     r"^(?P<test>.+?)_(?P<approach>[a-z0-9\-]+?)_(?P<kind>[a-z0-9\-]+)_(?P<timestamp>\d{8}_\d{6}|\d+)\.json$"
 )
 
+# Build a lookup once at module level
+_TEST_TO_FAMILY: Dict[str, str] = {
+    test: family
+    for family, entries in FAMILY_TEST_LABELS.items()
+    for test, _ in entries
+}
 
 @dataclass
 class ResultRecord:
@@ -130,6 +136,9 @@ def parse_test_script_algorithms(test_script: Path) -> List[str]:
 
 
 def family_name(test_name: str) -> str:
+    if test_name in _TEST_TO_FAMILY:
+        return _TEST_TO_FAMILY[test_name]
+    # Fallback for tests not in FAMILY_TEST_LABELS
     if "-" not in test_name:
         return test_name
     return test_name.rsplit("-", 1)[0]

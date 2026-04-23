@@ -98,6 +98,9 @@ lattigo_expected_value_for_test() {
     form-low-high)
       echo 4
       ;;
+    form-high-low)
+      echo 1
+      ;;
     form-*)
       echo 677
       ;;
@@ -119,7 +122,10 @@ lattigo_expected_value_for_test() {
 lattigo_value_mode_for_test() {
   case "$1" in
     add-eq-*)
-      echo "all"
+      echo "negative"
+      ;;
+    form-high-low)
+      echo "last_only"
       ;;
     *)
       echo "first_only"
