@@ -42,11 +42,11 @@ KIND_HATCHES = {
 }
 FAMILY_TEST_LABELS: Dict[str, List[Tuple[str, str]]] = {
     "add-eq": [
-        ("add-eq-2", "Depth 2"),
-        ("add-eq-6", "Depth 6"),
-        ("add-eq-10", "Depth 10"),
-        ("add-eq-14", "Depth 14"),
-        ("add-eq-18", "Depth 18"),
+        ("add-eq-2", "Depth 2^*$"),
+        ("add-eq-6", "Depth 6^*$"),
+        ("add-eq-10", "Depth 10^*$"),
+        ("add-eq-14", "Depth 14^*$"),
+        ("add-eq-18", "Depth 18^*$"),
     ],
     "add-64": [
         ("add-64-0", "Level 4\n(before mult)"),
