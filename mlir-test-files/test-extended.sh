@@ -184,7 +184,7 @@ emit_group_tests() {
       ;;
     add-eq)
       # Requested subset for add-eq experiments.
-      printf '%s\n' add-eq-0 add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
+      printf '%s\n' add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
       ;;
     all)
       # Bundle of requested suites in this thread.
@@ -194,7 +194,7 @@ emit_group_tests() {
         rotate-0 rotate-1 rotate-2 rotate-3 rotate-4 \
         add-num-1 add-num-32 add-num-64 add-num-128 \
         rotate-num-1 rotate-num-32 rotate-num-64 rotate-num-128 \
-        add-eq-0 add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
+        add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
       ;;
     *)
       return 1

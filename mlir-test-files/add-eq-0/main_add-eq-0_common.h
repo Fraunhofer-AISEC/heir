@@ -45,21 +45,12 @@ int run(FuncGenerator generateCryptoContext,
   for (int i = 0; i < 64; i++) {
     // Initialize each tensor with 8 elements
     // Using i+1 as the value for all elements in tensor i
-    std::vector<int16_t> arg(8, i % 64 == 0 ? 1 : 0);
+    std::vector<int16_t> arg(8, 1);
     args.push_back(arg);
   }
 
-  // Calculate expected result
-  int64_t sum_per_position = 0;
-  for (int i = 0; i < 64; i++) {
-    auto pos = i % 64 == 0 ? 1 : 0;
-
-    sum_per_position += pos;  // Each tensor has value i at all positions
-  }
-
-  // The expected result is a vector where each element is sum_per_position^2
-  std::vector<int16_t> expected_vector(8, sum_per_position);
-
+  std::vector<int16_t> expected_vector(8, 32);
+  
   // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;
   for (int i = 0; i < 64; i++) {

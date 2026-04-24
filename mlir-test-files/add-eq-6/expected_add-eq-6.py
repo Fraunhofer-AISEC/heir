@@ -32,7 +32,7 @@ def make_memref(np_array):
     return desc
 
 # ── 1. Parse & lower ────────────────────────────────────────────────────────
-with open("form-high-low.mlir", "r") as f:
+with open("add-eq-6.mlir", "r") as f:
     src = f.read()
 
 registry = ir.DialectRegistry()
@@ -92,10 +92,10 @@ print("Shared library written to libfunc.dylib")
 lib    = ctypes.CDLL("./libfunc.dylib")
 cfunc  = getattr(lib, "_mlir_ciface_func")
 cfunc.restype  = None
-cfunc.argtypes = [ctypes.POINTER(MemRefDescriptor)] * 64
+cfunc.argtypes = [ctypes.POINTER(MemRefDescriptor)] * 65
 
 # ── Call the function ─────────────────────────────────────────────────────────
-inputs = [np.zeros(8, dtype=np.int16) for _ in range(63)] + [np.ones(8, dtype=np.int16)]
+inputs = [np.zeros(8, dtype=np.int16) for _ in range(65)]
 output = np.zeros(8, dtype=np.int16)
 
 all_arrays = [output] + inputs

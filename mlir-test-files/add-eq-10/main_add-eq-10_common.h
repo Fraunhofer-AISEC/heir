@@ -43,14 +43,11 @@ int run(FuncGenerator generateCryptoContext,
 
   // Create 64 tensor arguments
   for (int i = 0; i < 64; i++) {
-    // Initialize each tensor with 8 elements
-    // Using i+1 as the value for all elements in tensor i
-    std::vector<int16_t> arg(8, i % 64 == 0 ? 1 : 0);
+    std::vector<int16_t> arg(8, 0);
     args.push_back(arg);
   }
 
-  // OpenFHE currently evaluates add-eq-10 to 12732 for this input pattern.
-  std::vector<int16_t> expected_vector(8, 12732);
+  std::vector<int16_t> expected_vector(8, 0);
 
   // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;

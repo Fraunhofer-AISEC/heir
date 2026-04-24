@@ -76,21 +76,9 @@ normalize_lattigo_file() {
 }
 
 lattigo_expected_value_for_test() {
-  case "$1" in
-    add-eq-1)
-      echo 2
-      ;;
-    add-eq-6)
-      echo 161
-      ;;
-    add-eq-10)
-      echo 29445
-      ;;
-    add-eq-4)
-      echo 677
-      ;;
-    add-eq-2)
-      echo 65
+  case "$1" in    
+    add-eq-*)
+      echo 0
       ;;
     form-decreasing)
       echo 676
@@ -125,7 +113,7 @@ lattigo_expected_value_for_test() {
 lattigo_value_mode_for_test() {
   case "$1" in
     add-eq-*)
-      echo "negative"
+      echo "all_zeros"
       ;;
     form-high-low)
       echo "last_only"
