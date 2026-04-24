@@ -174,6 +174,8 @@ static std::vector<double> computeBoundChain(
 
   std::vector<double> bound(moduli.size() + 1);
   bound[0] = ciphertextCount * (noiseBounds.boundClean + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
+
+  std::cerr << "input bound" << bound[0] << ", log2(input bound)=" << log2(bound[0]) << std::endl;
   
   for (int i = 0; i < moduli.size(); ++i) {
     int ciphertextCount = levelOpCounts[moduli.size() - i].getCiphertextCount();
@@ -182,6 +184,11 @@ static std::vector<double> computeBoundChain(
     // No multiplication for B_clean
     double a = ciphertextCount * (bound[i] * bound[i] + keySwitchCount * noiseBounds.addedNoiseKeySwitching);
     bound[i + 1] = noiseBounds.boundScale + (a / moduli[i]);
+
+     std::cerr << "Level " << moduli.size() -i << ": bound before scale: " << a
+              << ", log2(bound before scale)=" << log2(a) << std::endl
+              << "modulus: " << moduli[i] << ", log2(modulus)=" << log2(moduli[i]) << std::endl
+              << "bound after scale: " << bound[i + 1] << ", log2(bound)=" << log2(bound[i + 1]) << std::endl;
   }
 
   return bound;
@@ -809,9 +816,6 @@ static std::vector<int> computeModuliSizesGreedy(
         ciphertextCount * (currentBound * currentBound +
                            keySwitchCount * noiseBounds.addedNoiseKeySwitching);
 
-    std::cerr << "Level " << levelIndex << " noise term: " << levelNoiseTerm
-              << ", log2(levelNoiseTerm)=" << log2(levelNoiseTerm) << std::endl;
-
     double greedyQi = 2.0 * levelNoiseTerm / noiseBounds.boundScale;
   
 
@@ -820,11 +824,14 @@ static std::vector<int> computeModuliSizesGreedy(
       greedyQi = std::pow(2.0, kMaxBitSize - 1);
     }
 
-    std::cerr << "Level " << levelIndex << " selected modulus: " << greedyQi
-              << ", bit size: " << greedyQiSize << std::endl;
-
     scalingModuli.push_back(greedyQi);
     currentBound = noiseBounds.boundScale + (levelNoiseTerm / greedyQi);
+
+    std::cerr << "Level " << levelIndex << " selected modulus: " << greedyQi
+          << " (bit size: " << greedyQiSize << ")" 
+          << ", bound before scale: " << levelNoiseTerm << ", log2(bound before scale)=" << log2(levelNoiseTerm)
+          << ",  bound after scale: " << currentBound
+          << ", log2(bound after scale)=" << log2(currentBound) << std::endl;
   }
 
   double firstMod = 2.0 * currentBound;
@@ -1013,6 +1020,9 @@ static std::vector<int64_t> selectLattigoPrimesFromSizes(
     if (requestedSize >= kMaxBitSize) {
       throw std::runtime_error("Requested modulus size exceeds maximum bit size");
     }
+
+    std::cerr << "Selecting prime of size " << requestedSize
+              << " bits for modulus with order " << modulusOrder << std::endl;
 
     auto currentPrime = lbcrypto::FirstPrime<lbcrypto::NativeInteger>(
         requestedSize - 1, modulusOrder);
