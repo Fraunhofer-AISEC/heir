@@ -818,9 +818,7 @@ static std::vector<int> computeModuliSizesGreedy(
 
     double greedyQi = 2.0 * levelNoiseTerm / noiseBounds.boundScale;
   
-
-    int greedyQiSize = getBitSize(greedyQi);
-    if (greedyQiSize >= kMaxBitSize) {
+    if (getBitSize(greedyQi) >= kMaxBitSize) {
       greedyQi = std::pow(2.0, kMaxBitSize - 1);
     }
 
@@ -828,7 +826,7 @@ static std::vector<int> computeModuliSizesGreedy(
     currentBound = noiseBounds.boundScale + (levelNoiseTerm / greedyQi);
 
     std::cerr << "Level " << levelIndex << " selected modulus: " << greedyQi
-          << " (bit size: " << greedyQiSize << ")" 
+          << " (bit size: " << getBitSize(greedyQi) << ")" 
           << ", bound before scale: " << levelNoiseTerm << ", log2(bound before scale)=" << log2(levelNoiseTerm)
           << ",  bound after scale: " << currentBound
           << ", log2(bound after scale)=" << log2(currentBound) << std::endl;
@@ -1017,7 +1015,7 @@ static std::vector<int64_t> selectLattigoPrimesFromSizes(
   selectedPrimes.reserve(moduliSizes.size());
 
   for (int requestedSize : moduliSizes) {
-    if (requestedSize >= kMaxBitSize) {
+    if (requestedSize > kMaxBitSize) {
       throw std::runtime_error("Requested modulus size exceeds maximum bit size");
     }
 
