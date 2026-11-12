@@ -27,7 +27,7 @@ VALUES_INIT_LAST_ONLY = """\
   values := make([][]int16, {arity})
   for i := 0; i < {arity}; i++ {{
     values[i] = make([]int16, 8)
-    if i == 63 {{
+    if i == {arity} - 1 {{
       for j := 0; j < 8; j++ {{
         values[i][j] = 1
       }}

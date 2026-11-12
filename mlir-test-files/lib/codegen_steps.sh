@@ -84,7 +84,7 @@ lattigo_expected_value_for_test() {
       echo 676
       ;;
     form-low-high)
-      echo 4
+      echo 2
       ;;
     form-high-low)
       echo 1

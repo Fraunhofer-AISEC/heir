@@ -10,11 +10,6 @@
 
 #define EvalNoiseBGV NoiseEvaluator::EvalNoiseBGV
 
-// If printModulusChain is already defined in params.h, don't declare it again
-// Otherwise, declare it here
-// void printModulusChain(const lbcrypto::CryptoContext<lbcrypto::DCRTPoly>& cc);
-
-// Common main function implementation that uses the specified variant's functions
 template <typename FuncGenerator, typename FuncConfigure, typename FuncEncryptArg0,
           typename FuncEncryptArg1, typename FuncCompute, typename FuncDecryptResult>
 int run(FuncGenerator generateCryptoContext,
@@ -30,7 +25,6 @@ int run(FuncGenerator generateCryptoContext,
   cc = configureCryptoContext(cc, keyPair.secretKey);
 
   std::cout << *(cc->GetCryptoParameters()) << std::endl;
-
   printModulusChain(cc, "form-low-high", selectionApproach);
   saveParamsToJsonFile(cc, "form-low-high", selectionApproach);
   
@@ -38,58 +32,25 @@ int run(FuncGenerator generateCryptoContext,
     return 0;
   }
 
-  // Initialize 64 tensors with values
+  // Initialize 160 tensors with values
   std::vector<std::vector<int16_t>> args;
-
-  // Create 64 tensor arguments
-  for (int i = 0; i < 64; i++) {
-    // Initialize each tensor with 8 elements
-    // Using i+1 as the value for all elements in tensor i
-    std::vector<int16_t> arg(8, i == 63 ? 1 : 0);
+  for (int i = 0; i < 160; i++) {
+    std::vector<int16_t> arg(8, i == 0 ? 4 : 0);
     args.push_back(arg);
   }
 
-  // For form-* with one-hot inputs (arg0=1, others=0), the plaintext
-  // reference result for each slot is 2.
   std::vector<int16_t> expected_vector(8, 2);
 
-  // Encrypt all arguments
   std::vector<std::vector<Ciphertext<DCRTPoly>>> encryptedArgs;
-  for (int i = 0; i < 64; i++) {
-    // Fix the encryption function call - use the numbered version corresponding
-    // to each arg
+  for (int i = 0; i < 160; i++) {
     auto encrypted = encryptArg0(cc, args[i], keyPair.publicKey);
     encryptedArgs.push_back(encrypted);
   }
 
-  // Call the function with all encrypted arguments
-  auto outputEncrypted = compute(
-      cc, encryptedArgs[0], encryptedArgs[1], encryptedArgs[2],
-      encryptedArgs[3], encryptedArgs[4], encryptedArgs[5], encryptedArgs[6],
-      encryptedArgs[7], encryptedArgs[8], encryptedArgs[9], encryptedArgs[10],
-      encryptedArgs[11], encryptedArgs[12], encryptedArgs[13],
-      encryptedArgs[14], encryptedArgs[15], encryptedArgs[16],
-      encryptedArgs[17], encryptedArgs[18], encryptedArgs[19],
-      encryptedArgs[20], encryptedArgs[21], encryptedArgs[22],
-      encryptedArgs[23], encryptedArgs[24], encryptedArgs[25],
-      encryptedArgs[26], encryptedArgs[27], encryptedArgs[28],
-      encryptedArgs[29], encryptedArgs[30], encryptedArgs[31],
-      encryptedArgs[32], encryptedArgs[33], encryptedArgs[34],
-      encryptedArgs[35], encryptedArgs[36], encryptedArgs[37],
-      encryptedArgs[38], encryptedArgs[39], encryptedArgs[40],
-      encryptedArgs[41], encryptedArgs[42], encryptedArgs[43],
-      encryptedArgs[44], encryptedArgs[45], encryptedArgs[46],
-      encryptedArgs[47], encryptedArgs[48], encryptedArgs[49],
-      encryptedArgs[50], encryptedArgs[51], encryptedArgs[52],
-      encryptedArgs[53], encryptedArgs[54], encryptedArgs[55],
-      encryptedArgs[56], encryptedArgs[57], encryptedArgs[58],
-      encryptedArgs[59], encryptedArgs[60], encryptedArgs[61],
-      encryptedArgs[62], encryptedArgs[63]);
+  auto outputEncrypted = compute(cc, encryptedArgs[0], encryptedArgs[1], encryptedArgs[2], encryptedArgs[3], encryptedArgs[4], encryptedArgs[5], encryptedArgs[6], encryptedArgs[7], encryptedArgs[8], encryptedArgs[9], encryptedArgs[10], encryptedArgs[11], encryptedArgs[12], encryptedArgs[13], encryptedArgs[14], encryptedArgs[15], encryptedArgs[16], encryptedArgs[17], encryptedArgs[18], encryptedArgs[19], encryptedArgs[20], encryptedArgs[21], encryptedArgs[22], encryptedArgs[23], encryptedArgs[24], encryptedArgs[25], encryptedArgs[26], encryptedArgs[27], encryptedArgs[28], encryptedArgs[29], encryptedArgs[30], encryptedArgs[31], encryptedArgs[32], encryptedArgs[33], encryptedArgs[34], encryptedArgs[35], encryptedArgs[36], encryptedArgs[37], encryptedArgs[38], encryptedArgs[39], encryptedArgs[40], encryptedArgs[41], encryptedArgs[42], encryptedArgs[43], encryptedArgs[44], encryptedArgs[45], encryptedArgs[46], encryptedArgs[47], encryptedArgs[48], encryptedArgs[49], encryptedArgs[50], encryptedArgs[51], encryptedArgs[52], encryptedArgs[53], encryptedArgs[54], encryptedArgs[55], encryptedArgs[56], encryptedArgs[57], encryptedArgs[58], encryptedArgs[59], encryptedArgs[60], encryptedArgs[61], encryptedArgs[62], encryptedArgs[63], encryptedArgs[64], encryptedArgs[65], encryptedArgs[66], encryptedArgs[67], encryptedArgs[68], encryptedArgs[69], encryptedArgs[70], encryptedArgs[71], encryptedArgs[72], encryptedArgs[73], encryptedArgs[74], encryptedArgs[75], encryptedArgs[76], encryptedArgs[77], encryptedArgs[78], encryptedArgs[79], encryptedArgs[80], encryptedArgs[81], encryptedArgs[82], encryptedArgs[83], encryptedArgs[84], encryptedArgs[85], encryptedArgs[86], encryptedArgs[87], encryptedArgs[88], encryptedArgs[89], encryptedArgs[90], encryptedArgs[91], encryptedArgs[92], encryptedArgs[93], encryptedArgs[94], encryptedArgs[95], encryptedArgs[96], encryptedArgs[97], encryptedArgs[98], encryptedArgs[99], encryptedArgs[100], encryptedArgs[101], encryptedArgs[102], encryptedArgs[103], encryptedArgs[104], encryptedArgs[105], encryptedArgs[106], encryptedArgs[107], encryptedArgs[108], encryptedArgs[109], encryptedArgs[110], encryptedArgs[111], encryptedArgs[112], encryptedArgs[113], encryptedArgs[114], encryptedArgs[115], encryptedArgs[116], encryptedArgs[117], encryptedArgs[118], encryptedArgs[119], encryptedArgs[120], encryptedArgs[121], encryptedArgs[122], encryptedArgs[123], encryptedArgs[124], encryptedArgs[125], encryptedArgs[126], encryptedArgs[127], encryptedArgs[128], encryptedArgs[129], encryptedArgs[130], encryptedArgs[131], encryptedArgs[132], encryptedArgs[133], encryptedArgs[134], encryptedArgs[135], encryptedArgs[136], encryptedArgs[137], encryptedArgs[138], encryptedArgs[139], encryptedArgs[140], encryptedArgs[141], encryptedArgs[142], encryptedArgs[143], encryptedArgs[144], encryptedArgs[145], encryptedArgs[146], encryptedArgs[147], encryptedArgs[148], encryptedArgs[149], encryptedArgs[150], encryptedArgs[151], encryptedArgs[152], encryptedArgs[153], encryptedArgs[154], encryptedArgs[155], encryptedArgs[156], encryptedArgs[157], encryptedArgs[158], encryptedArgs[159]);
 
-  // Decrypt the result - this will be a vector of 8 values
   auto actual_vector = decryptResult(cc, outputEncrypted, keyPair.secretKey);
 
-  // Print and compare results
   std::cout << "Expected: [";
   for (size_t i = 0; i < expected_vector.size(); i++) {
     std::cout << expected_vector[i];
@@ -104,7 +65,6 @@ int run(FuncGenerator generateCryptoContext,
   }
   std::cerr << "]\n";
 
-  // Check if all elements match
   bool all_match = true;
   for (size_t i = 0; i < expected_vector.size(); i++) {
     if (actual_vector[i] != expected_vector[i]) {
@@ -116,4 +76,4 @@ int run(FuncGenerator generateCryptoContext,
   return !all_match;
 }
 
-#endif // ADD_64_0_COMMON_H
+#endif
