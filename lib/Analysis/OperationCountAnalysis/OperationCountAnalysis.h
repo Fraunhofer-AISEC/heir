@@ -19,17 +19,27 @@ class OperationCount {
       : initialized(false),
         ciphertextCount(0),
         keySwitchCount(0),
+        constantMulCount(0),
         highestLevel(false) {}
   explicit OperationCount(int ciphertextCount, int keySwitchCount)
       : initialized(true),
         ciphertextCount(ciphertextCount),
         keySwitchCount(keySwitchCount),
+        constantMulCount(0),
         highestLevel(false) {}
   explicit OperationCount(int ciphertextCount, int keySwitchCount,
                           bool highestLevel)
       : initialized(true),
         ciphertextCount(ciphertextCount),
         keySwitchCount(keySwitchCount),
+        constantMulCount(0),
+        highestLevel(highestLevel) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount,
+                          int constantMulCount, bool highestLevel)
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        constantMulCount(constantMulCount),
         highestLevel(highestLevel) {}
 
   void countOperation(Operation *op);
@@ -44,9 +54,15 @@ class OperationCount {
     return keySwitchCount;
   }
 
+  int getConstantMulCount() const {
+    assert(isInitialized() && "OperationCount not initialized");
+    return constantMulCount;
+  }
+
   OperationCount incrementKeySwitch() const {
     assert(isInitialized() && "OperationCount not initialized");
-    return OperationCount(ciphertextCount, keySwitchCount + 1, highestLevel);
+    return OperationCount(ciphertextCount, keySwitchCount + 1,
+                          constantMulCount, highestLevel);
   }
 
   bool isInitialized() const { return initialized; }
@@ -55,17 +71,22 @@ class OperationCount {
 
   bool operator==(const OperationCount &rhs) const {
     return initialized == rhs.initialized && ciphertextCount == rhs.ciphertextCount &&
-           keySwitchCount == rhs.keySwitchCount && highestLevel == rhs.highestLevel;
+           keySwitchCount == rhs.keySwitchCount &&
+           constantMulCount == rhs.constantMulCount &&
+           highestLevel == rhs.highestLevel;
   }
 
   OperationCount operator+(const OperationCount &rhs) const {
     return OperationCount(ciphertextCount + rhs.ciphertextCount,
-                          std::max(keySwitchCount, rhs.keySwitchCount), highestLevel && rhs.highestLevel );
+                          std::max(keySwitchCount, rhs.keySwitchCount),
+                          constantMulCount + rhs.constantMulCount,
+                          highestLevel && rhs.highestLevel);
   }
 
   static OperationCount max(const OperationCount &lhs, const OperationCount &rhs) {
     return OperationCount(std::max(lhs.ciphertextCount, rhs.ciphertextCount),
-                          std::max(lhs.keySwitchCount, rhs.keySwitchCount), 
+                          std::max(lhs.keySwitchCount, rhs.keySwitchCount),
+                          std::max(lhs.constantMulCount, rhs.constantMulCount),
                           lhs.highestLevel && rhs.highestLevel);
   }
 
@@ -85,7 +106,8 @@ class OperationCount {
   void print(llvm::raw_ostream &os) const {
     if (isInitialized()) {
       os << "OperationCount(ciphertextCount=" << ciphertextCount
-         << ", keySwitchCount=" << keySwitchCount << ")";
+         << ", keySwitchCount=" << keySwitchCount
+         << ", constantMulCount=" << constantMulCount << ")";
     } else {
       os << "OperationCount(uninitialized)";
     }
@@ -102,6 +124,8 @@ class OperationCount {
   // "Number of ciphertexts with base noise" that flow into the respective value
   int ciphertextCount;
   int keySwitchCount;
+  // Number of constant (plaintext × ciphertext) multiplications
+  int constantMulCount;
   // Indicates, whether the OperationCount started from a fresh ciphertext
   bool highestLevel;
 };
