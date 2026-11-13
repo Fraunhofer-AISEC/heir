@@ -1,0 +1,161 @@
+#ifndef LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
+#define LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
+
+
+#include <cstdint>
+#include "lib/Analysis/SecretnessAnalysis/SecretnessAnalysis.h"
+#include "mlir/include/mlir/Analysis/DataFlow/SparseAnalysis.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Diagnostics.h"  // from @llvm-project
+#include "mlir/include/mlir/IR/Operation.h"    // from @llvm-project
+#include "mlir/include/mlir/IR/Value.h"        // from @llvm-project
+#include "llvm/include/llvm/Support/raw_ostream.h"  // from @llvm-project
+
+namespace mlir {
+namespace heir {
+
+class OperationCount {
+ public:
+  OperationCount()
+      : initialized(false),
+        ciphertextCount(0),
+        keySwitchCount(0),
+        constantMulCount(0),
+        highestLevel(false) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount)
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        constantMulCount(0),
+        highestLevel(false) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount,
+                          bool highestLevel)
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        constantMulCount(0),
+        highestLevel(highestLevel) {}
+  explicit OperationCount(int ciphertextCount, int keySwitchCount,
+                          int constantMulCount, bool highestLevel)
+      : initialized(true),
+        ciphertextCount(ciphertextCount),
+        keySwitchCount(keySwitchCount),
+        constantMulCount(constantMulCount),
+        highestLevel(highestLevel) {}
+
+  void countOperation(Operation *op);
+
+  int getCiphertextCount() const {
+    assert(isInitialized() && "OperationCount not initialized");
+    return ciphertextCount;
+  }
+
+  int getKeySwitchCount() const {
+    assert(isInitialized() && "OperationCount not initialized");
+    return keySwitchCount;
+  }
+
+  int getConstantMulCount() const {
+    assert(isInitialized() && "OperationCount not initialized");
+    return constantMulCount;
+  }
+
+  OperationCount incrementKeySwitch() const {
+    assert(isInitialized() && "OperationCount not initialized");
+    return OperationCount(ciphertextCount, keySwitchCount + 1,
+                          constantMulCount, highestLevel);
+  }
+
+  bool isInitialized() const { return initialized; }
+
+  bool isHighestLevel() const { return highestLevel; }
+
+  bool operator==(const OperationCount &rhs) const {
+    return initialized == rhs.initialized && ciphertextCount == rhs.ciphertextCount &&
+           keySwitchCount == rhs.keySwitchCount &&
+           constantMulCount == rhs.constantMulCount &&
+           highestLevel == rhs.highestLevel;
+  }
+
+  OperationCount operator+(const OperationCount &rhs) const {
+    return OperationCount(ciphertextCount + rhs.ciphertextCount,
+                          std::max(keySwitchCount, rhs.keySwitchCount),
+                          constantMulCount + rhs.constantMulCount,
+                          highestLevel && rhs.highestLevel);
+  }
+
+  static OperationCount max(const OperationCount &lhs, const OperationCount &rhs) {
+    return OperationCount(std::max(lhs.ciphertextCount, rhs.ciphertextCount),
+                          std::max(lhs.keySwitchCount, rhs.keySwitchCount),
+                          std::max(lhs.constantMulCount, rhs.constantMulCount),
+                          lhs.highestLevel && rhs.highestLevel);
+  }
+
+  static OperationCount join(const OperationCount &lhs,
+                             const OperationCount &rhs) {
+    if (!lhs.isInitialized()) {
+      return rhs;
+    }
+
+    if (!rhs.isInitialized()) {
+      return lhs;
+    }
+
+    return OperationCount::max(lhs, rhs);
+  }
+
+  void print(llvm::raw_ostream &os) const {
+    if (isInitialized()) {
+      os << "OperationCount(ciphertextCount=" << ciphertextCount
+         << ", keySwitchCount=" << keySwitchCount
+         << ", constantMulCount=" << constantMulCount << ")";
+    } else {
+      os << "OperationCount(uninitialized)";
+    }
+  }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                       const OperationCount &count) {
+    count.print(os);
+    return os;
+  }
+
+ private:
+  bool initialized;
+  // "Number of ciphertexts with base noise" that flow into the respective value
+  int ciphertextCount;
+  int keySwitchCount;
+  // Number of constant (plaintext × ciphertext) multiplications
+  int constantMulCount;
+  // Indicates, whether the OperationCount started from a fresh ciphertext
+  bool highestLevel;
+};
+
+class OperationCountLattice : public dataflow::Lattice<OperationCount> {
+ public:
+  using Lattice::Lattice;
+};
+
+class OperationCountAnalysis
+    : public dataflow::SparseForwardDataFlowAnalysis<OperationCountLattice>,
+      public SecretnessAnalysisDependent<OperationCountAnalysis> {
+ public:
+  explicit OperationCountAnalysis(DataFlowSolver &solver)
+      : SparseForwardDataFlowAnalysis(solver) {}
+  ~OperationCountAnalysis() override = default;
+  using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
+  friend class SecretnessAnalysisDependent<OperationCountAnalysis>;
+
+  LogicalResult visitOperation(
+      Operation *op, ArrayRef<const OperationCountLattice *> operands,
+      ArrayRef<OperationCountLattice *> results) override;
+
+  void setToEntryState(OperationCountLattice *lattice) override;
+};
+
+void annotateCountParams(Operation *top, DataFlowSolver *solver,
+                         int ringDimension, int plaintextModulus, std::string algorithm);
+
+}  // namespace heir
+}  // namespace mlir
+
+#endif  // LIB_ANALYSIS_OPERATIONCOUNT_OPERATIONCOUNTANALYSIS_H_
