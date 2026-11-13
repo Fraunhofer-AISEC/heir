@@ -123,6 +123,7 @@ cc_binary(
         "@heir//lib/Transforms/AnnotateLevel",
         "@heir//lib/Transforms/AnnotateModule",
         "@heir//lib/Transforms/AnnotateMulDepth",
+        "@heir//lib/Transforms/AnnotateParameters",
         "@heir//lib/Transforms/AnnotatePreprocessing",
         "@heir//lib/Transforms/AnnotateSecretness",
         "@heir//lib/Transforms/ApplyFolders",

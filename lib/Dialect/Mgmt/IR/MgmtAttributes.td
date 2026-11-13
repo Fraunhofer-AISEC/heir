@@ -60,13 +60,18 @@ def Mgmt_OpenfheParamsAttr : Mgmt_Attr<"OpenfheParams", "openfhe_params"> {
 
     Example:
     ```
-    #openfhe_params = #mgmt.openfhe_params<evalAddCount = 1, keySwitchCount = 1>
+    #openfhe_params = #mgmt.openfhe_params<evalAddCount = 1, keySwitchCount = 1, firstModSize = 20, multiplicativeDepth = 3, scalingModSize = 38, plaintextModulus = 65537, ringDimension = 32768>
     ```
   }];
 
   let parameters = (ins
     AttrParameter<"int", "Param for OpenFHE SetEvalAddCount.">: $evalAddCount,
-    AttrParameter<"int", "Param for OpenFHE SetKeySwitchCount.">: $keySwitchCount
+    AttrParameter<"int", "Param for OpenFHE SetFirstModSize.">: $firstModSize,
+    AttrParameter<"int", "Param for OpenFHE SetKeySwitchCount.">: $keySwitchCount,
+    AttrParameter<"int", "Param for OpenFHE SetMultiplicativeDepth.">: $multiplicativeDepth,
+    AttrParameter<"int", "Param for OpenFHE SetPlaintextModulus.">: $plaintextModulus,
+    AttrParameter<"int", "Param for OpenFHE SetRingDimension.">: $ringDimension,
+    AttrParameter<"int", "Param for OpenFHE SetScalingModSize.">: $scalingModSize
   );
   let assemblyFormat = "`<` struct(params) `>`";
 }

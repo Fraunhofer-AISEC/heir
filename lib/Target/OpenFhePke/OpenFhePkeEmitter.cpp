@@ -1391,6 +1391,15 @@ LogicalResult OpenFhePkeEmitter::printOperation(tensor::EmptyOp op) {
 LogicalResult OpenFhePkeEmitter::printOperation(tensor::ExtractOp op) {
   // Recall, tensors in this emitter are all flattened.
   // const auto& v1 = in[0];
+  //
+  // NOTE: For ciphertext results, we must clone the extracted element.
+  // OpenFHE's Ciphertext<DCRTPoly> uses shared-pointer semantics, so a bare
+  // `auto ct = v[i]` is a shallow copy.  When AllocToInPlace later converts
+  // AddOp -> AddInPlaceOp, the generated EvalAddInPlace(ct, ...) mutates the
+  // underlying ciphertext data, corrupting the source vector for all future
+  // uses.  This is a genuine aliasing bug; the liveness check in
+  // isSafeToMutateInPlace only verifies that the extracted SSA value is dead,
+  // not that the storage vector it came from is also dead.
   if (isa<CiphertextType>(op.getResult().getType())) {
     emitAutoAssignPrefix(op.getResult());
   } else {
@@ -1408,7 +1417,11 @@ LogicalResult OpenFhePkeEmitter::printOperation(tensor::ExtractOp op) {
           return constantStr.value_or(variableNames->getNameForValue(value));
         });
   }
-  os << "];\n";
+  os << "]";
+  if (isa<CiphertextType>(op.getResult().getType())) {
+    os << "->Clone()";
+  }
+  os << ";\n";
   return success();
 }
 

@@ -94,6 +94,7 @@
 #include "lib/Transforms/ActivationCanonicalizations/ActivationCanonicalizations.h"
 #include "lib/Transforms/AddClientInterface/AddClientInterface.h"
 #include "lib/Transforms/AnnotateLevel/AnnotateLevel.h"
+#include "lib/Transforms/AnnotateParameters/AnnotateParameters.h"
 #include "lib/Transforms/AnnotateModule/AnnotateModule.h"
 #include "lib/Transforms/AnnotateMulDepth/AnnotateMulDepth.h"
 #include "lib/Transforms/AnnotatePreprocessing/AnnotatePreprocessing.h"
@@ -440,6 +441,7 @@ int main(int argc, char** argv) {
   registerAnnotatePreprocessingPasses();
   registerAnnotateSecretnessPasses();
   registerAnnotateLevelPasses();
+  registerAnnotateParametersPasses();
   registerAnnotateMulDepthPasses();
   registerApplyFoldersPasses();
   registerBooleanVectorizerPasses();
