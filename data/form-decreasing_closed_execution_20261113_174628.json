@@ -1,0 +1,13 @@
+{
+  "testname": "form-decreasing",
+  "selectionApproach": "closed",
+  "timestamp": 1794588388,
+  "modulusSizes": [42, 47, 47, 47, 47],
+  "totalSize": 230,
+  "ringDimension": 16384,
+  "plaintextModulus": 65537,
+  "extensionModuliSize": 120,
+  "extensionModuliSizes": [60, 60],
+  "numPartQ": 3,
+  "numPerPartQ": 2
+}
