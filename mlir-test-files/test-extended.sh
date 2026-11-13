@@ -558,7 +558,7 @@ run_gap_mono() {
   print_header "$TEST_NAME GAP APPROACH" "Running mono model"
 
   run_command "$HEIR_OPT" \
-    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} slot-number=${RING_DIMENSION}" \
+    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} min-slot-count=${RING_DIMENSION}" \
     "$MIDDLE_MLIR" \
     > "$GAP_MONO_MLIR"
 
@@ -580,16 +580,16 @@ lower_to_bgv() {
   
   run_command bash -c '"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" > "${15}"' _ \
     "$HEIR_OPT" \
-    "--generate-param-bgv=model=${NOISE_MODEL} plaintext-modulus=${PLAINTEXT_MODULUS} slot-number=${CIPHERTEXT_DEGREE} use-public-key=true encryption-technique-extended=false" \
+    "--generate-param-bgv=model=${NOISE_MODEL} plaintext-modulus=${PLAINTEXT_MODULUS} min-slot-count=${CIPHERTEXT_DEGREE} use-public-key=true encryption-technique-extended=false" \
     --populate-scale-bgv \
     --canonicalize \
     --secret-distribute-generic \
     --canonicalize \
-    "--secret-to-bgv=poly-mod-degree=${CIPHERTEXT_DEGREE}" \
+    "--secret-to-bgv=min-slot-count=${CIPHERTEXT_DEGREE}" \
     --forward-insert-to-extract \
     --canonicalize \
     --cse \
-    --split-preprocessing=max-return-values=0 \
+    --split-preprocessing \
     "--convert-elementwise-to-affine=convert-dialects=ckks,bgv,lwe" \
     --tensor-ext-to-tensor \
     "$input_mlir" \
@@ -729,6 +729,7 @@ process_test() {
   run_command bash -c "\"$HEIR_OPT\" \
     --canonicalize \
     --secretize \
+    --annotate-module=backend=openfhe \
     --mlir-to-secret-arithmetic \
     --secret-insert-mgmt-bgv \
     \"$INPUT_MLIR\" > \"$MIDDLE_MLIR\""
