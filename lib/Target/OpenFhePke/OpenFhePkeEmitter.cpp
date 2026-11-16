@@ -2072,6 +2072,16 @@ LogicalResult OpenFhePkeEmitter::printOperation(GenParamsOp op) {
   if (keySwitchCount != 0) {
     os << paramsName << ".SetKeySwitchCount(" << keySwitchCount << ");\n";
   }
+  // FixedAuto Scaling Mode for the direct approach (fork commit a1e3e51c9):
+  // when evalAddCount/keySwitchCount are given, OpenFHE performs its own
+  // KPZ21-style parameter derivation. Pin the scaling technique to
+  // FIXEDAUTO, otherwise OpenFHE's BGVRNS default (FLEXIBLEAUTOEXT) makes
+  // direct use different formulas (fresh-noise-based first moduli, linear
+  // noise terms) and appends an extra ~2.5t-bit extension modulus, changing
+  // the baseline that closed/bisection/greedy are compared against.
+  if (evalAddCount != 0 || keySwitchCount != 0) {
+    os << paramsName << ".SetScalingTechnique(FIXEDAUTO);\n";
+  }
   // Key switching technique parameters
   if (op.getDigitSize() != 0) {
     os << paramsName << ".SetDigitSize(" << op.getDigitSize() << ");\n";
