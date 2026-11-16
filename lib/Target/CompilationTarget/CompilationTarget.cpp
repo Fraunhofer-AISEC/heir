@@ -58,7 +58,14 @@ FailureOr<BackendName> findBackend(ModuleOp module) {
       return backend;
     }
   }
-  return module->emitError("Unable to find backend attribute on module");
+  // NOTE(fork): several callers (mgmt canonicalization patterns, insert-mgmt
+  // pipelines, level analysis) treat a missing backend attribute as "feature
+  // not configured, use defaults" and fall back gracefully. This path is hit
+  // once per pattern application, and emitting a diagnostic here dumps the
+  // entire module in an attached note, which multiplies log sizes by orders of
+  // magnitude on large circuits. Return quietly; callers that genuinely need a
+  // target emit their own diagnostics on failed(getTargetConfig(...)).
+  return failure();
 }
 
 FailureOr<CompilationTarget> getTargetConfig(ModuleOp module) {
