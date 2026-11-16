@@ -29,7 +29,7 @@ generate_openfhe() {
     --symbol-dce \
     "$3" > "$4"' _ \
     "$HEIR_OPT" \
-    "--openfhe-configure-crypto-context=entry-function=func max-relin-sk-deg=4"
+    "--openfhe-configure-crypto-context=entry-function=func max-relin-sk-deg=4" \
     "$bgv_mlir" \
     "$openfhe_mlir"
 

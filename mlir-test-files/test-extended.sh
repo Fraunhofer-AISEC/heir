@@ -726,10 +726,14 @@ process_test() {
 
   print_header "$TEST_NAME" "Pre-BGV secret/arithmetic lowering"
   set_test_state "PREPROCESS"
+  # NOTE: deliberately no --annotate-module here. On the current upstream,
+  # a module annotated backend=openfhe makes secret-insert-mgmt-bgv switch to
+  # BFV-style management (relinearize only, no mod_reduce, all ops at max
+  # level), which collapses the per-level operation counts the
+  # annotate-parameters noise model depends on.
   run_command bash -c "\"$HEIR_OPT\" \
     --canonicalize \
     --secretize \
-    --annotate-module=backend=openfhe \
     --mlir-to-secret-arithmetic \
     --secret-insert-mgmt-bgv \
     \"$INPUT_MLIR\" > \"$MIDDLE_MLIR\""
