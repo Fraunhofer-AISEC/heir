@@ -80,7 +80,7 @@ func writeExecutionParams(path string, params bgv.Parameters) error {
 }
 
 func main() {
-  evaluator, param, encoder, encryptor, decryptor := func__configure()
+  evaluator, param, encoder, encryptor, decryptor := Func__configure()
   if err := writeExecutionParams(PARAMS_OUTPUT_PATH, param); err != nil {
     fmt.Fprintf(os.Stderr, "WARNING: failed to write Lattigo execution params: %v\n", err)
   }
@@ -94,9 +94,9 @@ func main() {
 
 __ENCRYPT_CALLS__
 
-  out := fheFunc(evaluator, param, encoder__OUT_ARGS__)
+  out := Func(evaluator, param, encoder__OUT_ARGS__)
 
-  actual := func__decrypt__result0(evaluator, param, encoder, decryptor, out)
+  actual := Func__decrypt__result0(evaluator, param, encoder, decryptor, out)
   expected := make([]int16, 8)
   for i := range expected {
     expected[i] = __EXPECTED_VALUE__

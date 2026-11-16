@@ -516,7 +516,10 @@ infer_lattigo_arity() {
   local input_go="$1"
   local helper_arity
 
-  helper_arity="$(grep -cE '^func func__encrypt__arg[0-9]+\(' "$input_go" || true)"
+  # Upstream changed the Lattigo emitter's function naming: emit-lattigo now
+  # generates capitalized Go identifiers (Func__encrypt__argN) instead of the
+  # old lowercase ones (func__encrypt__argN). Accept both.
+  helper_arity="$(grep -cE '^func (func|Func)__encrypt__arg[0-9]+\(' "$input_go" || true)"
   if [[ -n "$helper_arity" && "$helper_arity" -gt 0 ]]; then
     echo "$helper_arity"
     return 0

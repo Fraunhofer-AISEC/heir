@@ -72,7 +72,10 @@ normalize_lattigo_file() {
   local input_go="$1"
   local output_go="$2"
 
-  run_command bash -c "sed -e '1s/^package[[:space:]]*$/package main/' -e 's/^func func(/func fheFunc(/' \"$input_go\" > \"$output_go\""
+  # Fix empty package header and canonicalize old-branch lowercase emitter
+  # names (func func(...), func func__helper(...)) to the capitalized ones
+  # (Func, Func__...) that current upstream emit-lattigo produces.
+  run_command bash -c "sed -e '1s/^package[[:space:]]*$/package main/' -e 's/^func func(/func Func(/' -e 's/^func func__/func Func__/' \"$input_go\" > \"$output_go\""
 }
 
 lattigo_expected_value_for_test() {
