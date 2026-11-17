@@ -560,8 +560,10 @@ infer_lattigo_arity() {
 run_gap_mono() {
   print_header "$TEST_NAME GAP APPROACH" "Running mono model"
 
+  # min-slot-count expects a slot count, not a ring dimension; BGV ring
+  # dimension = 2 * slot count, so pass half of RING_DIMENSION.
   run_command "$HEIR_OPT" \
-    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} min-slot-count=${RING_DIMENSION}" \
+    "--generate-param-bgv=model=bgv-noise-mono plaintext-modulus=${PLAINTEXT_MODULUS} min-slot-count=$(( RING_DIMENSION / 2 ))" \
     "$MIDDLE_MLIR" \
     > "$GAP_MONO_MLIR"
 
