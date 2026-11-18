@@ -82,12 +82,20 @@ FAMILY_TEST_LABELS: Dict[str, List[Tuple[str, str]]] = {
     ],
     "form": [
         ("form-equal", "Equal"),
-        ("form-high-low", "High-Low$^*$"),
+        ("form-high-low", "High-Low"),
         ("form-low-high", "Low-High"),
         ("form-hill", "Hill"),
         ("form-valley", "Valley"),
-        ("form-increasing", "Increasing$^*$"),
+        ("form-increasing", "Increasing"),
         ("form-decreasing", "Decreasing"),
+    ],
+    "const-mul": [
+        ("poly-eval", "Poly-Eval
+(deg 4, 4 cmul)"),
+        ("weighted-sum", "Weighted-Sum
+(8 cmul)"),
+        ("matvec-4", "MatVec-4
+(16 cmul)"),
     ],
 }
 JSON_FILE_RE = re.compile(

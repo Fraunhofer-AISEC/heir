@@ -109,15 +109,20 @@ use_repo(cheddar_extensions, "cheddar", "libtommath", "rmm")
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "spdlog", version = "1.17.0")
 
-# CUDA for CHEDDAR (disabled in sandbox - download blocked by network policy)
-# cuda = use_extension("@rules_cuda//cuda:extensions.bzl", "toolchain")
-# cuda.redist_json(
-#     name = "cuda_redist",
-#     sha256 = "8335301010b0023ee1ff61eb11e2600ca62002d76780de4089011ad77e0c7630",
-#     version = "12.9.1",
-# )
-# cuda.toolkit(name = "cuda")
-# use_repo(cuda, "cuda")
+# CUDA for CHEDDAR
+cuda = use_extension("@rules_cuda//cuda:extensions.bzl", "toolchain")
+
+# NVIDIA publishes no macOS CUDA redistributable; on non-Linux hosts rules_cuda
+# resolves this to a disabled toolkit, which is fine because CHEDDAR targets are
+# Linux-x86_64 only. Do not add `components = [...]` here: that path indexes the
+# redist JSON by host platform and hard-fails on macOS.
+cuda.redist_json(
+    name = "cuda_redist",
+    sha256 = "8335301010b0023ee1ff61eb11e2600ca62002d76780de4089011ad77e0c7630",
+    version = "12.9.1",
+)
+cuda.toolkit(name = "cuda")
+use_repo(cuda, "cuda")
 
 # The subset of LLVM backend targets that should be compiled
 _LLVM_TARGETS = [
@@ -137,18 +142,6 @@ llvm_configure(
 
 # eigen 4.0.0-20241125.bcr.1 has issues with gitlab changing the checksum
 # Cf. https://github.com/google/heir/issues/1840
-# Bliss: upstream source host (tcs.hut.fi) returns 403; vendored locally
-local_path_override(
-    module_name = "bliss",
-    path = "/home/agent/overrides/bliss-src",
-)
-
-# tcl_lang: sourceforge download blocked by sandbox; vendored from GitHub mirror
-local_path_override(
-    module_name = "tcl_lang",
-    path = "/home/agent/overrides/tcl-lang-src",
-)
-
 bazel_dep(name = "eigen", version = "3.4.0.bcr.3")
 bazel_dep(name = "soplex", version = "7.1.4.bcr.1")
 bazel_dep(name = "or-tools", version = "9.12", repo_name = "com_google_ortools")
