@@ -610,12 +610,17 @@ static double findOptimalScalingModSizeBisection(
   return (pLow + pHigh) / 2.0;
 }
 
-static int computeLogPQ(const std::vector<int> &moduli) {
+static int computeLogPQ(const std::vector<int> &moduli,
+                        uint32_t numPartQOverride = 0) {
   if (moduli.empty()) {
     return 0;
   }
 
-  auto numPartQ = ComputeNumLargeDigits(0, moduli.size() - 1);
+  // A positive override pins ω consistently across selection, validation and
+  // ring-dimension computation; 0 falls back to OpenFHE's tower-count heuristic.
+  auto numPartQ = (numPartQOverride > 0)
+                      ? numPartQOverride
+                      : ComputeNumLargeDigits(0, moduli.size() - 1);
   auto logQ = std::accumulate(moduli.begin(), moduli.end(), 0);
 
   int qBound = logQ;
@@ -636,19 +641,21 @@ static int computeLogPQ(const std::vector<int> &moduli) {
   return qBound + logP;
 };
 
-static int computeRingDimensionFromPrimes(const std::vector<int64_t> &moduli) {
+static int computeRingDimensionFromPrimes(const std::vector<int64_t> &moduli,
+                                         uint32_t numPartQOverride = 0) {
   std::vector<int> moduliSizes;
   for (auto mod : moduli) {
     moduliSizes.push_back(getBitSize(mod));
   }
-  auto logQP = computeLogPQ(moduliSizes);
+  auto logQP = computeLogPQ(moduliSizes, numPartQOverride);
   return lbcrypto::StdLatticeParm::FindRingDim(
       lbcrypto::HEStd_ternary, lbcrypto::HEStd_128_classic, logQP);
 };
 
 static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
                                         int numPrimes,
-                                        double keySwitchNoiseFactor = 1.0) {
+                                        double keySwitchNoiseFactor = 1.0,
+                                        uint32_t numPartQOverride = 0) {
   auto phi = ringDimension;  // Pessimistic
   auto t = plaintextModulus;
   auto d = 6.0;
@@ -668,8 +675,12 @@ static NoiseBounds calculateBoundParams(int ringDimension, int plaintextModulus,
 
   auto f0 = keySwitchNoiseFactor;
 
-  // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE)
-  auto numPartQ = ComputeNumLargeDigits(0, numPrimes - 1);
+  // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE).
+  // A positive override lets the caller pin ω consistently across selection
+  // (ν_KS) and validation; 0 falls back to OpenFHE's tower-count heuristic.
+  auto numPartQ = (numPartQOverride > 0)
+                      ? numPartQOverride
+                      : ComputeNumLargeDigits(0, numPrimes - 1);
   // Calculate partitions similar to OpenFHE (ceil(sizeQ/numPartQ) towers per digit)
   int k = ceil(static_cast<double>(numPrimes) / numPartQ);
 
@@ -818,10 +829,11 @@ static std::vector<int> computeModuliSizesBalancing(
 static std::vector<int> computeModuliSizesGreedy(
     int ringDimension, int plaintextModulus,
     const std::vector<OperationCount>& levelOpCounts, int numPrimes,
-    double keySwitchNoiseFactor = 1.0) {
+    double keySwitchNoiseFactor = 1.0,
+    uint32_t numPartQOverride = 0) {
   auto noiseBounds =
       calculateBoundParams(ringDimension, plaintextModulus, numPrimes,
-                           keySwitchNoiseFactor);
+                           keySwitchNoiseFactor, numPartQOverride);
 
   // Print the level operation counts and noise bounds for debugging
   std::cerr << "Level operation counts:" << std::endl;
@@ -866,9 +878,17 @@ static std::vector<int> computeModuliSizesGreedy(
     int keySwitchCount = levelOpCounts[levelIndex].getKeySwitchCount();
     int constantMulCount = levelOpCounts[levelIndex].getConstantMulCount();
 
+    // The incoming noise is squared only when a ct×ct multiplication
+    // occurred at the previous (higher) level.  A ct×ct mul resets
+    // ciphertextCount to 1, so ciphertextCount > 1 at the current level
+    // signals that only additions / plain multiplications happened (noise
+    // grows linearly, not quadratically).
+    double incomingBound =
+        (ciphertextCount > 1) ? currentBound : (currentBound * currentBound);
+
     double levelNoiseTerm =
         std::pow(noiseBounds.boundConstant, constantMulCount) *
-        ciphertextCount * (currentBound * currentBound +
+        ciphertextCount * (incomingBound +
                            keySwitchCount * noiseBounds.addedNoiseKeySwitching);
 
     double greedyQi = 2.0 * levelNoiseTerm / noiseBounds.boundScale;
@@ -945,12 +965,15 @@ void printParamsWithResultTags(const std::vector<int> &moduli, int ringDimension
 using BigInteger = bigintbackend::BigInteger;
 
 static bool validateHybridAssumptionFromSizes(const std::vector<int> &moduliSizes,
-                                              int auxBits) {
+                                              int auxBits,
+                                              uint32_t numPartQOverride = 0) {
   if (moduliSizes.empty()) {
     return false;
   }
 
-  auto numPartQ = ComputeNumLargeDigits(0, moduliSizes.size() - 1);
+  auto numPartQ = (numPartQOverride > 0)
+                      ? numPartQOverride
+                      : ComputeNumLargeDigits(0, moduliSizes.size() - 1);
   if (numPartQ == 0) {
     return false;
   }
@@ -974,22 +997,35 @@ static bool validateHybridAssumptionFromSizes(const std::vector<int> &moduliSize
     return false;
   }
 
-  return log2(sqrt(static_cast<double>(numPartQ) * moduliSizes.size())) +
-         maxBits <= static_cast<double>(auxBits) * sizeP;
+  // Diagnostic: trace the hybrid key-switching assumption check
+  double lhs = log2(sqrt(static_cast<double>(numPartQ) * moduliSizes.size())) +
+               maxBits;
+  double rhs = static_cast<double>(auxBits) * sizeP;
+  std::cerr << "Hybrid assumption check: numPartQ=" << numPartQ
+            << ", towersPerPart=" << towersPerPart
+            << ", maxBits=" << maxBits
+            << ", sizeP=" << sizeP
+            << ", lhs=" << lhs
+            << ", rhs=" << rhs
+            << (lhs <= rhs ? " [PASS]" : " [FAIL]") << std::endl;
+
+  return lhs <= rhs;
 }
 
 static bool validateHybridAssumptionFromPrimes(const std::vector<int64_t> &moduli,
-                                              int auxBits) {
+                                              int auxBits,
+                                              uint32_t numPartQOverride = 0) {
   std::vector<int> moduliSizes;
   for (auto mod : moduli) {
     moduliSizes.push_back(getBitSize(mod));
   }
-  return validateHybridAssumptionFromSizes(moduliSizes, auxBits);
+  return validateHybridAssumptionFromSizes(moduliSizes, auxBits, numPartQOverride);
 }
 
 static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
                                             int ringDimension,
-                                            int plaintextModulus) {
+                                            int plaintextModulus,
+                                            uint32_t numPartQOverride = 0) {
   // Following OpenFHE's approach for extension moduli in HYBRID key switching
   std::vector<int64_t> pi;
 
@@ -998,7 +1034,9 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
   int auxBits = heir::kMaxBitSize;
 
   // Find number of digits/partitions of Q (similar to numPartQ in OpenFHE)
-  auto numPartQ = ComputeNumLargeDigits(0, qi.size() - 1);
+  auto numPartQ = (numPartQOverride > 0)
+                      ? numPartQOverride
+                      : ComputeNumLargeDigits(0, qi.size() - 1);
 
   // Group qi into partitions as done in HYBRID
   std::vector<BigInteger> moduliPartQ;
@@ -1057,6 +1095,73 @@ static std::vector<int64_t> computePiModuli(const std::vector<int64_t> &qi,
   return pi;
 }
 
+// On hybrid-key-switching-assumption failure, grow the moduli of a *sub-maximal*
+// digit so that it becomes the new maximum and crosses the next auxBits boundary.
+// This increases sizeP (hence P), restoring the slack the check needs, while only
+// *enlarging* moduli (which never breaks correctness — larger q_i only add noise
+// margin). The selected moduli are minimal-but-not-fixed: if they must be larger
+// for the key-switching validation to hold, we may grow them.
+// Returns the grown bit-sizes, or empty if no sub-maximal digit can be grown
+// across the boundary (e.g. all its moduli are already at the cap).
+static std::vector<int> growDigitForHybridAssumption(
+    const std::vector<int> &moduliSizes, uint32_t numPartQ,
+    int auxBits = kMaxBitSize) {
+  if (moduliSizes.empty() || numPartQ == 0) return {};
+  int n = static_cast<int>(moduliSizes.size());
+  uint32_t towersPerPart =
+      static_cast<uint32_t>(std::ceil(static_cast<double>(n) / numPartQ));
+
+  // Digit bit-sums and tower ranges (uniform consecutive, matching OpenFHE).
+  std::vector<uint32_t> digitBits(numPartQ, 0);
+  std::vector<std::pair<int, int>> digitRange(numPartQ, {0, 0});
+  for (uint32_t j = 0; j < numPartQ; ++j) {
+    int start = static_cast<int>(towersPerPart * j);
+    int end = std::min(static_cast<int>(towersPerPart * (j + 1)), n);
+    digitRange[j] = {start, end};
+    for (int i = start; i < end; ++i) digitBits[j] += moduliSizes[i];
+  }
+
+  uint32_t maxDigit = 0;
+  for (uint32_t j = 1; j < numPartQ; ++j)
+    if (digitBits[j] > digitBits[maxDigit]) maxDigit = j;
+
+  uint32_t maxBits = digitBits[maxDigit];
+  uint32_t sizeP = static_cast<uint32_t>(
+      std::ceil(static_cast<double>(maxBits) / auxBits));
+  int pBits = auxBits * static_cast<int>(sizeP);
+  double slackNeeded =
+      log2(sqrt(static_cast<double>(numPartQ) * moduliSizes.size()));
+
+  // Already passing: nothing to do.
+  if (static_cast<double>(maxBits) + slackNeeded <= pBits) return moduliSizes;
+
+  // Try each sub-maximal digit: grow its non-capped moduli so the digit crosses
+  // the current P boundary (pBits), making it the new max and bumping sizeP.
+  for (uint32_t j = 0; j < numPartQ; ++j) {
+    if (j == maxDigit) continue;
+    int growable = 0;
+    for (int i = digitRange[j].first; i < digitRange[j].second; ++i)
+      if (moduliSizes[i] < auxBits) growable += auxBits - moduliSizes[i];
+    if (growable == 0) continue;  // digit fully capped
+
+    int target = pBits + 1 - static_cast<int>(digitBits[j]);  // bits to add
+    if (target <= 0) continue;  // already past boundary (not the non-max)
+    if (target > growable) continue;  // can't grow enough
+
+    std::vector<int> grown = moduliSizes;
+    int toAdd = target + 1;  // +1 for strict crossing
+    for (int i = digitRange[j].first; i < digitRange[j].second && toAdd > 0; ++i) {
+      int room = auxBits - grown[i];
+      int add = std::min(room, toAdd);
+      grown[i] += add;
+      toAdd -= add;
+    }
+    if (toAdd > 0) continue;
+    return grown;
+  }
+  return {};
+}
+
 static std::vector<int64_t> selectLattigoPrimesFromSizes(
     const std::vector<int> &moduliSizes, int ringDimension,
     int plaintextModulus) {
@@ -1096,12 +1201,13 @@ static std::vector<int64_t> selectLattigoPrimesFromSizes(
 }
 
 static void annotateSchemeParam(Operation *op, const uint64_t plaintextModulus,
-                         const uint64_t ringDimension, const std::vector<int64_t>& moduli) {
+                         const uint64_t ringDimension, const std::vector<int64_t>& moduli,
+                         uint32_t numPartQOverride = 0) {
   std::vector<int64_t> qi = moduli;
 
   // Compute pi moduli (extension moduli)
   std::vector<int64_t> pi =
-      computePiModuli(qi, ringDimension, plaintextModulus);
+      computePiModuli(qi, ringDimension, plaintextModulus, numPartQOverride);
 
   // Set the scheme parameters attribute
   op->setAttr(bgv::BGVDialect::kSchemeParamAttrName,
@@ -1273,25 +1379,49 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
     int validatedFirstModSize = 0;
     int validatedScalingModSize = 0;
 
+    // Hybrid key-switching digit count (ω). The paper (§4.5) prescribes the
+    // smallest ω ≥ 2 such that PQ maintains the target security; OpenFHE's
+    // ComputeNumLargeDigits table is only a fallback. For GREEDY we start at ω=2
+    // and escalate only if recovery fails; other algorithms keep the table value.
+    uint32_t currentOmega = 0;
+    if (algorithm == "GREEDY") currentOmega = 2;
+
+    // Floor on modulus bit-sizes carried across retries: when the hybrid check
+    // fails because the max digit sits on an auxBits boundary, we grow a
+    // sub-maximal digit's moduli and enforce those sizes as a minimum on the
+    // next selection pass. Empty means "use greedy-minimal sizes".
+    std::vector<int> moduliSizeFloor;
+    int growAttempts = 0;
+    const int kMaxGrowAttempts = 4;
+
+    auto applyFloor = [&](std::vector<int> sizes) {
+      if (moduliSizeFloor.size() == sizes.size()) {
+        for (size_t i = 0; i < sizes.size(); ++i)
+          sizes[i] = std::max(sizes[i], moduliSizeFloor[i]);
+      }
+      return sizes;
+    };
+
     auto computeModuliSizes =
         [&](int ringDimension) -> std::vector<int> {
       if (numPrimes == 1) {
         auto noiseBounds = calculateBoundParams(
-            ringDimension, plaintextModulus, numPrimes, keySwitchNoiseFactor);
+            ringDimension, plaintextModulus, numPrimes, keySwitchNoiseFactor,
+            currentOmega);
         int firstModSize = floor(1 + log2(std::pow(noiseBounds.boundConstant, levelOpCounts[1].getConstantMulCount()) *
                             levelOpCounts[1].getCiphertextCount() * (noiseBounds.boundClean + levelOpCounts[1].getKeySwitchCount() * noiseBounds.addedNoiseKeySwitching))) + 1;
-        return {firstModSize};
+        return applyFloor({firstModSize});
       }
       try {
         if (algorithm == "BALANCING") {
-          return computeModuliSizesBalancing(ringDimension, plaintextModulus,
+          return applyFloor(computeModuliSizesBalancing(ringDimension, plaintextModulus,
                                              levelOpCounts, numPrimes,
-                                             keySwitchNoiseFactor);
+                                             keySwitchNoiseFactor));
         }
         if (algorithm == "GREEDY") {
-          return computeModuliSizesGreedy(ringDimension, plaintextModulus,
+          return applyFloor(computeModuliSizesGreedy(ringDimension, plaintextModulus,
                                           levelOpCounts, numPrimes,
-                                          keySwitchNoiseFactor);
+                                          keySwitchNoiseFactor, currentOmega));
         }
       } catch (const std::runtime_error& e) {
         genericOp->emitOpError() << "Parameter optimization failed: " << e.what();
@@ -1419,7 +1549,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
             break;
           }
 
-          newRingDimension = computeRingDimensionFromPrimes(moduli);
+          newRingDimension = computeRingDimensionFromPrimes(moduli,
+                                                              currentOmega);
 
           if (newRingDimension == ringDimension) {
             // Try smaller ring dimension.
@@ -1445,7 +1576,8 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
               break;
             }
 
-            newRingDimension = computeRingDimensionFromPrimes(smallerValidatedModuli);
+            newRingDimension = computeRingDimensionFromPrimes(smallerValidatedModuli,
+                                                                currentOmega);
 
             if (newRingDimension == smallerDimension) {
               ringDimension = smallerDimension;
@@ -1465,29 +1597,68 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
           return;
         }
 
-        if (!validateHybridAssumptionFromPrimes(moduli, kMaxBitSize)) {
+        if (validateHybridAssumptionFromPrimes(moduli, kMaxBitSize,
+                                              currentOmega)) {
+          annotateSchemeParam(top, plaintextModulus, ringDimension, moduli,
+                              currentOmega);
+          // Convert primes to bit sizes for OpenFHE params and reporting
+          std::vector<int> moduliSizes;
+          moduliSizes.reserve(moduli.size());
+          for (auto prime : moduli) {
+            moduliSizes.push_back(
+                static_cast<int>(std::floor(std::log2((double)prime)) + 1));
+          }
+          int firstModSize = moduliSizes[0];
+          int scalingModSize =
+              *std::max_element(moduliSizes.begin() + 1, moduliSizes.end());
+          annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension,
+                                firstModSize, scalingModSize, plaintextModulus,
+                                maxCounts);
+          printParamsWithResultTags(moduliSizes, ringDimension, plaintextModulus,
+                                    "<testname>", algorithm);
+          return;
+        }
+
+        // Hybrid key-switching assumption failed. The selected moduli are minimal
+        // but not fixed: if enlarging a sub-maximal digit's moduli lets the max
+        // digit cross the next auxBits boundary, sizeP (hence P) grows and the
+        // check recovers. We enforce the grown sizes as a floor on the next pass.
+        if (algorithm == "GREEDY") {
+          std::vector<int> bitSizes;
+          bitSizes.reserve(moduli.size());
+          for (auto prime : moduli)
+            bitSizes.push_back(
+                static_cast<int>(std::floor(std::log2((double)prime)) + 1));
+          auto grown = growDigitForHybridAssumption(bitSizes, currentOmega);
+          if (!grown.empty() && growAttempts < kMaxGrowAttempts) {
+            moduliSizeFloor = grown;
+            growAttempts++;
+            continue;
+          }
+          // Grow exhausted: escalate ω to the OpenFHE table value, then declare
+          // the circuit infeasible for greedy selection.
+          if (currentOmega == 2) {
+            currentOmega = ComputeNumLargeDigits(0, numPrimes - 1);
+            moduliSizeFloor.clear();
+            growAttempts = 0;
+            continue;
+          }
+          genericOp->emitOpError()
+              << "Greedy parameter selection infeasible: hybrid key-switching "
+                 "assumption cannot be satisfied (the largest digit saturates "
+                 "the modulus cap). No valid parameter set exists for this circuit.";
+          return;
+        }
+
+        // BALANCING: bounded keySwitchNoiseFactor retry, then infeasible.
+        if (keySwitchNoiseFactor < 5.0) {
           keySwitchNoiseFactor += 0.1;
           continue;
         }
-
-        annotateSchemeParam(top, plaintextModulus, ringDimension, moduli);
-        // Convert primes to bit sizes for OpenFHE params and reporting
-        std::vector<int> moduliSizes;
-        moduliSizes.reserve(moduli.size());
-        for (auto prime : moduli) {
-          moduliSizes.push_back(
-              static_cast<int>(std::floor(std::log2((double)prime)) + 1));
-        }
-        int firstModSize = moduliSizes[0];
-        int scalingModSize =
-            *std::max_element(moduliSizes.begin() + 1, moduliSizes.end());
-        annotateOpenfheParams(genericOp, multiplicativeDepth, ringDimension,
-                              firstModSize, scalingModSize, plaintextModulus,
-                              maxCounts);
-        printParamsWithResultTags(moduliSizes, ringDimension, plaintextModulus,
-                                  "<testname>", algorithm);
+        genericOp->emitOpError()
+            << "Balancing parameter selection infeasible: hybrid key-switching "
+               "assumption cannot be satisfied.";
         return;
-
       }
 
       if (algorithm == "BISECTION" || algorithm == "CLOSED") {
@@ -1503,8 +1674,14 @@ void annotateCountParams(Operation *top, DataFlowSolver *solver,
           openfheModuliSizes.push_back(validatedScalingModSize);
         }
         if (!validateHybridAssumptionFromSizes(openfheModuliSizes, kMaxBitSize)) {
-           keySwitchNoiseFactor += 0.1;
-           continue;
+          if (keySwitchNoiseFactor < 5.0) {
+            keySwitchNoiseFactor += 0.1;
+            continue;
+          }
+          genericOp->emitOpError()
+              << "Parameter selection infeasible: hybrid key-switching "
+                 "assumption cannot be satisfied.";
+          return;
         }
 
         // Compute actual primes from bit sizes for bgv.scheme_param
