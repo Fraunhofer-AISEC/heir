@@ -95,6 +95,15 @@ lattigo_expected_value_for_test() {
     form-*)
       echo 677
       ;;
+    poly-eval)
+      echo 18
+      ;;
+    weighted-sum)
+      echo 1
+      ;;
+    matvec-4)
+      echo 28
+      ;;
     add-num-32)
       echo 677
       ;;

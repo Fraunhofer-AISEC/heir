@@ -90,12 +90,9 @@ FAMILY_TEST_LABELS: Dict[str, List[Tuple[str, str]]] = {
         ("form-decreasing", "Decreasing"),
     ],
     "const-mul": [
-        ("poly-eval", "Poly-Eval
-(deg 4, 4 cmul)"),
-        ("weighted-sum", "Weighted-Sum
-(8 cmul)"),
-        ("matvec-4", "MatVec-4
-(16 cmul)"),
+        ("poly-eval", "Poly-Eval (deg 4, 4 cmul)"),
+        ("weighted-sum", "Weighted-Sum (8 cmul)"),
+        ("matvec-4", "MatVec-4 (16 cmul)"),
     ],
 }
 JSON_FILE_RE = re.compile(

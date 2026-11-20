@@ -182,6 +182,9 @@ emit_group_tests() {
     rotate-num)
       printf '%s\n' rotate-num-1 rotate-num-32 rotate-num-64 rotate-num-128
       ;;
+    const-mul)
+      printf '%s\n' poly-eval weighted-sum matvec-4
+      ;;
     add-eq)
       # Requested subset for add-eq experiments.
       printf '%s\n' add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
@@ -194,6 +197,7 @@ emit_group_tests() {
         rotate-0 rotate-1 rotate-2 rotate-3 rotate-4 \
         add-num-1 add-num-32 add-num-64 add-num-128 \
         rotate-num-1 rotate-num-32 rotate-num-64 rotate-num-128 \
+        poly-eval weighted-sum matvec-4 \
         add-eq-2 add-eq-6 add-eq-10 add-eq-14 add-eq-18
       ;;
     *)

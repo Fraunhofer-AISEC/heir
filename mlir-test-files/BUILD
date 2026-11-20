@@ -4323,3 +4323,204 @@ cc_library(
         "@openfhe//:pke",
     ],
 )
+
+# === poly-eval: degree-4 polynomial with plaintext coefficients ===
+# Tests constant (plaintext * ciphertext) multiplication noise model.
+
+cc_library(
+    name = "main_poly-eval_common",
+    srcs = ["poly-eval/main_poly-eval_common.cpp"],
+    hdrs = ["poly-eval/main_poly-eval_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_poly-eval_bisection",
+    srcs = ["poly-eval/main_poly-eval_bisection.cpp"],
+    deps = [
+        ":main_poly-eval_common",
+        ":poly-eval_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_poly-eval_closed",
+    srcs = ["poly-eval/main_poly-eval_closed.cpp"],
+    deps = [
+        ":main_poly-eval_common",
+        ":poly-eval_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_poly-eval_direct",
+    srcs = ["poly-eval/main_poly-eval_direct.cpp"],
+    deps = [
+        ":main_poly-eval_common",
+        ":poly-eval_direct",
+    ],
+)
+
+cc_library(
+    name = "poly-eval_bisection",
+    srcs = ["poly-eval/poly-eval_bisection.cpp"],
+    hdrs = ["poly-eval/poly-eval_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "poly-eval_closed",
+    srcs = ["poly-eval/poly-eval_closed.cpp"],
+    hdrs = ["poly-eval/poly-eval_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "poly-eval_direct",
+    srcs = ["poly-eval/poly-eval_direct.cpp"],
+    hdrs = ["poly-eval/poly-eval_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+# === weighted-sum: 8-input weighted sum with plaintext weights ===
+# Tests 8 constant (plaintext * ciphertext) multiplications at one level.
+
+cc_library(
+    name = "main_weighted-sum_common",
+    srcs = ["weighted-sum/main_weighted-sum_common.cpp"],
+    hdrs = ["weighted-sum/main_weighted-sum_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_weighted-sum_bisection",
+    srcs = ["weighted-sum/main_weighted-sum_bisection.cpp"],
+    deps = [
+        ":main_weighted-sum_common",
+        ":weighted-sum_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_weighted-sum_closed",
+    srcs = ["weighted-sum/main_weighted-sum_closed.cpp"],
+    deps = [
+        ":main_weighted-sum_common",
+        ":weighted-sum_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_weighted-sum_direct",
+    srcs = ["weighted-sum/main_weighted-sum_direct.cpp"],
+    deps = [
+        ":main_weighted-sum_common",
+        ":weighted-sum_direct",
+    ],
+)
+
+cc_library(
+    name = "weighted-sum_bisection",
+    srcs = ["weighted-sum/weighted-sum_bisection.cpp"],
+    hdrs = ["weighted-sum/weighted-sum_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "weighted-sum_closed",
+    srcs = ["weighted-sum/weighted-sum_closed.cpp"],
+    hdrs = ["weighted-sum/weighted-sum_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "weighted-sum_direct",
+    srcs = ["weighted-sum/weighted-sum_direct.cpp"],
+    hdrs = ["weighted-sum/weighted-sum_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+# === matvec-4: 4x4 matrix-vector multiply with plaintext matrix ===
+# Tests 16 constant (plaintext * ciphertext) multiplications at one level.
+
+cc_library(
+    name = "main_matvec-4_common",
+    srcs = ["matvec-4/main_matvec-4_common.cpp"],
+    hdrs = ["matvec-4/main_matvec-4_common.h"],
+    deps = [
+        ":params",
+        "@openfhe//:pke",
+    ],
+)
+
+cc_binary(
+    name = "main_matvec-4_bisection",
+    srcs = ["matvec-4/main_matvec-4_bisection.cpp"],
+    deps = [
+        ":main_matvec-4_common",
+        ":matvec-4_bisection",
+    ],
+)
+
+cc_binary(
+    name = "main_matvec-4_closed",
+    srcs = ["matvec-4/main_matvec-4_closed.cpp"],
+    deps = [
+        ":main_matvec-4_common",
+        ":matvec-4_closed",
+    ],
+)
+
+cc_binary(
+    name = "main_matvec-4_direct",
+    srcs = ["matvec-4/main_matvec-4_direct.cpp"],
+    deps = [
+        ":main_matvec-4_common",
+        ":matvec-4_direct",
+    ],
+)
+
+cc_library(
+    name = "matvec-4_bisection",
+    srcs = ["matvec-4/matvec-4_bisection.cpp"],
+    hdrs = ["matvec-4/matvec-4_bisection.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "matvec-4_closed",
+    srcs = ["matvec-4/matvec-4_closed.cpp"],
+    hdrs = ["matvec-4/matvec-4_closed.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)
+
+cc_library(
+    name = "matvec-4_direct",
+    srcs = ["matvec-4/matvec-4_direct.cpp"],
+    hdrs = ["matvec-4/matvec-4_direct.h"],
+    deps = [
+        "@openfhe//:pke",
+    ],
+)

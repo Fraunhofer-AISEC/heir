@@ -77,9 +77,14 @@ class OperationCount {
   }
 
   OperationCount operator+(const OperationCount &rhs) const {
+    // ciphertextCount is summed because noise adds linearly across
+    // additions.  keySwitchCount and constantMulCount are maxed because
+    // each incoming ciphertext independently has at most max(ks1,ks2) key
+    // switches and max(cm1,cm2) constant multiplications — they do not
+    // compound in sequence when ciphertexts are merely added.
     return OperationCount(ciphertextCount + rhs.ciphertextCount,
                           std::max(keySwitchCount, rhs.keySwitchCount),
-                          constantMulCount + rhs.constantMulCount,
+                          std::max(constantMulCount, rhs.constantMulCount),
                           highestLevel && rhs.highestLevel);
   }
 

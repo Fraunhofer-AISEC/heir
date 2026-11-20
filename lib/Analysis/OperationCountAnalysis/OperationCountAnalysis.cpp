@@ -878,13 +878,8 @@ static std::vector<int> computeModuliSizesGreedy(
     int keySwitchCount = levelOpCounts[levelIndex].getKeySwitchCount();
     int constantMulCount = levelOpCounts[levelIndex].getConstantMulCount();
 
-    // The incoming noise is squared only when a ct×ct multiplication
-    // occurred at the previous (higher) level.  A ct×ct mul resets
-    // ciphertextCount to 1, so ciphertextCount > 1 at the current level
-    // signals that only additions / plain multiplications happened (noise
-    // grows linearly, not quadratically).
-    double incomingBound =
-        (ciphertextCount > 1) ? currentBound : (currentBound * currentBound);
+    // The incoming noise is squared per the paper's noise model
+    double incomingBound = currentBound * currentBound;
 
     double levelNoiseTerm =
         std::pow(noiseBounds.boundConstant, constantMulCount) *
